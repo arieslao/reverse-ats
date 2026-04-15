@@ -1,0 +1,29 @@
+# Reverse ATS — Configuration
+# Scoring, scraping, and pipeline settings
+
+inference:
+  # Configure your LLM provider in the web UI (Admin → LLM Settings)
+  # These are fallback defaults for the pipeline CLI
+  url: "http://localhost:8080/v1/chat/completions"
+  model: "default"
+  timeout: 60
+  temperature: 0.1
+  max_tokens: 500
+
+scraping:
+  remote_only: true
+  rate_limit_seconds: 1.0
+  request_timeout: 15
+
+scoring:
+  min_score_display: 0
+  batch_delay_seconds: 0.5
+
+pipeline:
+  # Jobs not seen in N consecutive scrapes are marked expired
+  expire_after_missing: 3
+
+database:
+  # Set REVERSE_ATS_DB_PATH env var for production
+  # Default: reverse_ats.db in the backend/ directory
+  local_path: "reverse_ats.db"
