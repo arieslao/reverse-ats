@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { fetchJobs } from '../lib/api'
+import { fetchJobs, fetchFeedIndustries } from '../lib/api'
 import { JobCard } from '../components/JobCard'
 import { FilterBar } from '../components/FilterBar'
 
@@ -62,6 +62,21 @@ export function Feed() {
     queryFn: () => fetch('/api/scrape/status').then((r) => r.json()).catch(() => null),
     refetchInterval: 60000,
   })
+
+  const { data: industriesData } = useQuery({
+    queryKey: ['feed-industries'],
+    queryFn: fetchFeedIndustries,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const industryOptions = useMemo(
+    () =>
+      (industriesData ?? []).map((i) => ({
+        value: i.id,
+        label: i.count > 0 ? `${i.label} (${i.count})` : i.label,
+      })),
+    [industriesData],
+  )
 
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters)
@@ -153,7 +168,7 @@ export function Feed() {
       </div>
 
       {/* Filters */}
-      <FilterBar filters={filters} onChange={handleFilterChange} />
+      <FilterBar filters={filters} onChange={handleFilterChange} industries={industryOptions} />
 
       {/* Stats bar */}
       {data && (

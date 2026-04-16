@@ -418,9 +418,12 @@ def get_jobs(
 
     if exclude_companies:
         for idx, comp in enumerate(exclude_companies):
+            needle = comp.strip().lower()
+            if not needle:
+                continue
             param_name = f"exc_comp_{idx}"
-            conditions.append(f"LOWER(j.company) != :{param_name}")
-            params[param_name] = comp.strip().lower()
+            conditions.append(f"LOWER(j.company) NOT LIKE :{param_name}")
+            params[param_name] = f"%{needle}%"
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 

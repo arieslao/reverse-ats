@@ -109,7 +109,11 @@ def list_jobs(
 ):
     conn = _conn()
     try:
-        exc_companies = [c.strip() for c in exclude_companies.split(",")] if exclude_companies else None
+        exc_companies = (
+            [c.strip() for c in exclude_companies.split(",") if c.strip()]
+            if exclude_companies
+            else None
+        ) or None
         jobs_raw, total = get_jobs(
             conn,
             page=page,
@@ -490,6 +494,70 @@ def delete_company_endpoint(company_id: int):
         return {"deleted": True, "id": company_id}
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Feed — Industries (dropdown source)
+# ---------------------------------------------------------------------------
+
+# Friendly labels for legacy category IDs that pre-date the industry-pack system.
+# Pack IDs get their labels from industry_packs.PACKS automatically.
+_LEGACY_CATEGORY_LABELS = {
+    "fintech": "Fintech",
+    "big_tech": "Big Tech",
+    "ai_tech": "AI & Tech",
+    "healthtech": "HealthTech",
+    "quant": "Quant / Trading",
+}
+
+
+@app.get("/api/feed/industries")
+def list_feed_industries():
+    """
+    Return the union of:
+      - all industry packs (so users see the full taxonomy even if empty)
+      - any legacy/ad-hoc categories present in the jobs table that aren't packs
+
+    Each entry has a friendly label + current job count. Used to populate the
+    Feed's Industry dropdown.
+    """
+    from industry_packs import PACKS
+
+    conn = _conn()
+    try:
+        rows = conn.execute(
+            """
+            SELECT category, COUNT(*) AS n
+            FROM jobs
+            WHERE dismissed = 0 AND expired = 0 AND category IS NOT NULL AND category != ''
+            GROUP BY category
+            """
+        ).fetchall()
+    finally:
+        conn.close()
+
+    counts: dict[str, int] = {row["category"]: row["n"] for row in rows}
+
+    industries: list[dict] = []
+    seen: set[str] = set()
+
+    # 1. All industry packs, in declaration order (canonical taxonomy)
+    for pack_id, pack in PACKS.items():
+        industries.append(
+            {"id": pack_id, "label": pack["name"], "count": counts.get(pack_id, 0)}
+        )
+        seen.add(pack_id)
+
+    # 2. Legacy / ad-hoc categories from the DB that aren't packs
+    for cat_id, n in counts.items():
+        if cat_id in seen:
+            continue
+        label = _LEGACY_CATEGORY_LABELS.get(cat_id) or cat_id.replace("_", " ").title()
+        industries.append({"id": cat_id, "label": label, "count": n})
+
+    # Sort: non-empty first (by count desc), then empty packs alphabetically by label
+    industries.sort(key=lambda i: (0 if i["count"] > 0 else 1, -i["count"], i["label"]))
+    return industries
 
 
 # ---------------------------------------------------------------------------

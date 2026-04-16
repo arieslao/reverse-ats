@@ -106,6 +106,10 @@ export const testLLMSettings = () =>
 export const generateCoverLetter = (jobId: string) =>
   request<{ cover_letter: string; provider: string; error: string | null }>(`/api/jobs/${jobId}/cover-letter`, { method: 'POST' })
 
+// Feed industries (dynamic dropdown — distinct categories currently in DB)
+export const fetchFeedIndustries = () =>
+  request<{ id: string; label: string; count: number }[]>('/api/feed/industries')
+
 // Industry Packs
 export const fetchIndustryPacks = () =>
   request<{ id: string; name: string; description: string; count: number }[]>('/api/admin/industry-packs')

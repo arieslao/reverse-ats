@@ -10,19 +10,19 @@ interface FilterState {
   exclude_companies: string
 }
 
+interface IndustryOption {
+  value: string
+  label: string
+}
+
 interface FilterBarProps {
   filters: FilterState
   onChange: (filters: FilterState) => void
-  categories?: string[]
+  industries?: IndustryOption[]
 }
 
-const CATEGORY_OPTIONS = [
-  { value: '', label: 'All Categories' },
-  { value: 'fintech', label: 'Fintech' },
-  { value: 'big_tech', label: 'Big Tech' },
-  { value: 'ai_tech', label: 'AI & Tech' },
-  { value: 'healthtech', label: 'HealthTech' },
-  { value: 'quant', label: 'Quant / Trading' },
+const DEFAULT_INDUSTRY_OPTIONS: IndustryOption[] = [
+  { value: '', label: 'All Industries' },
 ]
 
 const SORT_OPTIONS = [
@@ -59,7 +59,7 @@ const rowStyle: React.CSSProperties = {
   flexWrap: 'wrap',
 }
 
-export function FilterBar({ filters, onChange, categories }: FilterBarProps) {
+export function FilterBar({ filters, onChange, industries }: FilterBarProps) {
   const [local, setLocal] = useState(filters)
 
   useEffect(() => {
@@ -72,9 +72,10 @@ export function FilterBar({ filters, onChange, categories }: FilterBarProps) {
     onChange(next)
   }
 
-  const categoryOpts = categories
-    ? [{ value: '', label: 'All Categories' }, ...categories.map((c) => ({ value: c, label: c }))]
-    : CATEGORY_OPTIONS
+  const industryOpts: IndustryOption[] =
+    industries && industries.length > 0
+      ? [{ value: '', label: 'All Industries' }, ...industries]
+      : DEFAULT_INDUSTRY_OPTIONS
 
   const hasActiveFilters =
     local.search ||
@@ -111,15 +112,15 @@ export function FilterBar({ filters, onChange, categories }: FilterBarProps) {
           />
         </div>
 
-        {/* Category */}
+        {/* Industry */}
         <div style={{ flex: '0 0 auto' }}>
-          <label style={labelStyle}>Category</label>
+          <label style={labelStyle}>Industry</label>
           <select
             value={local.category}
             onChange={(e) => update({ category: e.target.value })}
             style={{ ...inputStyle, cursor: 'pointer' }}
           >
-            {categoryOpts.map((c) => (
+            {industryOpts.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}
               </option>
