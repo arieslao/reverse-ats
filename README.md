@@ -2,24 +2,20 @@
 
 **An AI-powered job search tool that works for you, not against you.**
 
-In a traditional ATS (Applicant Tracking System), recruiters filter candidates. Reverse ATS flips this — it scrapes job postings from 54+ companies, scores them against your resume using AI, and gives you a daily ranked feed of jobs you should actually apply for.
+In a traditional ATS (Applicant Tracking System), recruiters filter candidates. Reverse ATS flips this — it scrapes job postings from 220+ companies across 9 industries, scores them against your resume using AI, tracks your applications with a drag-and-drop Kanban board, and generates tailored cover letters with one click.
 
 Built for job seekers tired of manually checking career pages and guessing which roles are a good fit.
 
 ## What It Does
 
-- **Scrapes 54+ companies daily** via public ATS APIs (Greenhouse, Lever, Ashby) — no API keys needed for scraping
+- **Scrapes 220+ companies** via public ATS APIs (Greenhouse, Lever, Ashby) — no API keys needed for scraping
+- **9 industry packs** — Tech, Healthcare, Consulting, E-Commerce, Media, SaaS, Education, Defense, Climate
 - **AI-powered matching** — an LLM reads each job description against your resume and scores relevance 0-100 with reasoning
-- **Application pipeline** — Kanban board to track every application from Saved through Offer (drag and drop)
-- **Cover letter generation** — one-click AI-drafted cover letters tailored to each specific job posting
+- **Smart filters** — sort by Best Match/Newest/Company, filter by category, score, remote-only, exclude companies
+- **Application pipeline** — drag-and-drop Kanban board to track every application from Saved through Offer
+- **Cover letter generation** — one-click AI-drafted cover letters tailored to each specific job, stored per application
 - **Works with any LLM** — OpenAI, Anthropic, Ollama (free/local), llama.cpp, or just keyword matching (no LLM needed)
 - **Fully self-hosted** — your data stays on your machine. No accounts, no tracking, no subscriptions.
-
-## Screenshots
-
-| Job Feed | Pipeline | Cover Letter |
-|----------|----------|--------------|
-| Ranked feed with filters, scores, and direct apply links | Drag-and-drop Kanban board | AI-generated, copy-pasteable |
 
 ## Quick Start
 
@@ -30,7 +26,7 @@ Built for job seekers tired of manually checking career pages and guessing which
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/arieslabs/reverse-ats.git
+git clone https://github.com/arieslao/reverse-ats.git
 cd reverse-ats
 
 # Backend
@@ -54,7 +50,7 @@ python -m uvicorn api:app --host 0.0.0.0 --port 8091
 
 The first run automatically:
 - Creates the SQLite database
-- Seeds 54 companies from the built-in registry
+- Seeds 54 tech/fintech companies from the built-in registry
 - Creates default profile and settings
 
 ### 3. Start the frontend
@@ -66,23 +62,41 @@ npm run dev
 
 Open **http://localhost:5173**
 
-### 4. Configure your profile
+### 4. Set up your profile
 
-Go to **Admin** tab:
-1. **Profile** — Paste your resume, set target roles, skills, salary range
+Go to the **Admin** tab:
+1. **Profile** — Paste your resume, set target roles, skills, salary range, and preferences
 2. **LLM Settings** — Pick your AI provider (or skip for free keyword matching)
-3. **Companies** — Add/remove companies to track
+3. **Companies** — Install industry packs or add individual companies
 
 ### 5. Run your first scrape
 
-Click **Refresh** on the Feed page, or run manually:
+Click the **Refresh** button on the Feed page (triggers scrape + AI scoring), or run manually:
 
 ```bash
 cd backend
-python pipeline.py              # scrape + score
+python pipeline.py              # scrape + score all new jobs
 python pipeline.py --skip-score # scrape only (faster, no LLM needed)
-python pipeline.py --score-only # re-score existing jobs
+python pipeline.py --score-only # re-score existing jobs with updated profile
 ```
+
+## Industry Packs
+
+Not in tech? No problem. Install pre-built company packs for your industry from **Admin > Companies**:
+
+| Pack | Companies | Examples |
+|------|-----------|---------|
+| **Tech & Fintech** | 54 (pre-installed) | Stripe, Coinbase, Anthropic, Netflix, Google |
+| **Healthcare & Life Sciences** | 27 | Epic, UnitedHealth, Moderna, Flatiron Health, Tempus |
+| **Consulting & Professional** | 20 | McKinsey, Deloitte, Accenture, Booz Allen, PwC |
+| **E-Commerce & Retail** | 23 | Shopify, DoorDash, Airbnb, Nike, Target, Instacart |
+| **Media & Entertainment** | 20 | Spotify, Disney, Roblox, Reddit, Bloomberg, Discord |
+| **Enterprise SaaS & Cloud** | 30 | Salesforce, Snowflake, Cloudflare, Atlassian, MongoDB |
+| **Education & EdTech** | 15 | Coursera, Duolingo, Khan Academy, Handshake |
+| **Government & Defense** | 18 | SpaceX, Palantir, Lockheed Martin, Shield AI, Anduril |
+| **Climate & Clean Energy** | 14 | Tesla, Rivian, Watershed, Form Energy, ChargePoint |
+
+One click to install. You can also add any company manually with its ATS type and career page URL.
 
 ## LLM Providers
 
@@ -102,59 +116,59 @@ Configure in **Admin > LLM Settings**. All providers are optional — keyword ma
 
 ### Job Feed
 - Search by company, title, keywords
-- Filter by category (Fintech, Big Tech, AI, HealthTech, Quant)
-- Sort by Best Match, Newest, Company, Title
-- Min score slider (uses LLM score when available, keyword score as fallback)
-- Exclude specific companies
+- Filter by category (Fintech, Big Tech, AI, HealthTech, Quant, and all industry pack categories)
+- Sort by Best Match, Newest First, Oldest First, Company A-Z, Title A-Z
+- Min score slider — uses LLM score when available, keyword score as fallback
+- Exclude specific companies (case-insensitive, comma-separated)
 - Remote-only toggle
+- "New Since" date filter (Today, Last 3/7/14/30 days)
 - Direct "Apply" links to each company's career page
+- Refresh button triggers a full scrape + score run
+- Clean, readable job descriptions (HTML stripped and entities decoded)
 
 ### Application Pipeline
-- **Drag and drop** cards between stages: Saved, Applied, Phone Screen, Technical, Final, Offer, Rejected, Withdrawn
-- Track contacts, notes, salary offers, next steps per application
-- Cover letter generation and storage per application
-- Archive/remove stale applications
-- Timeline of all stage changes
+- **Drag and drop** cards between 8 stages: Saved, Applied, Phone Screen, Technical, Final, Offer, Rejected, Withdrawn
+- Track contacts (name, email, role), notes, salary offers, and next steps per application
+- Cover letter generation and storage — viewable anytime from the pipeline card
+- **Archive/remove** individual applications with confirmation
+- **Clear All** button for Rejected and Withdrawn columns
+- Stage change timeline with full audit history
+- Cards show company, title, location, score, applied date, and notes preview
 
 ### AI Scoring
 - LLM reads the full job description against your resume
 - Scores 0-100 with written reasoning
 - Highlights matching skills and flags concerns
-- Falls back to keyword matching if LLM is unavailable
+- Falls back to weighted keyword matching if LLM is unavailable
+- Automatic scoring on daily scrape runs and manual refresh
 
 ### Cover Letters
-- One-click generation from any job card
-- Tailored to the specific role and company
-- References real achievements from your resume
+- One-click generation from any job card (Feed or Pipeline)
+- LLM writes a 3-4 paragraph letter tailored to the specific role and company
+- References real achievements from your resume — no generic filler
+- Avoids cliches ("I am writing to express my interest...")
 - Copy to clipboard with one click
 - Stored in your pipeline for future reference
+- Regenerate for a different version
 
-### Admin
-- **Profile**: Resume, target roles, salary range, must-have/nice-to-have skills, blacklists
-- **Companies**: Add/remove/enable/disable target companies with their ATS type
-- **LLM Settings**: Configure AI provider, API key, model, temperature
-- **Scrape Status**: View last run, trigger manual scrapes
+### Admin Panel (4 tabs)
+- **Profile** — Resume text, target roles, salary range, must-have/nice-to-have skills, blacklisted companies/keywords, priority categories
+- **Companies** — Industry packs (one-click install), add/edit/enable/disable individual companies, filter by category
+- **LLM Settings** — Provider selector, API key, endpoint URL, model, temperature, max tokens, connection test
+- **Scrape Status** — Last run details, trigger manual scrapes
 
-## Supported Companies (54 built-in)
-
-**Big Tech:** Netflix, NVIDIA, Google, Apple, Amazon, Meta, Microsoft
-
-**Fintech:** Stripe, Block, Plaid, Affirm, Robinhood, Coinbase, Ripple, Ramp, Brex, Chime, Marqeta, Upstart, SoFi, Remitly, Wise, Toast, Bill.com, Wealthfront, Betterment, Airwallex, Mercury, Carta, Gusto, Deel, Klarna, PayPal, Mastercard, Visa, Adyen, Checkout.com
-
-**AI & Tech:** Anthropic, OpenAI, Datadog, Databricks, Scale AI, Anduril, Palantir, Notion, Figma, Vercel, Supabase
-
-**HealthTech:** Arcadia, Strata Decision, Oscar Health, Devoted Health, Cityblock Health
-
-**Quant:** Citadel, Two Sigma, Jane Street, DE Shaw, Jump Trading, Hudson River Trading
-
-Add more via the Admin > Companies tab or by editing `infrastructure/scripts/job_scraper.py`.
+### Analytics
+- Application funnel visualization
+- Key metrics: total discovered, applied, response rate
+- Per-company breakdown with pipeline conversion rates
+- Weekly activity trends (discovered vs applied)
 
 ## Daily Automation
 
-Set up a cron job for automatic daily scraping:
+Set up a cron job for automatic daily scraping and scoring:
 
 ```bash
-# Run daily at 6:00 AM
+# Run daily at 6:00 AM — scrapes new jobs and scores them with your LLM
 0 6 * * * cd /path/to/reverse-ats/backend && .venv/bin/python pipeline.py >> logs/pipeline.log 2>&1
 ```
 
@@ -163,51 +177,66 @@ Set up a cron job for automatic daily scraping:
 | Layer | Technology |
 |-------|-----------|
 | **Backend** | Python, FastAPI, SQLite, Pydantic v2 |
-| **Frontend** | React 18, TypeScript, Tailwind CSS v4, React Query, Vite |
+| **Frontend** | React 18, TypeScript, Tailwind CSS v4, React Query, Vite 8 |
 | **Scraping** | Public ATS APIs (Greenhouse, Lever, Ashby) — no auth required |
-| **AI** | Any OpenAI-compatible API, Anthropic, Ollama, or keyword fallback |
+| **AI Scoring** | Any OpenAI-compatible API, Anthropic, Ollama, or keyword fallback |
+| **Pipeline** | HTML5 native drag and drop (no external DnD library) |
 
 ## API Endpoints
 
 ```
-GET  /api/jobs                      — Paginated job feed with filters
-GET  /api/jobs/:id                  — Single job detail
-POST /api/jobs/:id/dismiss          — Dismiss a job
-POST /api/jobs/:id/save             — Save to pipeline
-POST /api/jobs/:id/cover-letter     — Generate cover letter
+# Jobs
+GET  /api/jobs                              — Paginated feed (sort, filter, exclude)
+GET  /api/jobs/:id                          — Single job detail
+POST /api/jobs/:id/dismiss                  — Dismiss a job
+POST /api/jobs/:id/save                     — Save to pipeline
+POST /api/jobs/:id/cover-letter             — Generate AI cover letter
 
-GET  /api/pipeline                  — All pipeline entries (Kanban data)
-POST /api/pipeline                  — Create pipeline entry
-PUT  /api/pipeline/:id              — Update stage, notes, contacts
-DELETE /api/pipeline/:id            — Archive/remove entry
-GET  /api/pipeline/:id/events       — Stage change history
+# Pipeline
+GET  /api/pipeline                          — All entries (Kanban data with job details)
+POST /api/pipeline                          — Create pipeline entry
+PUT  /api/pipeline/:id                      — Update stage, notes, contacts, cover letter
+DELETE /api/pipeline/:id                    — Archive/remove entry
+GET  /api/pipeline/:id/events               — Stage change history
 
-GET  /api/profile                   — Get profile/preferences
-PUT  /api/profile                   — Update profile
+# Profile
+GET  /api/profile                           — Get profile and preferences
+PUT  /api/profile                           — Update profile
 
-GET  /api/admin/companies           — List tracked companies
-POST /api/admin/companies           — Add company
-PUT  /api/admin/companies/:id       — Update company
-DELETE /api/admin/companies/:id     — Remove company
+# Admin — Companies
+GET  /api/admin/companies                   — List tracked companies
+POST /api/admin/companies                   — Add company
+PUT  /api/admin/companies/:id               — Update company
+DELETE /api/admin/companies/:id             — Remove company
 
-GET  /api/admin/llm-settings        — Get LLM config
-PUT  /api/admin/llm-settings        — Update LLM config
-POST /api/admin/llm-settings/test   — Test LLM connection
+# Admin — Industry Packs
+GET  /api/admin/industry-packs              — List available packs
+POST /api/admin/industry-packs/:id/install  — Install a pack
 
-GET  /api/analytics                 — Funnel metrics
-GET  /api/scrape/status             — Last scrape run
-POST /api/scrape/trigger            — Trigger scrape + score
+# Admin — LLM Settings
+GET  /api/admin/llm-settings                — Get LLM config (key masked)
+PUT  /api/admin/llm-settings                — Update LLM config
+POST /api/admin/llm-settings/test           — Test connection + sample score
+
+# Analytics & Scrape
+GET  /api/analytics                         — Funnel metrics and trends
+GET  /api/scrape/status                     — Last scrape run info
+POST /api/scrape/trigger                    — Trigger scrape + score
 ```
 
 ## Contributing
 
 PRs welcome. Some ideas:
-- More ATS integrations (Workday, SmartRecruiters, iCIMS)
-- Email/notification alerts for high-score new jobs
-- Browser extension to capture jobs from any career page
-- Resume parser (PDF/DOCX to structured profile)
-- Interview prep notes per company
-- Salary data integration
+
+- **More ATS integrations** — Workday, SmartRecruiters, iCIMS, Lever v2
+- **More industry packs** — Real estate, legal, nonprofit, biotech, crypto
+- **Email/notification alerts** for high-score new jobs (ntfy, email, Slack)
+- **Browser extension** to capture jobs from any career page
+- **Resume parser** — PDF/DOCX to structured profile (no manual paste)
+- **Interview prep** — AI-generated prep notes per company and role
+- **Salary data integration** — Levels.fyi, Glassdoor, or Payscale data overlay
+- **Multi-user support** — auth + separate profiles (for career coaches, bootcamps)
+- **Mobile-friendly UI** — responsive layout for phone/tablet use
 
 ## License
 
