@@ -2,87 +2,195 @@
 
 **An AI-powered job search tool that works for you, not against you.**
 
-In a traditional ATS (Applicant Tracking System), recruiters filter candidates. Reverse ATS flips this — it scrapes job postings from 220+ companies across 9 industries, scores them against your resume using AI, tracks your applications with a drag-and-drop Kanban board, and generates tailored cover letters with one click.
+Companies use Applicant Tracking Systems (ATS) to filter out candidates. Reverse ATS flips the script — it automatically finds job openings at 220+ companies, tells you which ones are the best fit for your skills, helps you track every application, and even writes personalized cover letters for you. All running privately on your own computer.
 
-Built for job seekers tired of manually checking career pages and guessing which roles are a good fit.
+---
 
-## What It Does
+## Who Is This For?
 
-- **Scrapes 220+ companies** via public ATS APIs (Greenhouse, Lever, Ashby) — no API keys needed for scraping
-- **9 industry packs** — Tech, Healthcare, Consulting, E-Commerce, Media, SaaS, Education, Defense, Climate
-- **AI-powered matching** — an LLM reads each job description against your resume and scores relevance 0-100 with reasoning
-- **Smart filters** — sort by Best Match/Newest/Company, filter by category, score, remote-only, exclude companies
-- **Application pipeline** — drag-and-drop Kanban board to track every application from Saved through Offer
-- **Cover letter generation** — one-click AI-drafted cover letters tailored to each specific job, stored per application
-- **Works with any LLM** — OpenAI, Anthropic, Ollama (free/local), llama.cpp, or just keyword matching (no LLM needed)
-- **Fully self-hosted** — your data stays on your machine. No accounts, no tracking, no subscriptions.
+Anyone looking for a job. Whether you're a software engineer, nurse, teacher, consultant, or recent graduate — if you're tired of manually checking dozens of career pages every day, this tool does it for you.
 
-## Quick Start
+**You don't need to be technical to use it.** If you can follow step-by-step instructions and copy-paste commands, you can set this up in about 10 minutes.
 
-### Prerequisites
-- Python 3.10+
-- Node.js 18+
+---
 
-### 1. Clone and install
+## What Does It Do?
+
+1. **Finds jobs for you** — Automatically checks career pages at 220+ companies daily and collects new job postings
+2. **Tells you which jobs fit** — AI reads each job description, compares it to your resume, and gives it a score from 0-100
+3. **Lets you track applications** — A visual board (like sticky notes on a wall) where you drag jobs through stages: Saved, Applied, Interviewing, Offer
+4. **Writes cover letters** — Click one button and get a professional cover letter tailored to that specific job
+5. **Works for any industry** — Tech, Healthcare, Consulting, Retail, Media, Education, Government, Energy, and more
+
+---
+
+## System Requirements
+
+This runs on any modern laptop or desktop computer:
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| **Operating System** | Windows 10, macOS 10.15, or Linux (Ubuntu 20.04+) | Any recent version |
+| **RAM** | 4 GB | 8 GB+ |
+| **Disk Space** | 500 MB (app + database) | 1 GB |
+| **Internet** | Required (to fetch job postings) | Broadband |
+| **Python** | 3.10 or newer | 3.12+ |
+| **Node.js** | 18 or newer | 20+ |
+
+**No special hardware needed.** No GPU, no powerful server. A basic laptop from the last 5 years will work fine.
+
+For AI scoring and cover letters, you have options:
+- **Free (no setup):** Keyword matching works out of the box — no AI service needed
+- **Free (local AI):** Install [Ollama](https://ollama.com) to run AI on your own computer (needs 8 GB RAM)
+- **Paid cloud AI:** Use OpenAI ($0.01-0.03 per job scored) or Anthropic for the best results
+
+---
+
+## Installation Guide (Step by Step)
+
+### Step 0: Install the prerequisites
+
+You need two programs installed on your computer: **Python** and **Node.js**. If you already have them, skip to Step 1.
+
+<details>
+<summary><b>How to install Python (click to expand)</b></summary>
+
+**On Mac:**
+1. Open the **Terminal** app (search for "Terminal" in Spotlight)
+2. Type `python3 --version` and press Enter
+3. If you see a version number (like `Python 3.12.0`), you're good! Skip ahead.
+4. If not, go to [python.org/downloads](https://www.python.org/downloads/) and download the latest version
+5. Open the downloaded file and follow the installer
+
+**On Windows:**
+1. Go to [python.org/downloads](https://www.python.org/downloads/)
+2. Click the big yellow "Download Python" button
+3. Run the installer — **IMPORTANT: check the box that says "Add Python to PATH"**
+4. Click "Install Now"
+
+**On Linux:**
+```bash
+sudo apt update && sudo apt install python3 python3-venv python3-pip
+```
+</details>
+
+<details>
+<summary><b>How to install Node.js (click to expand)</b></summary>
+
+1. Go to [nodejs.org](https://nodejs.org/)
+2. Download the **LTS** version (the green button)
+3. Run the installer and follow the prompts
+4. To verify, open Terminal/Command Prompt and type: `node --version`
+</details>
+
+### Step 1: Download the app
+
+Open your **Terminal** (Mac/Linux) or **Command Prompt** (Windows) and run:
 
 ```bash
 git clone https://github.com/arieslao/reverse-ats.git
 cd reverse-ats
+```
 
-# Backend
+> **Don't have git?** You can also [download the ZIP file](https://github.com/arieslao/reverse-ats/archive/refs/heads/main.zip) from GitHub, unzip it, and open a terminal in that folder.
+
+### Step 2: Set up the backend (the engine)
+
+```bash
 cd backend
 python3 -m venv .venv
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -r requirements.txt
+```
 
-# Frontend
-cd ../app
+Now activate it:
+- **Mac/Linux:** `source .venv/bin/activate`
+- **Windows:** `.venv\Scripts\activate`
+
+Then install the dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+### Step 3: Set up the frontend (the web interface)
+
+Open a **new terminal window** (keep the first one open) and run:
+
+```bash
+cd reverse-ats/app
 npm install
 ```
 
-### 2. Start the backend
+### Step 4: Start the app
 
+**In the first terminal** (backend):
 ```bash
-cd backend
-source .venv/bin/activate
+cd reverse-ats/backend
+source .venv/bin/activate   # Mac/Linux
+# .venv\Scripts\activate    # Windows
 python -m uvicorn api:app --host 0.0.0.0 --port 8091
 ```
 
-The first run automatically:
-- Creates the SQLite database
-- Seeds 54 tech/fintech companies from the built-in registry
-- Creates default profile and settings
+You should see: `Uvicorn running on http://0.0.0.0:8091`
 
-### 3. Start the frontend
-
+**In the second terminal** (frontend):
 ```bash
-cd app
+cd reverse-ats/app
 npm run dev
 ```
 
-Open **http://localhost:5173**
+You should see: `Local: http://localhost:5173/`
 
-### 4. Set up your profile
+### Step 5: Open it in your browser
 
-Go to the **Admin** tab:
-1. **Profile** — Paste your resume, set target roles, skills, salary range, and preferences
-2. **LLM Settings** — Pick your AI provider (or skip for free keyword matching)
-3. **Companies** — Install industry packs or add individual companies
+Go to **http://localhost:5173** in Chrome, Firefox, Safari, or Edge.
 
-### 5. Run your first scrape
+You should see the Reverse ATS dashboard. You're running!
 
-Click the **Refresh** button on the Feed page (triggers scrape + AI scoring), or run manually:
+### Step 6: Set up your profile
 
+Click **Admin** in the left sidebar, then:
+
+1. **Profile tab** — Paste your resume (copy from a Word doc, Google Doc, or PDF text). Set your target job titles, desired salary range, and key skills.
+
+2. **Companies tab** — The app comes with 54 tech/fintech companies pre-loaded. Want a different industry? Click **Install Pack** on any industry pack (Healthcare, Consulting, Retail, etc.) to add ~20-30 companies instantly.
+
+3. **LLM Settings tab** (optional) — If you want AI-powered scoring and cover letters:
+   - **Easiest free option:** Install [Ollama](https://ollama.com), then select "Ollama" as your provider
+   - **Best results:** Select "OpenAI" and paste your API key from [platform.openai.com](https://platform.openai.com)
+   - **No AI needed:** Leave it on "Keyword Only" — the app still works, just with simpler matching
+
+### Step 7: Find jobs!
+
+Click **Feed** in the left sidebar, then click the **Refresh** button. The app will:
+1. Check all your tracked companies for open positions
+2. Score each one against your resume
+3. Show you a ranked list with the best matches first
+
+Click any job to expand it, then:
+- **Apply** — Opens the company's application page in a new tab
+- **Save** — Adds it to your Pipeline board for tracking
+- **Draft Cover Letter** — AI writes a personalized cover letter you can copy and paste
+
+---
+
+## How to Use It Daily
+
+1. Open your browser to **http://localhost:5173**
+2. Start your backend and frontend (same commands as Step 4 — you'll need to do this each time you restart your computer)
+3. Click **Refresh** to pull the latest jobs
+4. Review your feed, save interesting ones, apply to the best matches
+5. Track your applications on the **Pipeline** page — drag cards as you progress through interviews
+
+**Want it to run automatically?** Set up a daily cron job (advanced):
 ```bash
-cd backend
-python pipeline.py              # scrape + score all new jobs
-python pipeline.py --skip-score # scrape only (faster, no LLM needed)
-python pipeline.py --score-only # re-score existing jobs with updated profile
+# Scrapes new jobs and scores them every morning at 6 AM
+0 6 * * * cd /path/to/reverse-ats/backend && .venv/bin/python pipeline.py >> logs/pipeline.log 2>&1
 ```
+
+---
 
 ## Industry Packs
 
-Not in tech? No problem. Install pre-built company packs for your industry from **Admin > Companies**:
+Not in tech? Install a pack for your industry from **Admin > Companies**:
 
 | Pack | Companies | Examples |
 |------|-----------|---------|
@@ -96,83 +204,71 @@ Not in tech? No problem. Install pre-built company packs for your industry from 
 | **Government & Defense** | 18 | SpaceX, Palantir, Lockheed Martin, Shield AI, Anduril |
 | **Climate & Clean Energy** | 14 | Tesla, Rivian, Watershed, Form Energy, ChargePoint |
 
-One click to install. You can also add any company manually with its ATS type and career page URL.
+You can also add any company manually — just enter its name, career page URL, and ATS type.
 
-## LLM Providers
+## AI Provider Comparison
 
-Configure in **Admin > LLM Settings**. All providers are optional — keyword matching works without any API key.
+| Provider | Cost | Quality | Setup Difficulty |
+|----------|------|---------|-----------------|
+| **Keyword Only** | Free | Basic matching | None — works immediately |
+| **Ollama (local)** | Free | Good | Easy — one download |
+| **OpenAI (GPT-4o-mini)** | ~$0.01-0.03/job | Excellent | Easy — just need API key |
+| **Anthropic (Claude)** | ~$0.01-0.03/job | Excellent | Easy — just need API key |
+| **OpenAI-Compatible** | Varies | Varies | Moderate — need a running endpoint |
 
-| Provider | Cost | Setup |
-|----------|------|-------|
-| **Keyword Only** | Free | No setup needed. Uses weighted keyword matching. |
-| **Ollama** | Free | [Install Ollama](https://ollama.com), run `ollama pull llama3.1:8b` |
-| **OpenAI** | ~$0.01-0.03/job | Get API key from [platform.openai.com](https://platform.openai.com) |
-| **Anthropic** | ~$0.01-0.03/job | Get API key from [console.anthropic.com](https://console.anthropic.com) |
-| **OpenAI-Compatible** | Varies | Works with llama.cpp, vLLM, LiteLLM, Groq, Together AI, etc. |
+**Our recommendation:** Start with **Keyword Only** (zero setup). If you want better matching, install **Ollama** for free local AI. If you want the best results and don't mind a few cents per job, use **OpenAI**.
 
-**Recommended for free local scoring:** Install [Ollama](https://ollama.com) and select "Ollama" in LLM Settings. No API key, no cost, runs on your machine.
+---
 
-## Features
+## Frequently Asked Questions
 
-### Job Feed
-- Search by company, title, keywords
-- Filter by category (Fintech, Big Tech, AI, HealthTech, Quant, and all industry pack categories)
-- Sort by Best Match, Newest First, Oldest First, Company A-Z, Title A-Z
-- Min score slider — uses LLM score when available, keyword score as fallback
-- Exclude specific companies (case-insensitive, comma-separated)
-- Remote-only toggle
-- "New Since" date filter (Today, Last 3/7/14/30 days)
-- Direct "Apply" links to each company's career page
-- Refresh button triggers a full scrape + score run
-- Clean, readable job descriptions (HTML stripped and entities decoded)
+**Q: Is this free?**
+A: Yes. The app itself is 100% free and open source. The only optional cost is if you choose to use a paid AI provider (OpenAI or Anthropic) for smarter job matching and cover letters — even then it's about $0.01-0.03 per job.
 
-### Application Pipeline
-- **Drag and drop** cards between 8 stages: Saved, Applied, Phone Screen, Technical, Final, Offer, Rejected, Withdrawn
-- Track contacts (name, email, role), notes, salary offers, and next steps per application
-- Cover letter generation and storage — viewable anytime from the pipeline card
-- **Archive/remove** individual applications with confirmation
-- **Clear All** button for Rejected and Withdrawn columns
-- Stage change timeline with full audit history
-- Cards show company, title, location, score, applied date, and notes preview
+**Q: Is my data private?**
+A: Yes. Everything runs on your computer. Your resume, job applications, and cover letters never leave your machine. There's no account to create, no data sent to us, no tracking.
 
-### AI Scoring
-- LLM reads the full job description against your resume
-- Scores 0-100 with written reasoning
-- Highlights matching skills and flags concerns
-- Falls back to weighted keyword matching if LLM is unavailable
-- Automatic scoring on daily scrape runs and manual refresh
+**Q: Can I use this on Windows?**
+A: Yes. Works on Windows 10+, macOS, and Linux.
 
-### Cover Letters
-- One-click generation from any job card (Feed or Pipeline)
-- LLM writes a 3-4 paragraph letter tailored to the specific role and company
-- References real achievements from your resume — no generic filler
-- Avoids cliches ("I am writing to express my interest...")
-- Copy to clipboard with one click
-- Stored in your pipeline for future reference
-- Regenerate for a different version
+**Q: What if a company I want isn't in the list?**
+A: Go to Admin > Companies and add it manually. You just need the company name, their career page URL, and their ATS type (most use Greenhouse — you can tell by looking at the career page URL).
 
-### Admin Panel (4 tabs)
-- **Profile** — Resume text, target roles, salary range, must-have/nice-to-have skills, blacklisted companies/keywords, priority categories
-- **Companies** — Industry packs (one-click install), add/edit/enable/disable individual companies, filter by category
-- **LLM Settings** — Provider selector, API key, endpoint URL, model, temperature, max tokens, connection test
-- **Scrape Status** — Last run details, trigger manual scrapes
+**Q: How often should I refresh?**
+A: Once a day is plenty. Most companies post new jobs during business hours. You can also set up automatic daily runs with a cron job.
 
-### Analytics
-- Application funnel visualization
-- Key metrics: total discovered, applied, response rate
-- Per-company breakdown with pipeline conversion rates
-- Weekly activity trends (discovered vs applied)
+**Q: Do I need a powerful computer?**
+A: No. Any laptop from the last 5 years with 4 GB of RAM will work. If you want to run local AI (Ollama), 8 GB RAM is recommended.
 
-## Daily Automation
+**Q: Can I use this while job searching on my phone?**
+A: The app is designed for desktop/laptop browsers. You can access it from a phone on the same WiFi network, but the interface is optimized for larger screens.
 
-Set up a cron job for automatic daily scraping and scoring:
+---
 
+## Troubleshooting
+
+**"Command not found" errors:** Make sure Python and Node.js are installed (see Step 0).
+
+**"Port already in use" error:** Another app is using port 8091 or 5173. Either close that app or change the port:
 ```bash
-# Run daily at 6:00 AM — scrapes new jobs and scores them with your LLM
-0 6 * * * cd /path/to/reverse-ats/backend && .venv/bin/python pipeline.py >> logs/pipeline.log 2>&1
+# Use a different backend port
+python -m uvicorn api:app --host 0.0.0.0 --port 8092
 ```
 
-## Tech Stack
+**Frontend can't connect to backend:** Make sure the backend is running (Step 4, first terminal). You should see `Uvicorn running on http://0.0.0.0:8091` in that terminal.
+
+**No jobs showing up:** Click Refresh on the Feed page. The first scrape takes 1-2 minutes to fetch from all companies.
+
+**AI scoring not working:** Go to Admin > LLM Settings and click "Test Connection." If it fails, check that your API key is correct or that Ollama is running (`ollama serve` in a terminal).
+
+---
+
+## For Developers
+
+<details>
+<summary><b>Technical details (click to expand)</b></summary>
+
+### Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
@@ -182,7 +278,7 @@ Set up a cron job for automatic daily scraping and scoring:
 | **AI Scoring** | Any OpenAI-compatible API, Anthropic, Ollama, or keyword fallback |
 | **Pipeline** | HTML5 native drag and drop (no external DnD library) |
 
-## API Endpoints
+### API Endpoints (24 total)
 
 ```
 # Jobs
@@ -224,19 +320,40 @@ GET  /api/scrape/status                     — Last scrape run info
 POST /api/scrape/trigger                    — Trigger scrape + score
 ```
 
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REVERSE_ATS_DB_PATH` | SQLite database file path | `./backend/reverse_ats.db` |
+
+### Pipeline CLI
+
+```bash
+python pipeline.py                          # Full run: scrape + score
+python pipeline.py --skip-score             # Scrape only (no LLM)
+python pipeline.py --score-only             # Re-score existing unscored jobs
+python pipeline.py --category fintech       # Only scrape one category
+python pipeline.py --no-remote-filter       # Include non-remote jobs
+python pipeline.py --db-path /tmp/test.db   # Custom database path
+python pipeline.py --inference-url http://localhost:8080/v1/chat/completions
+```
+
+</details>
+
 ## Contributing
 
-PRs welcome. Some ideas:
+PRs welcome! Some ideas:
 
+- **More industry packs** — Real estate, legal, nonprofit, biotech, crypto, automotive
 - **More ATS integrations** — Workday, SmartRecruiters, iCIMS, Lever v2
-- **More industry packs** — Real estate, legal, nonprofit, biotech, crypto
-- **Email/notification alerts** for high-score new jobs (ntfy, email, Slack)
+- **Email/notification alerts** for high-score new jobs
 - **Browser extension** to capture jobs from any career page
-- **Resume parser** — PDF/DOCX to structured profile (no manual paste)
-- **Interview prep** — AI-generated prep notes per company and role
-- **Salary data integration** — Levels.fyi, Glassdoor, or Payscale data overlay
-- **Multi-user support** — auth + separate profiles (for career coaches, bootcamps)
-- **Mobile-friendly UI** — responsive layout for phone/tablet use
+- **Resume parser** — PDF/DOCX import (no manual paste)
+- **Interview prep** — AI-generated prep notes per company
+- **Salary data overlay** — Levels.fyi or Glassdoor integration
+- **Multi-user support** — For career coaches or bootcamps
+- **Mobile-friendly UI** — Responsive layout for phones
+- **Docker image** — One-command deployment
 
 ## License
 
@@ -244,4 +361,4 @@ MIT License. See [LICENSE](LICENSE).
 
 ---
 
-Built by [Aries Labs AI](https://arieslabs.ai). If this helped you land a job, let us know!
+Built by [Aries Labs AI](https://arieslabs.ai). If this helped you land a job, we'd love to hear about it!
