@@ -697,21 +697,33 @@ export function Pipeline() {
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: 16, flexShrink: 0 }}>
-        <h1
-          style={{
-            margin: 0,
-            fontSize: 22,
-            fontWeight: 700,
-            color: '#e4e4e7',
-            letterSpacing: '-0.02em',
-          }}
-        >
-          Pipeline
-        </h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>
-          {total} total &middot; {activeCount} active
-        </p>
+      <div
+        style={{
+          marginBottom: 16,
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
+        <div>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 22,
+              fontWeight: 700,
+              color: '#e4e4e7',
+              letterSpacing: '-0.02em',
+            }}
+          >
+            Pipeline
+          </h1>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>
+            {total} total &middot; {activeCount} active
+          </p>
+        </div>
+        <ExportButtons disabled={total === 0} />
       </div>
 
       {isLoading && (
@@ -898,6 +910,59 @@ export function Pipeline() {
           })}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Export Buttons ──────────────────────────────────────────────────────────
+
+function ExportButtons({ disabled }: { disabled: boolean }) {
+  const [busy, setBusy] = useState<'csv' | 'json' | null>(null)
+
+  const download = async (format: 'csv' | 'json') => {
+    setBusy(format)
+    try {
+      const res = await fetch(`/api/pipeline/export?format=${format}`)
+      if (!res.ok) throw new Error(`Export failed: ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      // Pull filename from Content-Disposition if present
+      const disp = res.headers.get('Content-Disposition') || ''
+      const m = /filename="?([^"]+)"?/.exec(disp)
+      const filename = m?.[1] ?? `reverse-ats-pipeline.${format}`
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      alert(`Export failed: ${(err as Error).message}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const btn: React.CSSProperties = {
+    background: 'transparent',
+    border: '1px solid #2e3140',
+    borderRadius: 6,
+    color: disabled ? '#3f3f46' : '#a1a1aa',
+    fontSize: 12,
+    padding: '6px 12px',
+    cursor: disabled || busy ? 'not-allowed' : 'pointer',
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button onClick={() => download('csv')} disabled={disabled || !!busy} style={btn} title="Download as CSV">
+        {busy === 'csv' ? 'Exporting...' : '↓ CSV'}
+      </button>
+      <button onClick={() => download('json')} disabled={disabled || !!busy} style={btn} title="Download as JSON">
+        {busy === 'json' ? 'Exporting...' : '↓ JSON'}
+      </button>
     </div>
   )
 }

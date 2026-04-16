@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """Reverse ATS — FastAPI backend."""
 
+import csv
+import io
+import json
 import subprocess
 import sys
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from db import (
     get_connection,
@@ -274,6 +279,52 @@ def list_pipeline():
         return PipelineListResponse(items=items, by_stage=by_stage)
     finally:
         conn.close()
+
+
+@app.get("/api/pipeline/export")
+def export_pipeline(format: str = Query("csv", pattern="^(csv|json)$")):
+    """
+    Export every pipeline entry. Use this as a portable backup of your
+    application history that lives outside SQLite.
+
+    CSV columns are stable and human-readable; JSON includes all fields.
+    """
+    conn = _conn()
+    try:
+        rows = get_pipeline(conn)
+    finally:
+        conn.close()
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+
+    if format == "json":
+        # Strip non-serializable types and return as a download
+        payload = json.dumps(rows, indent=2, default=str)
+        return StreamingResponse(
+            io.BytesIO(payload.encode("utf-8")),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="reverse-ats-pipeline-{ts}.json"'},
+        )
+
+    # CSV
+    cols = [
+        "stage", "company", "title", "url", "location",
+        "applied_at", "notes",
+        "contact_name", "contact_email", "contact_role",
+        "next_step", "next_step_date", "salary_offered",
+        "created_at", "updated_at", "source_deleted", "job_id",
+    ]
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
+    writer.writeheader()
+    for r in rows:
+        writer.writerow({c: r.get(c, "") for c in cols})
+
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode("utf-8")),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="reverse-ats-pipeline-{ts}.csv"'},
+    )
 
 
 @app.post("/api/pipeline", response_model=PipelineOut)
