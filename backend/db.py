@@ -90,9 +90,22 @@ CREATE INDEX IF NOT EXISTS idx_jobs_expired     ON jobs(expired);
 CREATE INDEX IF NOT EXISTS idx_jobs_dismissed   ON jobs(dismissed);
 CREATE INDEX IF NOT EXISTS idx_jobs_last_seen   ON jobs(last_seen_at);
 
+-- Pipeline entries are SNAPSHOTS of an application's state. They MUST
+-- survive even if the source job listing is later deleted from the
+-- jobs table (e.g. the company removed the posting, or a future
+-- cleanup script purges old jobs). For that reason:
+--   * NO foreign key cascade — `job_id` is just a plain string reference
+--   * Key job fields (company, title, url, location) are denormalized
+--     onto the row at save time, so the Pipeline page renders correctly
+--     without any JOIN.
 CREATE TABLE IF NOT EXISTS pipeline (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    job_id          TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    job_id          TEXT NOT NULL,
+    -- Denormalized job snapshot (immutable copy at save time)
+    job_company     TEXT,
+    job_title       TEXT,
+    job_url         TEXT,
+    job_location    TEXT,
     stage           TEXT NOT NULL DEFAULT 'saved',
     applied_at      TEXT,
     notes           TEXT,
@@ -191,7 +204,9 @@ CREATE TABLE IF NOT EXISTS llm_settings (
 
 
 def init_db(db_path: str = None) -> None:
-    """Create all tables and indexes if they do not exist."""
+    """Create all tables and indexes if they do not exist, then run any
+    additive migrations needed for existing databases.
+    """
     path = db_path or get_db_path()
     # Ensure parent directory exists (important for GX10 state dir)
     Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -199,15 +214,121 @@ def init_db(db_path: str = None) -> None:
     try:
         conn.executescript(_SCHEMA)
         conn.commit()
-        # Migration: add cover_letter column if missing (existing DBs)
+
+        # ─── Additive migrations for existing databases ────────────────────
+        # Each migration is wrapped in try/except so it's idempotent on a
+        # fresh DB (where the column / table is already in the new shape).
+
+        # M1: cover_letter column (added 2026-04-13)
         try:
             conn.execute("ALTER TABLE pipeline ADD COLUMN cover_letter TEXT")
             conn.commit()
         except sqlite3.OperationalError:
-            pass  # column already exists
+            pass
+
+        # M2: pipeline snapshot columns (added 2026-04-16)
+        # Denormalize job fields onto pipeline entries so applications
+        # survive even if the source job row is deleted.
+        for col in ("job_company TEXT", "job_title TEXT", "job_url TEXT", "job_location TEXT"):
+            try:
+                conn.execute(f"ALTER TABLE pipeline ADD COLUMN {col}")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+
+        # M3: backfill snapshot columns for existing pipeline rows that
+        # still have the source job available
+        conn.execute(
+            """
+            UPDATE pipeline
+            SET
+              job_company  = COALESCE(job_company,  (SELECT company  FROM jobs WHERE jobs.id = pipeline.job_id)),
+              job_title    = COALESCE(job_title,    (SELECT title    FROM jobs WHERE jobs.id = pipeline.job_id)),
+              job_url      = COALESCE(job_url,      (SELECT url      FROM jobs WHERE jobs.id = pipeline.job_id)),
+              job_location = COALESCE(job_location, (SELECT location FROM jobs WHERE jobs.id = pipeline.job_id))
+            WHERE job_company IS NULL OR job_title IS NULL OR job_url IS NULL OR job_location IS NULL
+            """
+        )
+        conn.commit()
+
+        # M4: drop the legacy ON DELETE CASCADE foreign key on pipeline.job_id.
+        # A CASCADE here means deleting a job silently destroys the user's
+        # application history for that job — unacceptable. SQLite can't ALTER
+        # a constraint, so we rebuild the table when we detect the old shape.
+        _migrate_drop_pipeline_cascade(conn)
+
         seed_companies_from_scraper(conn)
     finally:
         conn.close()
+
+
+def _migrate_drop_pipeline_cascade(conn: sqlite3.Connection) -> None:
+    """If pipeline.job_id still has ON DELETE CASCADE, rebuild the table
+    without it. Idempotent — safe to run on every startup."""
+    fks = conn.execute("PRAGMA foreign_key_list(pipeline)").fetchall()
+    has_cascade = any(
+        fk["table"] == "jobs" and fk["from"] == "job_id" and fk["on_delete"] == "CASCADE"
+        for fk in fks
+    )
+    if not has_cascade:
+        return  # already migrated
+
+    # Rebuild within a transaction. PRAGMA foreign_keys must be off for the
+    # duration so that copying rows into the new table doesn't trip checks.
+    conn.execute("PRAGMA foreign_keys=OFF")
+    try:
+        conn.execute("BEGIN")
+        conn.execute(
+            """
+            CREATE TABLE pipeline_new (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                job_id          TEXT NOT NULL,
+                job_company     TEXT,
+                job_title       TEXT,
+                job_url         TEXT,
+                job_location    TEXT,
+                stage           TEXT NOT NULL DEFAULT 'saved',
+                applied_at      TEXT,
+                notes           TEXT,
+                contact_name    TEXT,
+                contact_email   TEXT,
+                contact_role    TEXT,
+                next_step       TEXT,
+                next_step_date  TEXT,
+                salary_offered  INTEGER,
+                cover_letter    TEXT,
+                created_at      TEXT NOT NULL,
+                updated_at      TEXT NOT NULL,
+                UNIQUE(job_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            INSERT INTO pipeline_new (
+                id, job_id, job_company, job_title, job_url, job_location,
+                stage, applied_at, notes, contact_name, contact_email, contact_role,
+                next_step, next_step_date, salary_offered, cover_letter,
+                created_at, updated_at
+            )
+            SELECT
+                id, job_id, job_company, job_title, job_url, job_location,
+                stage, applied_at, notes, contact_name, contact_email, contact_role,
+                next_step, next_step_date, salary_offered, cover_letter,
+                created_at, updated_at
+            FROM pipeline
+            """
+        )
+        conn.execute("DROP TABLE pipeline")
+        conn.execute("ALTER TABLE pipeline_new RENAME TO pipeline")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pipeline_stage  ON pipeline(stage)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pipeline_job_id ON pipeline(job_id)")
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        conn.execute("PRAGMA foreign_keys=ON")
 
 
 # ---------------------------------------------------------------------------
@@ -541,12 +662,28 @@ def create_pipeline_entry(
     now = _now_iso()
     applied_at = now if stage == "applied" else None
 
+    # Snapshot the source job's identifying fields onto the pipeline row so
+    # the user's application history survives even if the job is later
+    # removed from the jobs table.
+    job_row = conn.execute(
+        "SELECT company, title, url, location FROM jobs WHERE id = ?",
+        (job_id,),
+    ).fetchone()
+    job_company  = job_row["company"]  if job_row else None
+    job_title    = job_row["title"]    if job_row else None
+    job_url      = job_row["url"]      if job_row else None
+    job_location = job_row["location"] if job_row else None
+
     cursor = conn.execute(
         """
-        INSERT INTO pipeline (job_id, stage, applied_at, notes, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO pipeline (
+            job_id, job_company, job_title, job_url, job_location,
+            stage, applied_at, notes, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (job_id, stage, applied_at, notes, now, now),
+        (job_id, job_company, job_title, job_url, job_location,
+         stage, applied_at, notes, now, now),
     )
     pipeline_id = cursor.lastrowid
 
@@ -631,17 +768,23 @@ def get_pipeline(conn: sqlite3.Connection) -> list[dict]:
     Return all pipeline entries with their associated job data.
     Ordered by stage priority then most recently updated.
     """
-    # Stage ordering mirrors the PipelineStage enum progression
+    # Stage ordering mirrors the PipelineStage enum progression.
+    # LEFT JOIN (not INNER) so applications survive even if the source job
+    # was deleted; fall back to the denormalized snapshot for company/title/url.
     rows = conn.execute(
         """
         SELECT
             p.*,
-            j.company, j.title, j.location, j.url,
+            COALESCE(j.company,  p.job_company)  AS company,
+            COALESCE(j.title,    p.job_title)    AS title,
+            COALESCE(j.location, p.job_location) AS location,
+            COALESCE(j.url,      p.job_url)      AS url,
             j.remote, j.keyword_score, j.llm_score,
             j.category, j.ats_type, j.first_seen_at, j.last_seen_at,
-            j.description_snippet
+            j.description_snippet,
+            CASE WHEN j.id IS NULL THEN 1 ELSE 0 END AS source_deleted
         FROM pipeline p
-        JOIN jobs j ON j.id = p.job_id
+        LEFT JOIN jobs j ON j.id = p.job_id
         ORDER BY
             CASE p.stage
                 WHEN 'offer'        THEN 1
