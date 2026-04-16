@@ -11,6 +11,8 @@ import {
   triggerScrape,
   fetchScoreStats,
   triggerRescore,
+  fetchBackups,
+  createBackup,
   fetchLLMSettings,
   updateLLMSettings,
   testLLMSettings,
@@ -834,6 +836,79 @@ function ScrapeTab() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Backups card */}
+      <BackupsCard />
+    </div>
+  )
+}
+
+function BackupsCard() {
+  const queryClient = useQueryClient()
+  const { data: backups } = useQuery({ queryKey: ['backups'], queryFn: fetchBackups })
+
+  const backupMut = useMutation({
+    mutationFn: () => createBackup('manual'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['backups'] }),
+  })
+
+  const fmtSize = (b: number) =>
+    b >= 1_000_000 ? `${(b / 1_000_000).toFixed(1)} MB` : `${(b / 1_000).toFixed(0)} KB`
+  const fmtTime = (d: string) =>
+    new Date(d).toLocaleString('en-US', {
+      month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+    })
+
+  return (
+    <div style={{ background: '#1a1d27', border: '1px solid #2e3140', borderRadius: 8, padding: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Database Backups
+        </div>
+        <button
+          onClick={() => backupMut.mutate()}
+          disabled={backupMut.isPending}
+          style={{ ...ghostBtnStyle, color: '#a1a1aa', padding: '6px 12px', fontSize: 12 }}
+        >
+          {backupMut.isPending ? 'Backing up...' : 'Backup now'}
+        </button>
+      </div>
+
+      <div style={{ fontSize: 12, color: '#71717a', marginBottom: 12, lineHeight: 1.5 }}>
+        Backups are taken automatically before destructive ops (e.g. Re-score all). Last 10 are kept.
+        To restore: stop the backend, copy a backup file over <code style={{ color: '#a1a1aa' }}>reverse_ats.db</code>, restart.
+      </div>
+
+      {!backups || backups.length === 0 ? (
+        <div style={{ fontSize: 12, color: '#52525b', padding: '12px 0', textAlign: 'center' }}>
+          No backups yet. Click "Backup now" or trigger a re-score to create one.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 220, overflow: 'auto' }}>
+          {backups.map((b) => (
+            <div
+              key={b.path}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+                padding: '6px 10px',
+                background: '#0f1117',
+                border: '1px solid #2e3140',
+                borderRadius: 4,
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: '#e4e4e7', fontFamily: 'monospace' }}>{b.filename ?? b.path.split('/').pop()}</span>
+              <span style={{ color: '#71717a', display: 'flex', gap: 12 }}>
+                <span>{fmtSize(b.size_bytes)}</span>
+                <span>{fmtTime(b.created_at)}</span>
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>

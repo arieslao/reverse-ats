@@ -31,6 +31,8 @@ from db import (
     delete_company,
     get_llm_settings,
     update_llm_settings,
+    backup_db,
+    list_backups,
 )
 from models import (
     JobOut,
@@ -483,7 +485,12 @@ def trigger_rescore(all: bool = Query(False, description="If true, re-score ever
         )
 
     cleared = 0
+    backup_info: Optional[dict] = None
     if all:
+        # Snapshot the DB before clobbering scores. If the user changes their
+        # mind (or the new provider scores worse), they can restore by
+        # copying the backup back over reverse_ats.db.
+        backup_info = backup_db(reason="rescore-all")
         conn = _conn()
         try:
             cur = conn.execute(
@@ -500,7 +507,31 @@ def trigger_rescore(all: bool = Query(False, description="If true, re-score ever
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    return {"status": "started", "mode": "all" if all else "unscored_only", "cleared": cleared}
+    return {
+        "status": "started",
+        "mode": "all" if all else "unscored_only",
+        "cleared": cleared,
+        "backup": backup_info,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Admin — Backups
+# ---------------------------------------------------------------------------
+
+@app.get("/api/admin/backups")
+def list_db_backups():
+    """Return all DB backups (newest first)."""
+    return list_backups()
+
+
+@app.post("/api/admin/backups")
+def create_db_backup(reason: str = Query("manual", description="Short label, e.g. 'pre-import' or 'manual'")):
+    """Take an immediate backup of the SQLite DB."""
+    info = backup_db(reason=reason)
+    if info is None:
+        raise HTTPException(status_code=500, detail="DB file does not exist")
+    return info
 
 
 # ---------------------------------------------------------------------------

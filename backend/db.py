@@ -57,6 +57,90 @@ def get_connection(db_path: str = None) -> sqlite3.Connection:
 
 
 # ---------------------------------------------------------------------------
+# Backups
+# ---------------------------------------------------------------------------
+
+# Last N backups to keep before rotating the oldest. Backups are intended as
+# a safety net before destructive operations (re-score-all, future purge ops),
+# not a primary disaster-recovery system — pair with periodic exports.
+BACKUP_KEEP = 10
+
+
+def get_backups_dir() -> Path:
+    """Backups live next to the DB file in a `backups/` subdirectory."""
+    db = Path(get_db_path())
+    return db.parent / "backups"
+
+
+def backup_db(reason: str = "manual") -> Optional[dict]:
+    """
+    Create a timestamped copy of the SQLite DB before a destructive operation.
+
+    Uses SQLite's online backup API (works even while the DB is in use)
+    rather than a raw file copy, which would race against WAL writes.
+
+    Returns:
+        {"path": str, "size_bytes": int, "reason": str, "created_at": str}
+        or None if the source DB doesn't exist yet.
+    """
+    src_path = Path(get_db_path())
+    if not src_path.exists():
+        return None
+
+    backups_dir = get_backups_dir()
+    backups_dir.mkdir(parents=True, exist_ok=True)
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    safe_reason = re.sub(r"[^a-z0-9_-]+", "-", reason.lower())[:40] or "manual"
+    dest_path = backups_dir / f"reverse_ats-{ts}-{safe_reason}.db"
+
+    src = sqlite3.connect(str(src_path))
+    dest = sqlite3.connect(str(dest_path))
+    try:
+        src.backup(dest)
+    finally:
+        dest.close()
+        src.close()
+
+    _rotate_backups(backups_dir, keep=BACKUP_KEEP)
+
+    return {
+        "path": str(dest_path),
+        "size_bytes": dest_path.stat().st_size,
+        "reason": reason,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def list_backups() -> list[dict]:
+    """Return all backup files (newest first) with size + timestamp."""
+    backups_dir = get_backups_dir()
+    if not backups_dir.exists():
+        return []
+    out: list[dict] = []
+    for p in sorted(backups_dir.glob("reverse_ats-*.db"), reverse=True):
+        stat = p.stat()
+        out.append({
+            "path": str(p),
+            "filename": p.name,
+            "size_bytes": stat.st_size,
+            "created_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+        })
+    return out
+
+
+def _rotate_backups(backups_dir: Path, keep: int) -> None:
+    """Delete oldest backups so at most `keep` remain."""
+    files = sorted(backups_dir.glob("reverse_ats-*.db"))
+    excess = len(files) - keep
+    for old in files[:max(0, excess)]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+# ---------------------------------------------------------------------------
 # Schema
 # ---------------------------------------------------------------------------
 

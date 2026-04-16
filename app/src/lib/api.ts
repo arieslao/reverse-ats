@@ -97,11 +97,25 @@ export const triggerScrape = () =>
 export const fetchScoreStats = () =>
   request<{ total: number; scored: number; unscored: number }>('/api/jobs/score-stats')
 
+export interface BackupInfo {
+  path: string
+  filename?: string
+  size_bytes: number
+  reason?: string
+  created_at: string
+}
+
 export const triggerRescore = (mode: 'unscored' | 'all' = 'unscored') =>
-  request<{ status: string; mode: string; cleared: number }>(
+  request<{ status: string; mode: string; cleared: number; backup: BackupInfo | null }>(
     `/api/jobs/rescore${mode === 'all' ? '?all=true' : ''}`,
     { method: 'POST' },
   )
+
+// Backups
+export const fetchBackups = () => request<BackupInfo[]>('/api/admin/backups')
+
+export const createBackup = (reason = 'manual') =>
+  request<BackupInfo>(`/api/admin/backups?reason=${encodeURIComponent(reason)}`, { method: 'POST' })
 
 // LLM Settings
 export const fetchLLMSettings = () =>
