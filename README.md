@@ -23,7 +23,7 @@ Anyone looking for a job. Whether you're a software engineer, nurse, teacher, co
 5. **Works for any industry** — Tech, Healthcare, Consulting, Retail, Media, Education, Government, Energy, and more
 
 
-[![Watch the video](https://img.youtube.com/vi/sRJTMfnGA_4/0.jpg)](https://www.youtube.com/watch?v=sRJTMfnGA_4)
+[![Watch the video](https://img.youtube.com/vi/sRJTMfnGA4/0.jpg)](https://www.youtube.com/watch?v=sRJTMfnGA_4)
 
 ---
 
