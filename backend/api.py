@@ -490,7 +490,7 @@ def trigger_scrape():
     return {"status": "started", "script": str(PIPELINE_SCRIPT)}
 
 
-@app.get("/api/jobs/score-stats")
+@app.get("/api/scoring/stats")
 def job_score_stats():
     """
     Score coverage for active (non-dismissed, non-expired) jobs. Used by Admin UI
@@ -517,7 +517,7 @@ def job_score_stats():
     }
 
 
-@app.post("/api/jobs/rescore")
+@app.post("/api/scoring/rescore")
 def trigger_rescore(all: bool = Query(False, description="If true, re-score every active job (clears llm_score first)")):
     """
     Score all unscored jobs in the background.

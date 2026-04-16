@@ -95,7 +95,7 @@ export const triggerScrape = () =>
 
 // Scoring — backfill / re-score
 export const fetchScoreStats = () =>
-  request<{ total: number; scored: number; unscored: number }>('/api/jobs/score-stats')
+  request<{ total: number; scored: number; unscored: number }>('/api/scoring/stats')
 
 export interface BackupInfo {
   path: string
@@ -107,7 +107,7 @@ export interface BackupInfo {
 
 export const triggerRescore = (mode: 'unscored' | 'all' = 'unscored') =>
   request<{ status: string; mode: string; cleared: number; backup: BackupInfo | null }>(
-    `/api/jobs/rescore${mode === 'all' ? '?all=true' : ''}`,
+    `/api/scoring/rescore${mode === 'all' ? '?all=true' : ''}`,
     { method: 'POST' },
   )
 
