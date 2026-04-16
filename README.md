@@ -22,7 +22,7 @@ Anyone looking for a job. Whether you're a software engineer, nurse, teacher, co
 4. **Writes cover letters** — Click one button and get a professional cover letter tailored to that specific job
 5. **Works for any industry** — Tech, Healthcare, Consulting, Retail, Media, Education, Government, Energy, and more
 
-[![Watch the video](https://img.youtube.com/vi/_l1QDiMpkKA/0.jpg)](https://www.youtube.com/watch?v=_l1QDiMpkKA)
+[![Watch the video](https://img.youtube.com/vi/uNipfgPpPBQ/0.jpg)](https://www.youtube.com/watch?v=uNipfgPpPBQ)
 
 ---
 
