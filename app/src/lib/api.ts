@@ -93,6 +93,16 @@ export const fetchScrapeStatus = () =>
 export const triggerScrape = () =>
   request('/api/scrape/trigger', { method: 'POST' })
 
+// Scoring — backfill / re-score
+export const fetchScoreStats = () =>
+  request<{ total: number; scored: number; unscored: number }>('/api/jobs/score-stats')
+
+export const triggerRescore = (mode: 'unscored' | 'all' = 'unscored') =>
+  request<{ status: string; mode: string; cleared: number }>(
+    `/api/jobs/rescore${mode === 'all' ? '?all=true' : ''}`,
+    { method: 'POST' },
+  )
+
 // LLM Settings
 export const fetchLLMSettings = () =>
   request<import('./types').LLMSettings>('/api/admin/llm-settings')

@@ -9,6 +9,8 @@ import {
   deleteCompany,
   fetchScrapeStatus,
   triggerScrape,
+  fetchScoreStats,
+  triggerRescore,
   fetchLLMSettings,
   updateLLMSettings,
   testLLMSettings,
@@ -1187,6 +1189,10 @@ function LLMTab() {
         {saveMut.isError && <span style={{ fontSize: 12, color: '#ef4444' }}>Save failed</span>}
       </div>
 
+      {/* Score coverage + re-score */}
+      <RescoreCard />
+
+
       {/* Test result */}
       {testResult && (
         <div
@@ -1257,6 +1263,118 @@ function LLMTab() {
           Test failed: {testError}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Re-score card (lives in LLM tab) ─────────────────────────────────────────
+
+function RescoreCard() {
+  const queryClient = useQueryClient()
+  const { data: stats } = useQuery({
+    queryKey: ['score-stats'],
+    queryFn: fetchScoreStats,
+    refetchInterval: 15_000,
+  })
+
+  const [mode, setMode] = useState<'unscored' | 'all' | null>(null)
+  const rescoreMut = useMutation({
+    mutationFn: (m: 'unscored' | 'all') => triggerRescore(m),
+    onSuccess: () => {
+      // Bump the stats so the user sees something happen
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['score-stats'] }), 1500)
+    },
+  })
+
+  const total = stats?.total ?? 0
+  const scored = stats?.scored ?? 0
+  const unscored = stats?.unscored ?? 0
+  const pct = total > 0 ? Math.round((scored / total) * 100) : 0
+
+  const handleClick = (m: 'unscored' | 'all') => {
+    if (m === 'all') {
+      const ok = window.confirm(
+        `Re-score ALL ${total} active jobs? This clears existing scores first and runs ~${total} LLM calls (may take a while + cost money).`,
+      )
+      if (!ok) return
+    }
+    setMode(m)
+    rescoreMut.mutate(m)
+  }
+
+  return (
+    <div
+      style={{
+        background: '#1a1d27',
+        border: '1px solid #2e3140',
+        borderRadius: 8,
+        padding: 16,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 12,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Score Coverage
+        </div>
+        <div style={{ fontSize: 12, color: '#71717a' }}>
+          {scored.toLocaleString()} / {total.toLocaleString()} active jobs scored ({pct}%)
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ height: 6, background: '#0f1117', borderRadius: 3, overflow: 'hidden' }}>
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: pct >= 90 ? '#22c55e' : pct >= 50 ? '#3b82f6' : '#f59e0b',
+            transition: 'width 0.3s',
+          }}
+        />
+      </div>
+
+      <div style={{ fontSize: 12, color: '#71717a', lineHeight: 1.5 }}>
+        Scores are computed once when a job is first scraped. If you just configured an LLM
+        provider, updated your resume, or switched models, use these to backfill or refresh.
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => handleClick('unscored')}
+          disabled={rescoreMut.isPending || unscored === 0}
+          style={{
+            ...primaryBtnStyle,
+            opacity: unscored === 0 ? 0.5 : 1,
+            cursor: rescoreMut.isPending || unscored === 0 ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {rescoreMut.isPending && mode === 'unscored'
+            ? 'Starting...'
+            : `Score ${unscored.toLocaleString()} unscored`}
+        </button>
+        <button
+          onClick={() => handleClick('all')}
+          disabled={rescoreMut.isPending || total === 0}
+          style={{
+            ...ghostBtnStyle,
+            color: '#a1a1aa',
+            padding: '7px 16px',
+            fontSize: 13,
+          }}
+        >
+          {rescoreMut.isPending && mode === 'all' ? 'Starting...' : 'Re-score all'}
+        </button>
+        {rescoreMut.isSuccess && (
+          <span style={{ fontSize: 12, color: '#22c55e' }}>
+            Started — running in background. Stats refresh every 15s.
+          </span>
+        )}
+        {rescoreMut.isError && (
+          <span style={{ fontSize: 12, color: '#ef4444' }}>Failed to start</span>
+        )}
+      </div>
     </div>
   )
 }

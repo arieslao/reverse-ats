@@ -437,6 +437,72 @@ def trigger_scrape():
     return {"status": "started", "script": str(PIPELINE_SCRIPT)}
 
 
+@app.get("/api/jobs/score-stats")
+def job_score_stats():
+    """
+    Score coverage for active (non-dismissed, non-expired) jobs. Used by Admin UI
+    to show how many jobs would be re-scored.
+    """
+    conn = _conn()
+    try:
+        row = conn.execute(
+            """
+            SELECT
+              COUNT(*)                                       AS total,
+              SUM(CASE WHEN llm_score IS NOT NULL THEN 1 ELSE 0 END) AS scored,
+              SUM(CASE WHEN llm_score IS NULL     THEN 1 ELSE 0 END) AS unscored
+            FROM jobs
+            WHERE dismissed = 0 AND expired = 0
+            """
+        ).fetchone()
+    finally:
+        conn.close()
+    return {
+        "total": row["total"] or 0,
+        "scored": row["scored"] or 0,
+        "unscored": row["unscored"] or 0,
+    }
+
+
+@app.post("/api/jobs/rescore")
+def trigger_rescore(all: bool = Query(False, description="If true, re-score every active job (clears llm_score first)")):
+    """
+    Score all unscored jobs in the background.
+
+    By default this only scores jobs where llm_score IS NULL (cheap backfill —
+    use this after first configuring an LLM provider).
+
+    Pass ?all=true to clear every active llm_score and re-run scoring against
+    the current resume + LLM settings (use after changing your resume or
+    switching providers). Costs roughly 1 LLM call per active job.
+    """
+    if not PIPELINE_SCRIPT.exists():
+        raise HTTPException(
+            status_code=500,
+            detail=f"pipeline.py not found at {PIPELINE_SCRIPT}",
+        )
+
+    cleared = 0
+    if all:
+        conn = _conn()
+        try:
+            cur = conn.execute(
+                "UPDATE jobs SET llm_score = NULL, llm_reasoning = NULL WHERE dismissed = 0 AND expired = 0"
+            )
+            cleared = cur.rowcount
+            conn.commit()
+        finally:
+            conn.close()
+
+    subprocess.Popen(
+        [sys.executable, str(PIPELINE_SCRIPT), "--score-only"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return {"status": "started", "mode": "all" if all else "unscored_only", "cleared": cleared}
+
+
 # ---------------------------------------------------------------------------
 # Admin — Companies
 # ---------------------------------------------------------------------------
