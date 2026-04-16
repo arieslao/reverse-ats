@@ -419,8 +419,8 @@ def get_jobs(
     if exclude_companies:
         for idx, comp in enumerate(exclude_companies):
             param_name = f"exc_comp_{idx}"
-            conditions.append(f"j.company != :{param_name}")
-            params[param_name] = comp
+            conditions.append(f"LOWER(j.company) != :{param_name}")
+            params[param_name] = comp.strip().lower()
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 

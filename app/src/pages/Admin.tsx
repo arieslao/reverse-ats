@@ -12,6 +12,8 @@ import {
   fetchLLMSettings,
   updateLLMSettings,
   testLLMSettings,
+  fetchIndustryPacks,
+  installIndustryPack,
 } from '../lib/api'
 import type { Profile, Company } from '../lib/types'
 
@@ -368,6 +370,82 @@ const BLANK_COMPANY: CompanyFormData = {
 const ATS_OPTIONS = ['greenhouse', 'lever', 'workday', 'icims', 'taleo', 'bamboohr', 'smartrecruiters', 'ashby', 'other']
 const CATEGORY_OPTIONS = ['tech', 'finance', 'healthcare', 'consulting', 'media', 'retail', 'education', 'government', 'other']
 
+function IndustryPacks() {
+  const queryClient = useQueryClient()
+  const { data: packs } = useQuery({
+    queryKey: ['industry-packs'],
+    queryFn: fetchIndustryPacks,
+  })
+  const [results, setResults] = useState<Record<string, { installed: number; skipped: number }>>({})
+  const [loading, setLoading] = useState<string | null>(null)
+
+  const handleInstall = async (packId: string) => {
+    setLoading(packId)
+    try {
+      const result = await installIndustryPack(packId)
+      setResults((r) => ({ ...r, [packId]: { installed: result.installed, skipped: result.skipped } }))
+      queryClient.invalidateQueries({ queryKey: ['companies'] })
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
+        Industry Packs
+      </h3>
+      <p style={{ fontSize: 12, color: '#71717a', marginBottom: 12 }}>
+        Quickly add companies from any industry. Each pack includes ~15-30 companies with their career page configurations.
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+        {(packs || []).map((pack) => {
+          const result = results[pack.id]
+          return (
+            <div
+              key={pack.id}
+              style={{
+                background: '#1a1d27',
+                border: '1px solid #2e3140',
+                borderRadius: 8,
+                padding: '12px 14px',
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: 13, color: '#e4e4e7' }}>{pack.name}</div>
+              <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>{pack.description}</div>
+              <div style={{ fontSize: 11, color: '#52525b', marginTop: 4 }}>{pack.count} companies</div>
+              {result ? (
+                <div style={{ fontSize: 11, color: '#22c55e', marginTop: 8 }}>
+                  Added {result.installed}, {result.skipped} already existed
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleInstall(pack.id)}
+                  disabled={loading === pack.id}
+                  style={{
+                    marginTop: 8,
+                    background: 'rgba(59,130,246,0.12)',
+                    border: '1px solid rgba(59,130,246,0.3)',
+                    borderRadius: 5,
+                    color: '#3b82f6',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: '5px 12px',
+                    cursor: loading === pack.id ? 'not-allowed' : 'pointer',
+                    opacity: loading === pack.id ? 0.6 : 1,
+                  }}
+                >
+                  {loading === pack.id ? 'Installing...' : 'Install Pack'}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function CompanyTab() {
   const queryClient = useQueryClient()
   const [filterCat, setFilterCat] = useState('')
@@ -430,6 +508,9 @@ function CompanyTab() {
 
   return (
     <div>
+      {/* Industry Packs */}
+      <IndustryPacks />
+
       {/* Toolbar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
         <select

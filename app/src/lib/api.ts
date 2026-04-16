@@ -105,3 +105,10 @@ export const testLLMSettings = () =>
 
 export const generateCoverLetter = (jobId: string) =>
   request<{ cover_letter: string; provider: string; error: string | null }>(`/api/jobs/${jobId}/cover-letter`, { method: 'POST' })
+
+// Industry Packs
+export const fetchIndustryPacks = () =>
+  request<{ id: string; name: string; description: string; count: number }[]>('/api/admin/industry-packs')
+
+export const installIndustryPack = (packId: string) =>
+  request<{ pack_id: string; installed: number; skipped: number; total: number }>(`/api/admin/industry-packs/${packId}/install`, { method: 'POST' })

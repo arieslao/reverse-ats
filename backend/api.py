@@ -493,6 +493,39 @@ def delete_company_endpoint(company_id: int):
 
 
 # ---------------------------------------------------------------------------
+# Admin — Industry Packs
+# ---------------------------------------------------------------------------
+
+@app.get("/api/admin/industry-packs")
+def list_industry_packs():
+    """List available industry packs with metadata."""
+    from industry_packs import get_available_packs
+    return get_available_packs()
+
+@app.post("/api/admin/industry-packs/{pack_id}/install")
+def install_industry_pack(pack_id: str):
+    """Install all companies from an industry pack."""
+    from industry_packs import get_pack_companies
+    companies = get_pack_companies(pack_id)
+    if not companies:
+        raise HTTPException(status_code=404, detail=f"Pack '{pack_id}' not found")
+
+    conn = _conn()
+    try:
+        installed = 0
+        skipped = 0
+        for company in companies:
+            try:
+                create_company(conn, company)
+                installed += 1
+            except Exception:
+                skipped += 1  # already exists (unique constraint)
+        return {"pack_id": pack_id, "installed": installed, "skipped": skipped, "total": len(companies)}
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
 # Admin — LLM Settings
 # ---------------------------------------------------------------------------
 
