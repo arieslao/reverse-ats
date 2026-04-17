@@ -70,7 +70,7 @@ PROVIDERS: dict[str, dict] = {
     },
 }
 
-REQUEST_TIMEOUT = 90  # seconds — LLMs on large prompts can be slow
+REQUEST_TIMEOUT = 120  # seconds — LLMs on large prompts can be slow
 
 # ---------------------------------------------------------------------------
 # Default resume placeholder
@@ -412,7 +412,15 @@ def _call_openai_format(user_prompt: str, settings: dict, provider_info: dict) -
     )
     resp.raise_for_status()
 
-    content = resp.json()["choices"][0]["message"]["content"].strip()
+    msg = resp.json()["choices"][0]["message"]
+    content = (msg.get("content") or "").strip()
+    # Qwen3 and other "thinking" models may put chain-of-thought in a
+    # separate `reasoning` field and leave `content` empty, or wrap
+    # thinking in <think>...</think> tags inside content.
+    if not content and msg.get("reasoning"):
+        # Thinking model — try to extract JSON from the reasoning field
+        content = msg["reasoning"].strip()
+    content = _strip_thinking_tags(content)
     return _parse_llm_response(content)
 
 
@@ -454,20 +462,50 @@ def _call_anthropic_format(user_prompt: str, settings: dict, provider_info: dict
     return _parse_llm_response(content)
 
 
+def _strip_thinking_tags(content: str) -> str:
+    """Remove <think>...</think> blocks that reasoning models may emit."""
+    import re
+    # Remove <think> blocks (greedy — may span multiple lines)
+    cleaned = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+    return cleaned or content  # fall back to original if nothing remains
+
+
 def _parse_llm_response(content: str) -> dict:
     """
     Parse the raw text from an LLM into a validated score dict.
 
-    Handles markdown code fences (```json ... ```) that some models emit
-    around JSON output.
+    Handles:
+    - Markdown code fences (```json ... ```)
+    - Thinking models that embed JSON after chain-of-thought text
+    - Partial / truncated JSON (best-effort extraction)
     """
-    if content.startswith("```"):
-        lines = content.split("\n")
-        inner = [line for line in lines[1:] if line.strip() != "```"]
-        content = "\n".join(inner).strip()
+    import re
 
-    result = json.loads(content)
-    return _validate_result(result)
+    # Strip markdown fences
+    if "```" in content:
+        fence_match = re.search(r"```(?:json)?\s*\n?(.*?)```", content, re.DOTALL)
+        if fence_match:
+            content = fence_match.group(1).strip()
+
+    # Try direct parse first
+    try:
+        result = json.loads(content)
+        return _validate_result(result)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Fallback: extract the first JSON object from the text
+    # (handles models that emit thinking text before the JSON)
+    json_match = re.search(r"\{[^{}]*\"score\"[^{}]*\}", content, re.DOTALL)
+    if json_match:
+        try:
+            result = json.loads(json_match.group())
+            return _validate_result(result)
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Last resort: raise so the caller can fall back to keyword scoring
+    raise ValueError(f"parse error: could not extract JSON score from LLM response")
 
 
 def _validate_result(result: dict) -> dict:
