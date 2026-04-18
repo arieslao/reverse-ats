@@ -1,0 +1,633 @@
+#!/usr/bin/env python3
+"""
+Job Scraper — Remote AI/ML/Engineering positions from public ATS APIs.
+No auth required. Targets major tech, fintech, and AI-finance companies.
+
+Requirements: pip install requests
+"""
+
+import argparse
+import json
+import os
+import sys
+import time
+from datetime import datetime
+from typing import Optional
+
+import requests
+from datetime import timezone
+
+# ---------------------------------------------------------------------------
+# Company Registry
+# ---------------------------------------------------------------------------
+
+COMPANIES = [
+    # FAANG / Big Tech
+    {"name": "Netflix",      "ats": "greenhouse", "slug": "netflix",      "category": "big_tech"},
+    {"name": "NVIDIA",       "ats": "workday",    "slug": "nvidia",        "category": "big_tech",
+     "workday_url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobs"},
+    {"name": "Google",       "ats": "custom",     "slug": "google",        "category": "big_tech",
+     "careers_url": "https://careers.google.com/jobs/results/?category=DATA_CENTER_OPERATIONS&category=DEVELOPER_RELATIONS&category=HARDWARE_ENGINEERING&category=INFORMATION_TECHNOLOGY&category=MANUFACTURING_SUPPLY_CHAIN&category=NETWORK_ENGINEERING&category=PRODUCT_MANAGEMENT&category=PROGRAM_MANAGEMENT&category=SOFTWARE_ENGINEERING&category=TECHNICAL_INFRASTRUCTURE_ENGINEERING&category=TECHNICAL_WRITING&category=USER_EXPERIENCE&employment_type=FULL_TIME"},
+    {"name": "Apple",        "ats": "custom",     "slug": "apple",         "category": "big_tech",
+     "careers_url": "https://jobs.apple.com/en-us/search"},
+    {"name": "Amazon",       "ats": "custom",     "slug": "amazon",        "category": "big_tech",
+     "careers_url": "https://amazon.jobs/en/search?base_query=machine+learning&loc_query=&job_count=10&result_limit=10&sort=relevant&category%5B%5D=machine-learning-science&category%5B%5D=software-development"},
+    {"name": "Meta",         "ats": "custom",     "slug": "meta",          "category": "big_tech",
+     "careers_url": "https://www.metacareers.com/jobs/?teams%5B0%5D=Data%20%26%20Analytics&teams%5B1%5D=Machine%20Learning&teams%5B2%5D=Software%20Engineering"},
+    {"name": "Microsoft",    "ats": "custom",     "slug": "microsoft",     "category": "big_tech",
+     "careers_url": "https://careers.microsoft.com/v2/global/en/search?q=machine+learning&lc=United+States&l=en_us&pgSz=20&o=Relevance&flt=true"},
+
+    # Major Fintech
+    {"name": "Stripe",       "ats": "greenhouse", "slug": "stripe",        "category": "fintech"},
+    {"name": "Block",        "ats": "greenhouse", "slug": "block",         "category": "fintech"},
+    {"name": "Plaid",        "ats": "greenhouse", "slug": "plaid",         "category": "fintech"},
+    {"name": "Affirm",       "ats": "greenhouse", "slug": "affirm",        "category": "fintech"},
+    {"name": "Robinhood",    "ats": "greenhouse", "slug": "robinhood",     "category": "fintech"},
+    {"name": "Coinbase",     "ats": "greenhouse", "slug": "coinbase",      "category": "fintech"},
+    {"name": "Ripple",       "ats": "greenhouse", "slug": "ripple",        "category": "fintech"},
+    {"name": "Ramp",         "ats": "greenhouse", "slug": "ramp",          "category": "fintech"},
+    {"name": "Brex",         "ats": "greenhouse", "slug": "brex",          "category": "fintech"},
+    {"name": "Chime",        "ats": "greenhouse", "slug": "chime",         "category": "fintech"},
+    {"name": "Marqeta",      "ats": "greenhouse", "slug": "marqeta",       "category": "fintech"},
+    {"name": "Upstart",      "ats": "greenhouse", "slug": "upstart",       "category": "fintech"},
+    {"name": "SoFi",         "ats": "greenhouse", "slug": "sofi",          "category": "fintech"},
+    {"name": "Remitly",      "ats": "greenhouse", "slug": "remitly",       "category": "fintech"},
+    {"name": "Wise",         "ats": "greenhouse", "slug": "transferwise",  "category": "fintech"},
+    {"name": "Toast",        "ats": "greenhouse", "slug": "toast",         "category": "fintech"},
+    {"name": "Bill.com",     "ats": "greenhouse", "slug": "billcom",       "category": "fintech"},
+    {"name": "Wealthfront",  "ats": "greenhouse", "slug": "wealthfront",   "category": "fintech"},
+    {"name": "Betterment",   "ats": "greenhouse", "slug": "betterment",    "category": "fintech"},
+    {"name": "Airwallex",    "ats": "greenhouse", "slug": "airwallex",     "category": "fintech"},
+    {"name": "Mercury",      "ats": "greenhouse", "slug": "mercury",       "category": "fintech"},
+    {"name": "Carta",        "ats": "greenhouse", "slug": "carta",         "category": "fintech"},
+    {"name": "Gusto",        "ats": "greenhouse", "slug": "gusto",         "category": "fintech"},
+    {"name": "Deel",         "ats": "ashby",      "slug": "deel",          "category": "fintech"},
+    {"name": "Klarna",       "ats": "greenhouse", "slug": "klarna",        "category": "fintech"},
+    {"name": "PayPal",       "ats": "custom",     "slug": "paypal",        "category": "fintech",
+     "careers_url": "https://careers.pypl.com/home/"},
+    {"name": "Mastercard",   "ats": "custom",     "slug": "mastercard",    "category": "fintech",
+     "careers_url": "https://careers.mastercard.com/us/en/search-results"},
+    {"name": "Visa",         "ats": "custom",     "slug": "visa",          "category": "fintech",
+     "careers_url": "https://corporate.visa.com/en/jobs.html"},
+    {"name": "Adyen",        "ats": "greenhouse", "slug": "adyen",         "category": "fintech"},
+    {"name": "Checkout.com", "ats": "greenhouse", "slug": "checkoutcom",   "category": "fintech"},
+
+    # Growth-Stage / AI-Finance
+    {"name": "Anthropic",   "ats": "ashby",      "slug": "anthropic",     "category": "ai_tech"},
+    {"name": "OpenAI",      "ats": "greenhouse", "slug": "openai",        "category": "ai_tech"},
+    {"name": "Datadog",     "ats": "greenhouse", "slug": "datadog",       "category": "ai_tech"},
+    {"name": "Databricks",  "ats": "greenhouse", "slug": "databricks",    "category": "ai_tech"},
+    {"name": "Scale AI",    "ats": "lever",      "slug": "scaleai",       "category": "ai_tech"},
+    {"name": "Anduril",     "ats": "greenhouse", "slug": "anduril",       "category": "ai_tech"},
+    {"name": "Palantir",    "ats": "lever",      "slug": "palantir",      "category": "ai_tech"},
+    {"name": "Notion",      "ats": "greenhouse", "slug": "notion",        "category": "ai_tech"},
+    {"name": "Figma",       "ats": "greenhouse", "slug": "figma",         "category": "ai_tech"},
+    {"name": "Vercel",      "ats": "greenhouse", "slug": "vercel",        "category": "ai_tech"},
+    {"name": "Supabase",    "ats": "ashby",      "slug": "supabase",      "category": "ai_tech"},
+
+    # HealthTech-FinTech Crossover
+    {"name": "Arcadia",          "ats": "greenhouse", "slug": "arcadiasolutions", "category": "healthtech"},
+    {"name": "Strata Decision",  "ats": "lever",      "slug": "stratadecision",   "category": "healthtech"},
+    {"name": "Oscar Health",     "ats": "greenhouse", "slug": "oscarhealth",      "category": "healthtech"},
+    {"name": "Devoted Health",   "ats": "greenhouse", "slug": "devoted",          "category": "healthtech"},
+    {"name": "Cityblock Health", "ats": "greenhouse", "slug": "cityblockhealth",  "category": "healthtech"},
+
+    # Trading / Quantitative
+    {"name": "Citadel",          "ats": "custom", "slug": "citadel",      "category": "quant",
+     "careers_url": "https://www.citadel.com/careers/open-opportunities/"},
+    {"name": "Two Sigma",        "ats": "custom", "slug": "twosigma",     "category": "quant",
+     "careers_url": "https://careers.twosigma.com/careers/JobSearch?query=&location="},
+    {"name": "Jane Street",      "ats": "custom", "slug": "janestreet",   "category": "quant",
+     "careers_url": "https://www.janestreet.com/join-jane-street/open-roles/"},
+    {"name": "DE Shaw",          "ats": "custom", "slug": "deshaw",       "category": "quant",
+     "careers_url": "https://www.deshaw.com/careers"},
+    {"name": "Jump Trading",     "ats": "custom", "slug": "jumptrading",  "category": "quant",
+     "careers_url": "https://www.jumptrading.com/careers/"},
+    {"name": "Hudson River",     "ats": "custom", "slug": "hrt",          "category": "quant",
+     "careers_url": "https://www.hudsonrivertrading.com/careers/"},
+]
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+TITLE_KEYWORDS = [
+    "ai", "ml", "machine learning", "data scientist", "data science",
+    "engineer", "architect", "director", "vp ", "vice president",
+    "head of", "product manager", "program manager", "solutions",
+    "data engineer", "platform engineer", "staff", "principal",
+    "analytics", "research scientist", "llm", "nlp",
+]
+
+EXCLUDE_KEYWORDS = ["intern", "internship", "co-op", "coop", "apprentice"]
+
+REMOTE_KEYWORDS = ["remote", "anywhere", "distributed", "us-based", "united states"]
+
+SKILL_KEYWORDS = [
+    "python", "typescript", "react", "machine learning", "ml", "ai",
+    "llm", "infrastructure", "healthcare", "hipaa", "fintech",
+    "multi-agent", "orchestration", "postgresql", "postgres",
+    "data engineering", "data platform", "spark", "kafka", "kubernetes",
+    "distributed systems", "real-time", "streaming", "etl", "dbt",
+    "trading", "quantitative", "financial", "api", "microservices",
+]
+
+REQUEST_TIMEOUT = 15
+RATE_LIMIT_SLEEP = 1.0
+
+CATEGORY_LABELS = {
+    "big_tech":   "FAANG / Big Tech",
+    "fintech":    "Major Fintech",
+    "ai_tech":    "Growth-Stage AI & Tech",
+    "healthtech": "HealthTech / Health-Fintech",
+    "quant":      "Trading / Quantitative",
+}
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _get(url: str, params: dict = None) -> Optional[dict]:
+    try:
+        resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT,
+                            headers={"User-Agent": "AriesLabs-JobScraper/1.0"})
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return None
+
+
+def _post(url: str, payload: dict) -> Optional[dict]:
+    try:
+        resp = requests.post(url, json=payload, timeout=REQUEST_TIMEOUT,
+                             headers={"User-Agent": "AriesLabs-JobScraper/1.0",
+                                      "Content-Type": "application/json"})
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as e:
+        return None
+
+
+def _normalize_location(loc: str) -> str:
+    return (loc or "").strip()
+
+
+def _is_remote(location: str) -> bool:
+    loc = location.lower()
+    return any(kw in loc for kw in REMOTE_KEYWORDS)
+
+
+def _passes_title_filter(title: str, extra_keywords: list[str] = None) -> bool:
+    t = title.lower()
+    if any(ex in t for ex in EXCLUDE_KEYWORDS):
+        return False
+    keywords = TITLE_KEYWORDS + (extra_keywords or [])
+    return any(kw in t for kw in keywords)
+
+
+def _relevance_score(title: str, description: str = "") -> int:
+    text = (title + " " + description).lower()
+    hits = sum(1 for kw in SKILL_KEYWORDS if kw in text)
+    return min(100, round((hits / len(SKILL_KEYWORDS)) * 100))
+
+
+# ---------------------------------------------------------------------------
+# ATS Fetchers
+# ---------------------------------------------------------------------------
+
+def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
+    url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
+    data = _get(url, params={"content": "true"})
+    if not data or "jobs" not in data:
+        return []
+
+    jobs = []
+    for j in data["jobs"]:
+        title = j.get("title", "")
+        location = _normalize_location(
+            j.get("location", {}).get("name", "") if isinstance(j.get("location"), dict)
+            else j.get("location", "")
+        )
+        dept = ""
+        depts = j.get("departments", [])
+        if depts:
+            dept = depts[0].get("name", "")
+        description = j.get("content", "") or ""
+        jobs.append({
+            "title": title,
+            "location": location,
+            "url": j.get("absolute_url", ""),
+            "department": dept,
+            "remote": _is_remote(location),
+            "description_snippet": description[:500],
+            "company": company_name,
+        })
+    return jobs
+
+
+def fetch_lever(slug: str, company_name: str) -> list[dict]:
+    url = f"https://api.lever.co/v0/postings/{slug}"
+    data = _get(url, params={"limit": 500})
+    if not isinstance(data, list):
+        return []
+
+    jobs = []
+    for j in data:
+        title = j.get("text", "")
+        cats = j.get("categories", {})
+        location = _normalize_location(cats.get("location", "") or cats.get("allLocations", ""))
+        dept = cats.get("team", "") or cats.get("department", "")
+        description = (j.get("descriptionPlain", "") or j.get("description", ""))[:500]
+        jobs.append({
+            "title": title,
+            "location": location,
+            "url": j.get("applyUrl", j.get("hostedUrl", "")),
+            "department": dept,
+            "remote": _is_remote(location),
+            "description_snippet": description,
+            "company": company_name,
+        })
+    return jobs
+
+
+def fetch_ashby(slug: str, company_name: str) -> list[dict]:
+    url = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
+    data = _get(url)
+    if not data:
+        # Fallback: try GraphQL endpoint
+        gql_url = "https://jobs.ashbyhq.com/api/non-user-graphql"
+        query = """
+        query ApiJobBoardWithTeams($organizationHostedJobsPageName: String!) {
+          jobBoard: jobBoardWithTeams(
+            organizationHostedJobsPageName: $organizationHostedJobsPageName
+          ) {
+            jobPostings { id title locationName isRemote teamName applyLink }
+          }
+        }
+        """
+        payload = {
+            "operationName": "ApiJobBoardWithTeams",
+            "variables": {"organizationHostedJobsPageName": slug},
+            "query": query,
+        }
+        gql_data = _post(gql_url, payload)
+        if not gql_data:
+            return []
+        postings = (gql_data.get("data", {})
+                            .get("jobBoard", {})
+                            .get("jobPostings", []))
+        jobs = []
+        for j in postings:
+            location = j.get("locationName", "")
+            if j.get("isRemote"):
+                location = location or "Remote"
+            jobs.append({
+                "title": j.get("title", ""),
+                "location": _normalize_location(location),
+                "url": j.get("applyLink", f"https://jobs.ashbyhq.com/{slug}"),
+                "department": j.get("teamName", ""),
+                "remote": j.get("isRemote", False) or _is_remote(location),
+                "description_snippet": "",
+                "company": company_name,
+            })
+        return jobs
+
+    # Primary Ashby API response
+    postings = data.get("jobs", data.get("jobPostings", []))
+    jobs = []
+    for j in postings:
+        location = j.get("location", j.get("locationName", ""))
+        is_remote = j.get("isRemote", False)
+        if is_remote:
+            location = location or "Remote"
+        jobs.append({
+            "title": j.get("title", ""),
+            "location": _normalize_location(location),
+            "url": j.get("applyLink", j.get("jobUrl", f"https://jobs.ashbyhq.com/{slug}")),
+            "department": j.get("department", j.get("teamName", "")),
+            "remote": is_remote or _is_remote(location),
+            "description_snippet": "",
+            "company": company_name,
+        })
+    return jobs
+
+
+def fetch_workday(company: dict, company_name: str) -> list[dict]:
+    """
+    Workday doesn't have a clean public API. We attempt the standard
+    REST endpoint pattern but fall back gracefully.
+    """
+    base_url = company.get("workday_url", "")
+    if not base_url:
+        return []
+
+    # Workday REST search endpoint (undocumented but public)
+    api_url = base_url.rstrip("/") + "?format=json"
+    data = _get(api_url)
+    if not data:
+        return [{
+            "title": "Visit careers page directly",
+            "location": "See careers page",
+            "url": base_url,
+            "department": "",
+            "remote": False,
+            "description_snippet": f"Workday API not accessible. Visit: {base_url}",
+            "company": company_name,
+            "_custom": True,
+        }]
+
+    job_postings = data.get("jobPostings", [])
+    jobs = []
+    for j in job_postings:
+        title = j.get("title", "")
+        location = j.get("locationsText", "") or j.get("primaryLocation", {}).get("descriptor", "")
+        jobs.append({
+            "title": title,
+            "location": _normalize_location(location),
+            "url": j.get("externalUrl", base_url),
+            "department": j.get("jobFamilyGroup", {}).get("descriptor", "") if isinstance(j.get("jobFamilyGroup"), dict) else "",
+            "remote": _is_remote(location),
+            "description_snippet": j.get("briefDescription", "")[:500],
+            "company": company_name,
+        })
+    return jobs
+
+
+def fetch_custom(company: dict, company_name: str) -> list[dict]:
+    careers_url = company.get("careers_url", f"https://careers.{company['slug']}.com")
+    return [{
+        "title": f"Visit {company_name} careers directly",
+        "location": "See careers page",
+        "url": careers_url,
+        "department": "",
+        "remote": False,
+        "description_snippet": f"Custom ATS — no public API. Browse openings at: {careers_url}",
+        "company": company_name,
+        "_custom": True,
+    }]
+
+
+# ---------------------------------------------------------------------------
+# Core Pipeline
+# ---------------------------------------------------------------------------
+
+def scrape_company(company: dict, extra_keywords: list[str], remote_only: bool) -> tuple[list[dict], Optional[str]]:
+    ats = company["ats"]
+    slug = company["slug"]
+    name = company["name"]
+
+    try:
+        if ats == "greenhouse":
+            raw = fetch_greenhouse(slug, name)
+        elif ats == "lever":
+            raw = fetch_lever(slug, name)
+        elif ats == "ashby":
+            raw = fetch_ashby(slug, name)
+        elif ats == "workday":
+            raw = fetch_workday(company, name)
+        elif ats == "custom":
+            raw = fetch_custom(company, name)
+        else:
+            return [], f"Unknown ATS type: {ats}"
+    except Exception as e:
+        return [], str(e)
+
+    filtered = []
+    for job in raw:
+        if job.get("_custom"):
+            filtered.append(job)
+            continue
+
+        if remote_only and not job["remote"]:
+            continue
+
+        if not _passes_title_filter(job["title"], extra_keywords):
+            continue
+
+        job["score"] = _relevance_score(job["title"], job.get("description_snippet", ""))
+        filtered.append(job)
+
+    return filtered, None
+
+
+def run_scraper(
+    categories: list[str],
+    extra_keywords: list[str],
+    remote_only: bool,
+    min_score: int,
+    output_dir: str,
+) -> None:
+    print_banner()
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    target_companies = [
+        c for c in COMPANIES
+        if not categories or c["category"] in categories
+    ]
+
+    print(f"  Targeting {len(target_companies)} companies across "
+          f"{len(set(c['category'] for c in target_companies))} categories\n")
+
+    all_jobs: list[dict] = []
+    errors: list[str] = []
+
+    for i, company in enumerate(target_companies, 1):
+        name = company["name"]
+        ats  = company["ats"].upper()
+        print(f"  [{i:02d}/{len(target_companies):02d}] {name:<22} ({ats})", end=" ... ", flush=True)
+
+        jobs, error = scrape_company(company, extra_keywords, remote_only)
+
+        if error:
+            errors.append(f"{name}: {error}")
+            print(f"ERROR: {error}")
+        else:
+            for j in jobs:
+                j["category"] = company["category"]
+            all_jobs.extend(jobs)
+            label = f"{len(jobs)} jobs" if jobs else "0 jobs"
+            print(label)
+
+        if company["ats"] != "custom":
+            time.sleep(RATE_LIMIT_SLEEP)
+
+    # Apply min score filter (skip custom placeholder entries)
+    scored = [j for j in all_jobs if j.get("_custom") or j.get("score", 0) >= min_score]
+    scored.sort(key=lambda j: j.get("score", 0), reverse=True)
+
+    # Save outputs
+    json_path = os.path.join(output_dir, "job_results.json")
+    md_path   = os.path.join(output_dir, "job_report.md")
+
+    save_json(scored, json_path)
+    save_markdown(scored, errors, md_path, remote_only, min_score)
+
+    # Console summary
+    real_jobs = [j for j in scored if not j.get("_custom")]
+    print(f"\n{'='*60}")
+    print(f"  Total jobs found:    {len(all_jobs)}")
+    print(f"  After filters:       {len(real_jobs)}")
+    print(f"  Errors:              {len(errors)}")
+    print(f"  JSON output:         {json_path}")
+    print(f"  Markdown report:     {md_path}")
+    print(f"{'='*60}\n")
+
+    if errors:
+        print("  Failed companies:")
+        for e in errors:
+            print(f"    - {e}")
+        print()
+
+
+# ---------------------------------------------------------------------------
+# Output Writers
+# ---------------------------------------------------------------------------
+
+def save_json(jobs: list[dict], path: str) -> None:
+    output = {
+        "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "total": len(jobs),
+        "jobs": jobs,
+    }
+    with open(path, "w") as f:
+        json.dump(output, f, indent=2)
+
+
+def save_markdown(
+    jobs: list[dict],
+    errors: list[str],
+    path: str,
+    remote_only: bool,
+    min_score: int,
+) -> None:
+    by_category: dict[str, list[dict]] = {}
+    for j in jobs:
+        cat = j.get("category", "other")
+        by_category.setdefault(cat, []).append(j)
+
+    lines = [
+        "# Job Search Report",
+        f"\n_Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}_  ",
+        f"_Remote only: {remote_only} | Min score: {min_score}_\n",
+        "---\n",
+    ]
+
+    real_total = sum(1 for j in jobs if not j.get("_custom"))
+    lines.append(f"**{real_total} matching positions** found across {len(by_category)} categories.\n")
+
+    for cat_key in ["big_tech", "fintech", "ai_tech", "healthtech", "quant"]:
+        cat_jobs = by_category.get(cat_key, [])
+        if not cat_jobs:
+            continue
+
+        label = CATEGORY_LABELS.get(cat_key, cat_key)
+        lines.append(f"\n## {label}\n")
+
+        real = [j for j in cat_jobs if not j.get("_custom")]
+        custom = [j for j in cat_jobs if j.get("_custom")]
+
+        if real:
+            lines.append("| Company | Role | Location | Score | Link |")
+            lines.append("|---------|------|----------|-------|------|")
+            for j in sorted(real, key=lambda x: x.get("score", 0), reverse=True):
+                dept = f" · _{j['department']}_" if j.get("department") else ""
+                loc = j["location"] or "—"
+                score = j.get("score", 0)
+                score_badge = f"`{score:3d}`"
+                link = f"[Apply]({j['url']})" if j.get("url") else "—"
+                lines.append(f"| {j['company']} | {j['title']}{dept} | {loc} | {score_badge} | {link} |")
+
+        if custom:
+            lines.append("\n**Custom ATS (visit directly):**\n")
+            for j in custom:
+                lines.append(f"- **{j['company']}** — [{j['description_snippet'].split(': ')[-1]}]({j['url']})")
+
+    if errors:
+        lines.append("\n\n---\n## Fetch Errors\n")
+        for e in errors:
+            lines.append(f"- {e}")
+
+    lines.append("\n\n---\n_All positions are AI-research only. Verify details on the company's official careers page._\n")
+
+    with open(path, "w") as f:
+        f.write("\n".join(lines))
+
+
+# ---------------------------------------------------------------------------
+# Banner
+# ---------------------------------------------------------------------------
+
+def print_banner() -> None:
+    print()
+    print("=" * 60)
+    print("  AriesLabs Job Scraper")
+    print("  Remote AI/ML/Engineering — Public ATS APIs")
+    print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    print("=" * 60)
+    print()
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Scrape remote AI/ML/engineering jobs from public ATS APIs.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--category",
+        choices=list(CATEGORY_LABELS.keys()),
+        help="Only scrape companies in this category.",
+    )
+    parser.add_argument(
+        "--keyword",
+        action="append",
+        dest="keywords",
+        default=[],
+        metavar="KEYWORD",
+        help="Additional title keyword filter (repeatable).",
+    )
+    parser.add_argument(
+        "--remote-only",
+        action="store_true",
+        default=True,
+        help="Only include remote-eligible positions (default: True).",
+    )
+    parser.add_argument(
+        "--no-remote-filter",
+        action="store_true",
+        default=False,
+        help="Include all positions regardless of remote status.",
+    )
+    parser.add_argument(
+        "--min-score",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Minimum relevance score 0-100 to include (default: 10).",
+    )
+    parser.add_argument(
+        "--output-dir",
+        default="/Users/arieslao/AriesLabs.ai/infrastructure/scripts/output",
+        metavar="PATH",
+        help="Directory for JSON and Markdown output.",
+    )
+    return parser.parse_args()
+
+
+if __name__ == "__main__":
+    args = parse_args()
+
+    categories = [args.category] if args.category else []
+    remote_only = args.remote_only and not args.no_remote_filter
+
+    run_scraper(
+        categories=categories,
+        extra_keywords=args.keywords,
+        remote_only=remote_only,
+        min_score=args.min_score,
+        output_dir=args.output_dir,
+    )
