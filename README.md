@@ -21,6 +21,7 @@ Anyone looking for a job. Whether you're a software engineer, nurse, teacher, co
 3. **Lets you track applications** — A visual board (like sticky notes on a wall) where you drag jobs through stages: Saved, Applied, Interviewing, Offer
 4. **Writes cover letters** — Click one button and get a professional cover letter tailored to that specific job
 5. **Works for any industry** — Tech, Healthcare, Consulting, Retail, Media, Education, Government, Energy, and more
+6. **Protects your work** — Your application history survives even if a job posting gets taken down. Auto-backups before destructive actions. One-click CSV/JSON export of your whole pipeline.
 
 ---
 
@@ -147,20 +148,28 @@ You should see the Reverse ATS dashboard. You're running!
 
 ### Step 6: Set up your profile
 
+The app opens to the Feed. On a fresh install you'll see a **welcome card** with a 4-step checklist — follow it. The detail:
+
 Click **Admin** in the left sidebar, then:
 
-1. **Profile tab** — Paste your resume (copy from a Word doc, Google Doc, or PDF text). Set your target job titles, desired salary range, and key skills.
+1. **Profile & Resume tab** — Paste your resume (copy from a Word doc, Google Doc, or PDF text). Then fill in:
+   - **Target Roles** — be specific and list every variation that fits (e.g. "VP Engineering", "Director of Engineering", "Head of AI", "Principal Engineer"). The LLM uses these directly when scoring — vague targets = vague scores.
+   - **Must-Have Skills** — 5-10 non-negotiables (e.g. Python, Machine Learning, Team Leadership)
+   - **Nice-to-Have Skills** — anything else that boosts a match
+   - **Salary Min / Max** — your floor; jobs below it get downweighted
+   - **Remote Only** — toggle off if you'll consider on-site / hybrid
 
-2. **Companies tab** — The app comes with 54 tech/fintech companies pre-loaded. Want a different industry? Click **Install Pack** on any industry pack (Healthcare, Consulting, Retail, etc.) to add ~20-30 companies instantly.
+2. **Company Manager tab** — The app comes with 59 tech/fintech companies pre-loaded. Want a different industry? Click **Install Pack** on any industry pack (Healthcare, Consulting, Retail, etc.) to add ~20-30 companies instantly.
 
-3. **LLM Settings tab** (optional) — If you want AI-powered scoring and cover letters:
-   - **Easiest free option:** Install [Ollama](https://ollama.com), then select "Ollama" as your provider
+3. **LLM Settings tab** (optional but strongly recommended) — If you want AI-powered scoring and cover letters:
+   - **Easiest free option:** Install [Ollama](https://ollama.com), then select "Ollama" as your provider. The in-app **Setup hint** tells you exactly which model to pull (`ollama pull qwen2.5:3b` is a great starter).
    - **Best results:** Select "OpenAI" and paste your API key from [platform.openai.com](https://platform.openai.com)
    - **No AI needed:** Leave it on "Keyword Only" — the app still works, just with simpler matching
+   - After saving, click **Test Connection**. If it succeeds, click **Score N unscored** in the Score Coverage card to score all your jobs.
 
 ### Step 7: Find jobs!
 
-Click **Feed** in the left sidebar, then click the **Refresh** button. The app will:
+Click **Feed** in the left sidebar. If this is your first run, click the big **Run first scrape** button on the welcome card. Otherwise click the **Refresh** button in the top right. The app will:
 1. Check all your tracked companies for open positions
 2. Score each one against your resume
 3. Show you a ranked list with the best matches first
@@ -205,6 +214,16 @@ Not in tech? Install a pack for your industry from **Admin > Companies**:
 | **Climate & Clean Energy** | 14 | Tesla, Rivian, Watershed, Form Energy, ChargePoint |
 
 You can also add any company manually — just enter its name, career page URL, and ATS type.
+
+---
+
+## Your Data is Safe
+
+Three layers of protection so you don't lose your application history:
+
+1. **Job snapshots** — When you save a job to your Pipeline, the company name, title, URL, and location are copied onto the pipeline entry. Even if the listing gets taken down later, your application record survives.
+2. **Auto DB backups** — Before any destructive action (e.g. "Re-score all"), the app snapshots your SQLite DB to `backend/backups/`. The last 10 are kept. You can also click **Backup now** any time from Admin → Scrape Status. Restore by stopping the backend, copying a backup over `reverse_ats.db`, and restarting.
+3. **One-click export** — On the Pipeline page, the **↓ CSV** and **↓ JSON** buttons download every entry (with all your notes, contacts, dates, and stages). Drop the CSV into Google Sheets or Excel — great for sharing with a coach or archiving when you take a job.
 
 ## AI Provider Comparison
 
@@ -257,9 +276,17 @@ python -m uvicorn api:app --host 0.0.0.0 --port 8092
 
 **Frontend can't connect to backend:** Make sure the backend is running (Step 4, first terminal). You should see `Uvicorn running on http://0.0.0.0:8091` in that terminal.
 
-**No jobs showing up:** Click Refresh on the Feed page. The first scrape takes 1-2 minutes to fetch from all companies.
+**No jobs showing up:** Click Refresh on the Feed page (or the **Run first scrape** button on the welcome card). The first scrape takes 1-2 minutes to fetch from all companies.
 
 **AI scoring not working:** Go to Admin > LLM Settings and click "Test Connection." If it fails, check that your API key is correct or that Ollama is running (`ollama serve` in a terminal).
+
+**All my scores are stuck in the 0-19 range:** This means the LLM isn't actually being called and the app is falling back to keyword matching. Two common causes:
+1. **Wrong model name.** The Ollama default is `llama3.1:8b`, but if you only ran `ollama pull qwen2.5:3b` then `llama3.1:8b` doesn't exist on your machine and every call returns 404. Run `ollama list` to see what you actually have, then put one of those exact names in Admin → LLM Settings.
+2. **Ollama isn't running.** Run `ollama serve` in a separate terminal and leave it open.
+
+After fixing, go to Admin → LLM Settings → Score Coverage card → click **Re-score all** to refresh every job's score.
+
+**My pipeline entries disappeared after a re-scrape:** Pull the latest version. As of the v0.4 release, pipeline entries are snapshotted with company/title/url and survive even if the source job is removed from the database. The migration runs automatically on backend startup.
 
 ---
 
@@ -278,7 +305,7 @@ python -m uvicorn api:app --host 0.0.0.0 --port 8092
 | **AI Scoring** | Any OpenAI-compatible API, Anthropic, Ollama, or keyword fallback |
 | **Pipeline** | HTML5 native drag and drop (no external DnD library) |
 
-### API Endpoints (24 total)
+### API Endpoints
 
 ```
 # Jobs
@@ -288,9 +315,13 @@ POST /api/jobs/:id/dismiss                  — Dismiss a job
 POST /api/jobs/:id/save                     — Save to pipeline
 POST /api/jobs/:id/cover-letter             — Generate AI cover letter
 
+# Feed
+GET  /api/feed/industries                   — Industry dropdown source (packs + counts)
+
 # Pipeline
-GET  /api/pipeline                          — All entries (Kanban data with job details)
+GET  /api/pipeline                          — All entries (Kanban data with job snapshot)
 POST /api/pipeline                          — Create pipeline entry
+GET  /api/pipeline/export?format=csv|json   — Download every entry as CSV or JSON
 PUT  /api/pipeline/:id                      — Update stage, notes, contacts, cover letter
 DELETE /api/pipeline/:id                    — Archive/remove entry
 GET  /api/pipeline/:id/events               — Stage change history
@@ -298,6 +329,11 @@ GET  /api/pipeline/:id/events               — Stage change history
 # Profile
 GET  /api/profile                           — Get profile and preferences
 PUT  /api/profile                           — Update profile
+
+# Scoring
+GET  /api/scoring/stats                     — Total / scored / unscored counts (live)
+POST /api/scoring/rescore                   — Score all unscored jobs (background)
+POST /api/scoring/rescore?all=true          — Clear + re-score every active job (auto-backs-up first)
 
 # Admin — Companies
 GET  /api/admin/companies                   — List tracked companies
@@ -314,6 +350,10 @@ GET  /api/admin/llm-settings                — Get LLM config (key masked)
 PUT  /api/admin/llm-settings                — Update LLM config
 POST /api/admin/llm-settings/test           — Test connection + sample score
 
+# Admin — Backups
+GET  /api/admin/backups                     — List DB backups (newest first)
+POST /api/admin/backups?reason=<label>      — Take an immediate DB backup
+
 # Analytics & Scrape
 GET  /api/analytics                         — Funnel metrics and trends
 GET  /api/scrape/status                     — Last scrape run info
@@ -322,9 +362,10 @@ POST /api/scrape/trigger                    — Trigger scrape + score
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `REVERSE_ATS_DB_PATH` | SQLite database file path | `./backend/reverse_ats.db` |
+| Variable | Where | Description | Default |
+|----------|-------|-------------|---------|
+| `REVERSE_ATS_DB_PATH` | backend | SQLite database file path | `./backend/reverse_ats.db` |
+| `VITE_API_URL` | frontend (`app/.env.local`) | Backend URL the dev server proxies `/api` to. Set this if your backend runs on a different host/port. | `http://localhost:8091` |
 
 ### Pipeline CLI
 
