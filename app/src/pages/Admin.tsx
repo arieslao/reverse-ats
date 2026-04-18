@@ -991,6 +991,19 @@ const PROVIDER_DESCRIPTIONS: Record<string, string> = {
   keyword_only: 'No LLM. Uses keyword matching only (free, no setup needed)',
 }
 
+// Per-provider setup hints shown next to the Test Connection button. Helps
+// users on a fresh install figure out what to install / pull / paste before
+// they hit the test button and get a generic timeout error.
+const PROVIDER_SETUP_HINTS: Record<string, string> = {
+  ollama:
+    "First install Ollama (ollama.com), then in a terminal run 'ollama pull <model>' and 'ollama serve'. Recommended starter model: qwen2.5:3b (small, fast) or llama3.1:8b (balanced).",
+  openai: 'Get an API key at platform.openai.com/api-keys and paste it above.',
+  anthropic: 'Get an API key at console.anthropic.com and paste it above.',
+  openai_compatible:
+    'Point API URL at any OpenAI-compatible endpoint (llama.cpp server, vLLM, Groq, Together AI, etc.) and paste the API key if required.',
+  keyword_only: '',
+}
+
 const PROVIDER_COST_NOTES: Record<string, string> = {
   openai: '~$0.01–0.03 per job scored with gpt-4o-mini',
   anthropic: '~$0.01–0.03 per job scored with Claude Haiku',
@@ -1237,6 +1250,23 @@ function LLMTab() {
             </div>
           </div>
         </Section>
+      )}
+
+      {/* Setup hint for the selected provider */}
+      {PROVIDER_SETUP_HINTS[provider] && (
+        <div
+          style={{
+            background: 'rgba(59,130,246,0.08)',
+            border: '1px solid rgba(59,130,246,0.2)',
+            borderRadius: 8,
+            padding: '10px 14px',
+            fontSize: 12,
+            color: '#93c5fd',
+            lineHeight: 1.5,
+          }}
+        >
+          <strong style={{ color: '#bfdbfe' }}>Setup:</strong> {PROVIDER_SETUP_HINTS[provider]}
+        </div>
       )}
 
       {/* Actions */}

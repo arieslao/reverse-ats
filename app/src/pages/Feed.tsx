@@ -224,10 +224,18 @@ export function Feed() {
       )}
 
       {!isLoading && !isError && jobs.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '64px 0', color: '#52525b' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>—</div>
-          <div style={{ fontSize: 15, color: '#3f3f46' }}>No jobs match your filters</div>
-        </div>
+        <EmptyFeed
+          hasFilters={Boolean(
+            filters.search ||
+              filters.category ||
+              filters.min_score > 0 ||
+              filters.exclude_companies ||
+              filters.since_days > 0,
+          )}
+          totalEverScraped={data?.total ?? 0}
+          isRefreshing={isRefreshing}
+          onTriggerScrape={handleRefresh}
+        />
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -292,6 +300,96 @@ export function Feed() {
           />
         </div>
       )}
+    </div>
+  )
+}
+
+// Empty-state shown when there are no jobs to render. Distinguishes between
+// "filters too narrow" (have data but none match) and "fresh install" (no
+// jobs in DB yet) so a brand-new user knows their next step.
+function EmptyFeed({
+  hasFilters,
+  totalEverScraped,
+  isRefreshing,
+  onTriggerScrape,
+}: {
+  hasFilters: boolean
+  totalEverScraped: number
+  isRefreshing: boolean
+  onTriggerScrape: () => void
+}) {
+  // Filters narrowed everything away
+  if (hasFilters && totalEverScraped === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '64px 0', color: '#52525b' }}>
+        <div style={{ fontSize: 32, marginBottom: 12 }}>—</div>
+        <div style={{ fontSize: 15, color: '#3f3f46' }}>No jobs match your filters</div>
+      </div>
+    )
+  }
+
+  // Fresh install — no jobs in DB at all. Walk the user through setup.
+  return (
+    <div
+      style={{
+        textAlign: 'center',
+        padding: '48px 24px',
+        background: '#1a1d27',
+        border: '1px solid #2e3140',
+        borderRadius: 8,
+        color: '#a1a1aa',
+      }}
+    >
+      <div style={{ fontSize: 28, marginBottom: 16 }}>👋</div>
+      <div style={{ fontSize: 17, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
+        Welcome to Reverse ATS
+      </div>
+      <div style={{ fontSize: 13, color: '#71717a', maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
+        No jobs scraped yet. To get the best results, set up your profile first
+        so the LLM can score jobs against your background.
+      </div>
+      <ol
+        style={{
+          textAlign: 'left',
+          maxWidth: 480,
+          margin: '0 auto 28px',
+          fontSize: 13,
+          color: '#a1a1aa',
+          lineHeight: 1.9,
+          paddingLeft: 24,
+        }}
+      >
+        <li>
+          Go to <a href="/admin" style={{ color: '#3b82f6' }}>Admin → Profile &amp; Resume</a> and paste your resume + target roles
+        </li>
+        <li>
+          (Optional) Configure an LLM provider in <a href="/admin" style={{ color: '#3b82f6' }}>Admin → LLM Settings</a> for AI-scored matches
+        </li>
+        <li>
+          Add or pick companies to track in <a href="/admin" style={{ color: '#3b82f6' }}>Admin → Company Manager</a>
+        </li>
+        <li>Click the button below to run your first scrape</li>
+      </ol>
+      <button
+        onClick={onTriggerScrape}
+        disabled={isRefreshing}
+        style={{
+          background: '#3b82f6',
+          color: 'white',
+          border: 'none',
+          borderRadius: 6,
+          fontSize: 14,
+          fontWeight: 600,
+          padding: '10px 20px',
+          cursor: isRefreshing ? 'not-allowed' : 'pointer',
+          opacity: isRefreshing ? 0.6 : 1,
+        }}
+      >
+        {isRefreshing ? 'Scraping…' : 'Run first scrape'}
+      </button>
+      <div style={{ fontSize: 11, color: '#52525b', marginTop: 12 }}>
+        First scrape takes 1–2 minutes (about 1 second per company)
+      </div>
     </div>
   )
 }
