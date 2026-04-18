@@ -442,6 +442,33 @@ def update_profile_endpoint(body: ProfileUpdate):
         conn.close()
 
 
+@app.post("/api/profile/suggest-roles")
+def suggest_roles_endpoint():
+    """
+    Use the configured LLM to recommend target roles from the user's resume.
+
+    Returns two lists:
+      - current_fit: roles the candidate could land today
+      - next_step:   one-level-up stretch / progression roles
+
+    Each item is {title, reasoning}. The frontend renders both as checklists
+    so the user can pick what to add to their Target Roles.
+    """
+    conn = _conn()
+    try:
+        profile = get_profile(conn)
+        settings = get_llm_settings(conn)
+    finally:
+        conn.close()
+
+    from scorer import suggest_roles
+
+    return suggest_roles(
+        resume_text=profile.get("resume_text", "") or "",
+        settings=settings,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------

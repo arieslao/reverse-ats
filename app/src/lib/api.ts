@@ -130,6 +130,21 @@ export const testLLMSettings = () =>
 export const generateCoverLetter = (jobId: string) =>
   request<{ cover_letter: string; provider: string; error: string | null }>(`/api/jobs/${jobId}/cover-letter`, { method: 'POST' })
 
+// Role suggester — AI-recommended target roles from the user's resume
+export interface RoleSuggestion {
+  title: string
+  reasoning: string
+}
+export interface RoleSuggestions {
+  current_fit: RoleSuggestion[]
+  next_step: RoleSuggestion[]
+  provider: string
+  error: string | null
+}
+
+export const suggestRoles = () =>
+  request<RoleSuggestions>('/api/profile/suggest-roles', { method: 'POST' })
+
 // Feed industries (dynamic dropdown — distinct categories currently in DB)
 export const fetchFeedIndustries = () =>
   request<{ id: string; label: string; count: number }[]>('/api/feed/industries')

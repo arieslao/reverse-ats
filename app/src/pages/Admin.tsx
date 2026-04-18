@@ -13,6 +13,7 @@ import {
   triggerRescore,
   fetchBackups,
   createBackup,
+  suggestRoles,
   fetchLLMSettings,
   updateLLMSettings,
   testLLMSettings,
@@ -182,6 +183,24 @@ function ProfileTab() {
         />
       </Section>
 
+      {/* AI role suggestions — uses the configured LLM to recommend
+          target roles from the resume. User picks which to add. */}
+      <SuggestRolesPanel
+        existingTargets={form.target_roles || []}
+        onAdd={(picked) => {
+          // Merge picked titles into target_roles, dedupe (case-insensitive)
+          const existing = new Set((form.target_roles || []).map((t) => t.toLowerCase()))
+          const merged = [...(form.target_roles || [])]
+          for (const t of picked) {
+            if (!existing.has(t.toLowerCase())) {
+              merged.push(t)
+              existing.add(t.toLowerCase())
+            }
+          }
+          setForm((f) => ({ ...f, target_roles: merged }))
+        }}
+      />
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <Section title="Target Roles">
           <TagInput
@@ -345,6 +364,261 @@ function ProfileTab() {
         {saved && <span style={{ fontSize: 12, color: '#22c55e' }}>Saved successfully</span>}
         {updateMut.isError && <span style={{ fontSize: 12, color: '#ef4444' }}>Save failed</span>}
       </div>
+    </div>
+  )
+}
+
+// ─── Suggest Roles Panel (lives in ProfileTab) ───────────────────────────────
+
+function SuggestRolesPanel({
+  existingTargets,
+  onAdd,
+}: {
+  existingTargets: string[]
+  onAdd: (titles: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  // Pre-checked items — keyed by title for stable identity across renders
+  const [picked, setPicked] = useState<Record<string, boolean>>({})
+
+  const mut = useMutation({
+    mutationFn: suggestRoles,
+    onSuccess: (data) => {
+      // Pre-check every suggestion that isn't already in target_roles
+      const existingLower = new Set(existingTargets.map((t) => t.toLowerCase()))
+      const next: Record<string, boolean> = {}
+      for (const r of [...data.current_fit, ...data.next_step]) {
+        next[r.title] = !existingLower.has(r.title.toLowerCase())
+      }
+      setPicked(next)
+      setOpen(true)
+    },
+  })
+
+  const data = mut.data
+  const error = mut.error as Error | undefined
+  const apiError = data?.error // backend may return error: "..." with empty arrays
+
+  const togglePick = (title: string) =>
+    setPicked((p) => ({ ...p, [title]: !p[title] }))
+
+  const handleAdd = () => {
+    const titles = Object.entries(picked)
+      .filter(([, v]) => v)
+      .map(([k]) => k)
+    if (titles.length === 0) return
+    onAdd(titles)
+    setOpen(false)
+    mut.reset()
+    setPicked({})
+  }
+
+  const pickedCount = Object.values(picked).filter(Boolean).length
+
+  // Trigger button for the Section header
+  const trigger = (
+    <button
+      onClick={() => mut.mutate()}
+      disabled={mut.isPending}
+      title="Use AI to suggest roles based on your resume"
+      style={{
+        background: 'transparent',
+        border: '1px solid #3b82f6',
+        borderRadius: 6,
+        color: mut.isPending ? '#52525b' : '#3b82f6',
+        fontSize: 11,
+        padding: '4px 10px',
+        cursor: mut.isPending ? 'wait' : 'pointer',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        fontWeight: 600,
+      }}
+    >
+      {mut.isPending ? 'Thinking…' : '✨ Suggest with AI'}
+    </button>
+  )
+
+  return (
+    <div
+      style={{
+        marginBottom: 16,
+        background: '#1a1d27',
+        border: '1px solid #2e3140',
+        borderRadius: 8,
+        padding: 14,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e4e4e7' }}>
+            AI Role Suggestions
+          </div>
+          <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>
+            Recommends roles you fit today + natural next-step roles. Pick what to add to Target Roles.
+          </div>
+        </div>
+        {trigger}
+      </div>
+
+      {/* Errors */}
+      {error && (
+        <div style={{ marginTop: 10, fontSize: 12, color: '#f87171' }}>
+          Suggestion failed: {error.message}
+        </div>
+      )}
+      {apiError && (
+        <div style={{ marginTop: 10, fontSize: 12, color: '#fbbf24' }}>{apiError}</div>
+      )}
+
+      {/* Results */}
+      {open && data && !apiError && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <SuggestionList
+              heading="Strong fit now"
+              subheading="Based on your current experience"
+              accentColor="#22c55e"
+              suggestions={data.current_fit}
+              existingTargets={existingTargets}
+              picked={picked}
+              onToggle={togglePick}
+            />
+            <SuggestionList
+              heading="Natural next step"
+              subheading="One level up — career progression"
+              accentColor="#3b82f6"
+              suggestions={data.next_step}
+              existingTargets={existingTargets}
+              picked={picked}
+              onToggle={togglePick}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <div style={{ fontSize: 11, color: '#71717a' }}>
+              {pickedCount} role{pickedCount === 1 ? '' : 's'} selected · provider: {data.provider}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => { setOpen(false); mut.reset(); setPicked({}) }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #2e3140',
+                  borderRadius: 6,
+                  color: '#a1a1aa',
+                  fontSize: 12,
+                  padding: '6px 12px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdd}
+                disabled={pickedCount === 0}
+                style={{
+                  background: pickedCount === 0 ? '#1a1d27' : '#3b82f6',
+                  border: '1px solid #3b82f6',
+                  borderRadius: 6,
+                  color: pickedCount === 0 ? '#52525b' : '#fff',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '6px 12px',
+                  cursor: pickedCount === 0 ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Add {pickedCount} to Target Roles
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SuggestionList({
+  heading,
+  subheading,
+  accentColor,
+  suggestions,
+  existingTargets,
+  picked,
+  onToggle,
+}: {
+  heading: string
+  subheading: string
+  accentColor: string
+  suggestions: { title: string; reasoning: string }[]
+  existingTargets: string[]
+  picked: Record<string, boolean>
+  onToggle: (title: string) => void
+}) {
+  const existingLower = new Set(existingTargets.map((t) => t.toLowerCase()))
+  return (
+    <div>
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 600, color: accentColor }}>{heading}</div>
+        <div style={{ fontSize: 10, color: '#52525b' }}>{subheading}</div>
+      </div>
+      {suggestions.length === 0 ? (
+        <div style={{ fontSize: 12, color: '#52525b', padding: '12px 0' }}>
+          No suggestions returned.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {suggestions.map((s) => {
+            const alreadyAdded = existingLower.has(s.title.toLowerCase())
+            const isPicked = !!picked[s.title]
+            return (
+              <label
+                key={s.title}
+                style={{
+                  display: 'flex',
+                  gap: 8,
+                  padding: '8px 10px',
+                  background: '#0f1117',
+                  border: `1px solid ${isPicked ? accentColor : '#2e3140'}`,
+                  borderRadius: 6,
+                  cursor: alreadyAdded ? 'default' : 'pointer',
+                  opacity: alreadyAdded ? 0.5 : 1,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isPicked}
+                  disabled={alreadyAdded}
+                  onChange={() => onToggle(s.title)}
+                  style={{ marginTop: 2, accentColor, cursor: 'pointer', flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#e4e4e7' }}>
+                    {s.title}
+                    {alreadyAdded && (
+                      <span style={{ marginLeft: 6, fontSize: 10, color: '#71717a', fontWeight: 400 }}>
+                        (already in targets)
+                      </span>
+                    )}
+                  </div>
+                  {s.reasoning && (
+                    <div style={{ fontSize: 11, color: '#71717a', marginTop: 2, lineHeight: 1.4 }}>
+                      {s.reasoning}
+                    </div>
+                  )}
+                </div>
+              </label>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -1541,22 +1815,40 @@ export function Admin() {
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+  headerAction,
+}: {
+  title: string
+  children: React.ReactNode
+  headerAction?: React.ReactNode
+}) {
   return (
     <div>
-      <label
+      <div
         style={{
-          display: 'block',
-          fontSize: 11,
-          color: '#52525b',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           marginBottom: 6,
-          fontWeight: 600,
+          gap: 8,
         }}
       >
-        {title}
-      </label>
+        <label
+          style={{
+            display: 'block',
+            fontSize: 11,
+            color: '#52525b',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontWeight: 600,
+          }}
+        >
+          {title}
+        </label>
+        {headerAction}
+      </div>
       {children}
     </div>
   )

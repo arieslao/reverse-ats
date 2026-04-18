@@ -633,7 +633,13 @@ def _call_llm_raw(user_prompt: str, system_prompt: str, settings: dict, provider
         "max_tokens": max_tokens,
     }, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"].strip()
+    msg = resp.json()["choices"][0]["message"]
+    # Thinking models (Qwen3, DeepSeek-R1) put output in `reasoning` and leave
+    # `content` empty, or wrap thinking in <think>...</think> tags.
+    content = (msg.get("content") or "").strip()
+    if not content and msg.get("reasoning"):
+        content = msg["reasoning"].strip()
+    return _strip_thinking_tags(content)
 
 
 def _call_llm_raw_anthropic(user_prompt: str, system_prompt: str, settings: dict, provider_info: dict) -> str:
@@ -657,6 +663,170 @@ def _call_llm_raw_anthropic(user_prompt: str, system_prompt: str, settings: dict
     }, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     return resp.json()["content"][0]["text"].strip()
+
+
+# ---------------------------------------------------------------------------
+# Role suggester — recommends target roles from the user's resume
+# ---------------------------------------------------------------------------
+
+ROLE_SUGGESTER_SYSTEM_PROMPT = """You are an experienced career coach reviewing a candidate's resume.
+
+Your job is to recommend job titles for them to target. Output TWO lists:
+
+1. **current_fit** — 6 to 10 role titles the candidate could land TODAY based on
+   the experience already on their resume. These should match (or be one notch
+   below) their current/most-recent seniority. Include obvious peer roles and
+   adjacent specializations they're directly qualified for.
+
+2. **next_step** — 4 to 8 role titles that represent a NATURAL CAREER PROGRESSION
+   from where they are now. These are stretch roles — typically one level up in
+   seniority or scope, OR a logical pivot into an adjacent function their
+   experience qualifies them to grow into.
+
+For each role, include a one-sentence rationale grounded in specific evidence
+from their resume — name the actual companies, technologies, or
+responsibilities you saw.
+
+Return ONLY valid JSON with this exact structure:
+
+{
+  "current_fit": [
+    {"title": "<exact role title>", "reasoning": "<one sentence citing resume evidence>"},
+    ...
+  ],
+  "next_step": [
+    {"title": "<exact role title>", "reasoning": "<one sentence citing resume evidence>"},
+    ...
+  ]
+}
+
+Rules:
+- Use industry-standard job titles (e.g. "VP of Engineering", "Senior Director
+  of Data Science") — these need to match what real job boards post.
+- Do NOT invent roles or repeat the same title across both lists.
+- Do NOT output any text outside the JSON object.
+"""
+
+
+def suggest_roles(resume_text: str, settings: Optional[dict] = None) -> dict:
+    """
+    Ask the configured LLM to recommend target roles from the candidate's resume.
+
+    Returns:
+        {"current_fit": [{"title": str, "reasoning": str}, ...],
+         "next_step":   [{"title": str, "reasoning": str}, ...],
+         "provider": str,
+         "error": Optional[str]}
+
+    Raises nothing — failures return an `error` field so the API layer can
+    surface the message to the user without crashing.
+    """
+    if not resume_text or len(resume_text.strip()) < 50:
+        return {
+            "current_fit": [], "next_step": [], "provider": "none",
+            "error": "Resume is too short. Add your resume in Admin → Profile first.",
+        }
+
+    settings = settings or {}
+    provider = settings.get("provider", "keyword_only")
+    if provider == "keyword_only":
+        return {
+            "current_fit": [], "next_step": [], "provider": provider,
+            "error": "Role suggestions need an LLM. Configure a provider in Admin → LLM Settings.",
+        }
+
+    provider_info = PROVIDERS.get(provider, PROVIDERS["openai_compatible"])
+
+    # Truncate resume for prompt budget — keep the first ~6000 chars which
+    # almost always covers summary + recent experience + skills.
+    truncated = resume_text.strip()[:6000]
+    user_prompt = (
+        f"## Candidate Resume\n\n{truncated}\n\n"
+        "Recommend roles per the system instructions."
+    )
+
+    # Use a slightly higher max_tokens than scoring — the response can be
+    # ~14 roles × 2 fields, plus reasoning models need overhead.
+    sugg_settings = dict(settings)
+    sugg_settings["max_tokens"] = max(int(settings.get("max_tokens") or 0), 2000)
+    sugg_settings["temperature"] = 0.4  # a bit of variety in suggestions
+
+    try:
+        if provider_info["format"] == "anthropic":
+            raw = _call_llm_raw_anthropic(user_prompt, ROLE_SUGGESTER_SYSTEM_PROMPT, sugg_settings, provider_info)
+        else:
+            raw = _call_llm_raw(user_prompt, ROLE_SUGGESTER_SYSTEM_PROMPT, sugg_settings, provider_info)
+    except Exception as exc:
+        logger.error("suggest_roles LLM call failed: %s", exc)
+        return {
+            "current_fit": [], "next_step": [], "provider": provider,
+            "error": f"LLM call failed: {exc}",
+        }
+
+    parsed = _extract_role_suggestions(raw)
+    if parsed is None:
+        return {
+            "current_fit": [], "next_step": [], "provider": provider,
+            "error": "Could not parse LLM response as JSON. Try again, or switch to a different model.",
+        }
+
+    return {
+        "current_fit": parsed.get("current_fit", []),
+        "next_step": parsed.get("next_step", []),
+        "provider": provider,
+        "error": None,
+    }
+
+
+def _extract_role_suggestions(raw: str) -> Optional[dict]:
+    """Best-effort JSON extraction. Mirrors _parse_llm_response but accepts
+    a different schema (current_fit / next_step arrays)."""
+    import re
+    if not raw:
+        return None
+
+    # Strip markdown fences
+    if "```" in raw:
+        m = re.search(r"```(?:json)?\s*\n?(.*?)```", raw, re.DOTALL)
+        if m:
+            raw = m.group(1).strip()
+
+    # Try direct parse
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        # Fallback: extract the first {...} that contains "current_fit"
+        m = re.search(r"\{.*?\"current_fit\".*\}", raw, re.DOTALL)
+        if not m:
+            return None
+        try:
+            data = json.loads(m.group())
+        except (json.JSONDecodeError, ValueError):
+            return None
+
+    # Normalize: keep only items with a non-empty title
+    def _clean(items) -> list[dict]:
+        if not isinstance(items, list):
+            return []
+        out = []
+        seen_titles = set()
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("title") or "").strip()
+            if not title or title.lower() in seen_titles:
+                continue
+            seen_titles.add(title.lower())
+            out.append({
+                "title": title,
+                "reasoning": str(item.get("reasoning") or "").strip(),
+            })
+        return out
+
+    return {
+        "current_fit": _clean(data.get("current_fit")),
+        "next_step": _clean(data.get("next_step")),
+    }
 
 
 # ---------------------------------------------------------------------------
