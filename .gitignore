@@ -10,6 +10,9 @@ __pycache__/
 *.db-shm
 backups/
 
+# Vite dev cache (auto-generated)
+.vite/
+
 # Environment
 .env
 .env.local
