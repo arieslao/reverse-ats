@@ -220,6 +220,11 @@ def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
             "department": dept,
             "remote": _is_remote(location),
             "description_snippet": description[:500],
+            # Greenhouse returns the full posting in `content` — keep all of it
+            # so the cloud preprocessor can extract comp ranges, YoE, and the
+            # complete responsibilities list (truncating to 500 chars dropped
+            # those for ~99% of jobs in Phase 0).
+            "description_full": description,
             "company": company_name,
         })
     return jobs
@@ -237,14 +242,18 @@ def fetch_lever(slug: str, company_name: str) -> list[dict]:
         cats = j.get("categories", {})
         location = _normalize_location(cats.get("location", "") or cats.get("allLocations", ""))
         dept = cats.get("team", "") or cats.get("department", "")
-        description = (j.get("descriptionPlain", "") or j.get("description", ""))[:500]
+        full_description = j.get("descriptionPlain", "") or j.get("description", "") or ""
         jobs.append({
             "title": title,
             "location": location,
             "url": j.get("applyUrl", j.get("hostedUrl", "")),
             "department": dept,
             "remote": _is_remote(location),
-            "description_snippet": description,
+            "description_snippet": full_description[:500],
+            # Lever returns the full posting in `descriptionPlain` (or HTML in
+            # `description`) — preserve it for cloud preprocessing so we can
+            # extract comp / YoE / required experience that lives further in.
+            "description_full": full_description,
             "company": company_name,
         })
     return jobs
