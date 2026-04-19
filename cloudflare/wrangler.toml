@@ -1,0 +1,45 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Reverse ATS — Cloudflare Worker config (Phase 0: centralized scrape ingest)
+#
+# This Worker:
+#   1. POST /ingest      — receives scraped jobs from GitHub Actions
+#   2. GET  /jobs        — read shared jobs (verification / future API)
+#   3. GET  /health      — uptime + ingest stats
+#   4. Scheduled cron    — preprocesses + embeds new jobs
+#
+# To deploy:
+#   wrangler login
+#   wrangler d1 create reverse-ats-jobs       # captures database_id, paste below
+#   wrangler d1 migrations apply reverse-ats-jobs --remote
+#   wrangler deploy
+#
+# Phase 0 is additive — does not affect any existing user-facing app.
+# ─────────────────────────────────────────────────────────────────────────────
+
+name = "reverse-ats-ingest"
+main = "src/index.ts"
+compatibility_date = "2026-04-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Scheduled trigger — preprocess any new jobs every 30 min.
+# (Scraping itself runs on GitHub Actions cron, which posts here.)
+[triggers]
+crons = ["*/30 * * * *"]
+
+# Cloudflare D1 — shared jobs database
+# Run `wrangler d1 create reverse-ats-jobs` to provision, then paste id here.
+[[d1_databases]]
+binding = "DB"
+database_name = "reverse-ats-jobs"
+database_id = "REPLACE_WITH_D1_ID_AFTER_CREATE"
+
+# Cloudflare Workers AI — preprocessing + embeddings on free tier
+[ai]
+binding = "AI"
+
+# Observability — logs visible in `wrangler tail`
+[observability]
+enabled = true
+
+# Secrets (set via `wrangler secret put NAME`):
+#   INGEST_SECRET   — shared with GitHub Actions, gates POST /ingest

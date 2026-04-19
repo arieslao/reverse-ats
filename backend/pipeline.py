@@ -89,6 +89,7 @@ def run_pipeline(
     score_only: bool = False,
     db_path: str = None,
     inference_url: str = None,
+    push_to_d1: bool = False,
 ) -> dict:
     """
     Main pipeline: scrape → deduplicate → score → store.
@@ -154,6 +155,10 @@ def run_pipeline(
     seen_ids: set[str] = set()
     # Collect jobs that were new/updated so we can score them after the scrape loop
     jobs_to_score: list[dict] = []
+    # Collect EVERY upserted job (new + updated) for the optional D1 push.
+    # Phase 0: this is what feeds the centralized cloud architecture without
+    # changing anything about the local single-tenant flow.
+    jobs_for_d1: list[dict] = []
 
     # Create the audit record before we start scraping
     run_id = create_scrape_run(conn)
@@ -201,6 +206,10 @@ def run_pipeline(
             else:
                 count_updated += 1
 
+            # Always queue for D1 (Worker upserts so duplicates are fine)
+            if push_to_d1:
+                jobs_for_d1.append({**raw_job, "id": job_id})
+
         stats["total_fetched"] += len(jobs)
         stats["new_jobs"] += count_new
         stats["updated_jobs"] += count_updated
@@ -219,6 +228,26 @@ def run_pipeline(
     stats["expired_jobs"] = expired_count
     if expired_count:
         logger.info("Marked %d jobs as expired (no longer on ATS boards)", expired_count)
+
+    # ------------------------------------------------------------------
+    # Optional: push every scraped job to the centralized D1 instance.
+    # Phase 0 of the cloud rewrite — additive only, doesn't affect the
+    # local SQLite app at all. Set CF_INGEST_URL + CF_INGEST_SECRET in env.
+    # ------------------------------------------------------------------
+    if push_to_d1 and jobs_for_d1:
+        try:
+            from d1_uploader import push_jobs as _push_jobs_to_d1
+            d1_stats = _push_jobs_to_d1(jobs_for_d1, source="pipeline")
+            stats["d1_pushed"] = d1_stats["sent"]
+            stats["d1_new"] = d1_stats["new"]
+            stats["d1_updated"] = d1_stats["updated"]
+            if d1_stats["errors"]:
+                logger.warning("D1 push had %d errors", len(d1_stats["errors"]))
+        except Exception as exc:
+            # D1 push failures must NEVER break the local pipeline — they're
+            # purely an additive observability stream during Phase 0.
+            logger.warning("D1 push failed (local pipeline unaffected): %s", exc)
+            stats["errors"].append(f"d1_push: {exc}")
 
     # ------------------------------------------------------------------
     # LLM scoring for new jobs
@@ -433,6 +462,16 @@ def parse_args() -> argparse.Namespace:
             "Use this to point at GX10 from another machine."
         ),
     )
+    parser.add_argument(
+        "--push-to-d1",
+        action="store_true",
+        help=(
+            "After scraping, push all upserted jobs to the centralized "
+            "Cloudflare D1 instance via the ingest Worker. Requires env "
+            "vars CF_INGEST_URL + CF_INGEST_SECRET. Used by GitHub Actions "
+            "cron — local users typically leave this off."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -450,4 +489,5 @@ if __name__ == "__main__":
         score_only=args.score_only,
         db_path=args.db_path,
         inference_url=args.inference_url,
+        push_to_d1=args.push_to_d1,
     )

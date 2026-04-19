@@ -13,6 +13,12 @@ backups/
 # Vite dev cache (auto-generated)
 .vite/
 
+# Cloudflare Workers — local state and build artifacts
+cloudflare/node_modules/
+cloudflare/.wrangler/
+cloudflare/.dev.vars
+cloudflare/dist/
+
 # Environment
 .env
 .env.local
