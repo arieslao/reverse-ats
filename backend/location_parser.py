@@ -364,57 +364,119 @@ def _parse_one_group_to_records(group: str) -> list[dict]:
     return records
 
 
-def _record_matches(record: dict, needles_lower: set[str]) -> bool:
-    """Return True if this record matches any of the selected location names.
+def categorize_tokens(tokens: Iterable[str]) -> tuple[set[str], set[str], set[str], bool]:
+    """Sort selected tokens by hierarchy level using the same dictionaries
+    the parser uses. Powers AND-across-levels filtering.
 
-    Match is case-insensitive equality against country / state / city.
-    "Remote" as a needle is special-cased to match the remote flag.
+    Returns: (countries, states, cities, has_remote) — sets of canonical names.
     """
-    if "remote" in needles_lower and record.get("remote"):
+    countries: set[str] = set()
+    states: set[str] = set()
+    cities: set[str] = set()
+    has_remote = False
+    for t in tokens or []:
+        if not t:
+            continue
+        clean = t.strip()
+        if not clean:
+            continue
+        if clean.lower() == "remote":
+            has_remote = True
+        elif clean in COUNTRY_ALIASES:
+            countries.add(COUNTRY_ALIASES[clean])
+        elif clean in US_STATE_NAMES:
+            states.add(clean)
+        elif clean in US_STATE_CODES:
+            states.add(STATE_CODE_TO_NAME[clean])
+        else:
+            cities.add(clean.lower())
+    return countries, states, cities, has_remote
+
+
+def record_matches(
+    record: dict,
+    sel_countries: set[str],
+    sel_states: set[str],
+    sel_cities: set[str],
+    sel_remote: bool,
+    skip: Optional[str] = None,
+) -> bool:
+    """Does this record satisfy the per-level filters?
+
+    Semantics: AND across levels, OR within a level. So picking
+    "United States" + "Oregon" requires country=US AND state=Oregon
+    — which gives the user just Oregon, not all of US.
+
+    `skip` excludes one level from the check ("country" / "state" /
+    "city" / "remote") so a column can narrow itself based on the
+    OTHER columns' selections.
+    """
+    if skip != "country" and sel_countries:
+        c = record.get("country")
+        if not c or c not in sel_countries:
+            return False
+    if skip != "state" and sel_states:
+        s = record.get("state")
+        if not s or s not in sel_states:
+            return False
+    if skip != "city" and sel_cities:
+        ci = (record.get("city") or "").lower()
+        if not ci or ci not in sel_cities:
+            return False
+    if skip != "remote" and sel_remote:
+        if not record.get("remote"):
+            return False
+    return True
+
+
+def job_matches_locations(location_str: str, filter_tokens: Iterable[str]) -> bool:
+    """Does this job have at least one record satisfying the filter?
+
+    Used to filter the job feed when `locations` is set.
+    """
+    sel_c, sel_s, sel_ci, sel_r = categorize_tokens(filter_tokens)
+    if not (sel_c or sel_s or sel_ci or sel_r):
         return True
-    for field in ("country", "state", "city"):
-        v = record.get(field)
-        if v and v.lower() in needles_lower:
-            return True
-    return False
+    return any(
+        record_matches(r, sel_c, sel_s, sel_ci, sel_r)
+        for r in parse_records(location_str or "")
+    )
 
 
 def aggregate(locations: Iterable[str], filter_tokens: Optional[Iterable[str]] = None) -> dict[str, list[dict]]:
     """Aggregate parsed records across many job locations into ranked buckets.
 
-    Args:
-        locations: iterable of raw location strings (one per job).
-        filter_tokens: if provided, only records that match any of these
-            (case-insensitive equality on country/state/city or the remote
-            flag) are counted. Powers hierarchical column narrowing.
-
-    Returns:
-        {
-          'countries': [{'name': 'United States', 'count': 1234}, ...],
-          'states':    [{'name': 'California',    'count':  321}, ...],
-          'cities':    [{'name': 'San Francisco', 'count':  198}, ...],
-          'remote':    {'count': 567}
-        }
+    Filtering uses AND across hierarchy levels and OR within a level. For
+    each column we narrow using the OTHER columns' selections (so e.g. the
+    States column shows states that have records matching the selected
+    countries+cities, but not its own state filter — otherwise the user
+    couldn't add a second state).
     """
-    needles = {n.strip().lower() for n in (filter_tokens or []) if n and n.strip()}
+    sel_c, sel_s, sel_ci, sel_r = categorize_tokens(filter_tokens or [])
 
     country_counts: Counter[str] = Counter()
     state_counts: Counter[str] = Counter()
     city_counts: Counter[str] = Counter()
-    remote_count = 0
+    remote_match_count = 0
 
     for loc in locations:
         for record in parse_records(loc or ""):
-            if needles and not _record_matches(record, needles):
-                continue
-            if record.get("remote"):
-                remote_count += 1
-            if record.get("country"):
-                country_counts[record["country"]] += 1
-            if record.get("state"):
-                state_counts[record["state"]] += 1
-            if record.get("city"):
-                city_counts[record["city"]] += 1
+            # Country column: narrow by states + cities + remote (skip country)
+            if record_matches(record, sel_c, sel_s, sel_ci, sel_r, skip="country"):
+                if record.get("country"):
+                    country_counts[record["country"]] += 1
+            # State column: narrow by countries + cities + remote (skip state)
+            if record_matches(record, sel_c, sel_s, sel_ci, sel_r, skip="state"):
+                if record.get("state"):
+                    state_counts[record["state"]] += 1
+            # City column: narrow by countries + states + remote (skip city)
+            if record_matches(record, sel_c, sel_s, sel_ci, sel_r, skip="city"):
+                if record.get("city"):
+                    city_counts[record["city"]] += 1
+            # Remote count uses the full filter
+            if record_matches(record, sel_c, sel_s, sel_ci, sel_r):
+                if record.get("remote"):
+                    remote_match_count += 1
 
     def _rank(counter: Counter[str]) -> list[dict]:
         return [{"name": name, "count": n} for name, n in counter.most_common()]
@@ -423,5 +485,5 @@ def aggregate(locations: Iterable[str], filter_tokens: Optional[Iterable[str]] =
         "countries": _rank(country_counts),
         "states": _rank(state_counts),
         "cities": _rank(city_counts),
-        "remote": {"count": remote_count},
+        "remote": {"count": remote_match_count},
     }

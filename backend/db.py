@@ -631,10 +631,13 @@ def get_jobs(
             conditions.append(f"LOWER(j.company) NOT LIKE :{param_name}")
             params[param_name] = f"%{needle}%"
 
+    # NOTE: location filtering happens in Python AFTER the SQL query (see
+    # below) using the structured location parser, so we can do
+    # AND-across-levels semantics — picking "United States" + "Oregon"
+    # narrows to Oregon jobs only, not "all US plus Oregon redundantly".
+    # SQL LIKE matching can't express that. We pre-filter with a coarse
+    # OR-LIKE here only to reduce the candidate set for big DBs.
     if locations:
-        # Match if location contains ANY of the selected tokens (case-insensitive
-        # partial). OR'd together so picking "California" AND "New York" returns
-        # jobs in either, which matches user intent for a multi-select filter.
         loc_clauses = []
         for idx, loc in enumerate(locations):
             needle = loc.strip().lower()
@@ -663,6 +666,33 @@ def get_jobs(
         {where}
     """
 
+    # When the user has selected location tokens we apply structured
+    # AND-across-levels matching in Python (SQL LIKE can't express this).
+    # Fetch the SQL pre-filtered candidates first, then post-filter.
+    if locations:
+        from location_parser import job_matches_locations
+
+        candidate_rows = conn.execute(
+            f"""
+            SELECT
+                j.*,
+                p.stage AS pipeline_stage
+            {base_query}
+            ORDER BY {order}
+            """,
+            params,
+        ).fetchall()
+
+        matching = [
+            row for row in candidate_rows
+            if job_matches_locations(row["location"] or "", locations)
+        ]
+        total = len(matching)
+        offset = (page - 1) * per_page
+        page_slice = matching[offset:offset + per_page]
+        return _rows_to_list(page_slice), total
+
+    # Standard SQL pagination when no location filter
     total: int = conn.execute(
         f"SELECT COUNT(*) {base_query}", params
     ).fetchone()[0]
