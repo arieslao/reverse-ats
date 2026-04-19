@@ -12,16 +12,19 @@ const COMPARISON_PRICES = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="px-5 sm:px-8 py-20 sm:py-28">
+    <section
+      id="pricing"
+      className="px-5 sm:px-8 py-20 sm:py-28"
+      style={{ background: 'var(--color-bg-card)' }}
+    >
       <div className="max-w-5xl mx-auto">
         <SectionHeader
           eyebrow="Pricing"
-          title="Free if you self-host. $10/month if you don't want to."
-          subtitle="That's it. No tiers, no Pro upsell, no surprise charges."
+          title="Free if you self-host. $10 a month if you don't want to."
+          subtitle="That's the whole price page. No tiers. No Pro upsell. No surprise charges."
         />
 
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Self-host card */}
+        <div className="mt-14 grid grid-cols-1 md:grid-cols-2 gap-6">
           <PricingCard
             name="Self-host"
             price="Free"
@@ -29,44 +32,43 @@ export function Pricing() {
             description="Run it on your own laptop. Your data never leaves your machine. Best for privacy-conscious folks comfortable with a terminal."
             features={[
               'Every feature, no limits',
-              'Bring your own LLM (or use free local Ollama)',
+              'Use a free local AI (Ollama) or your own API key',
               'Your data, your computer, your rules',
-              '~10-min setup, walked through step by step',
+              'About a 10-minute setup, walked through step by step',
             ]}
             cta="View install guide →"
             ctaHref="https://github.com/arieslao/reverse-ats#installation-guide-step-by-step"
             primary={false}
           />
 
-          {/* Hosted card — primary */}
           <PricingCard
             name="Hosted"
             price="$10"
             priceSubtext="per month, cancel anytime"
-            description="We run it for you. Sign in with GitHub. Your data lives on Cloudflare's infrastructure, encrypted at rest, never sold. For folks who want it to just work."
+            description="We run it for you. Sign in with GitHub. Your data lives encrypted on Cloudflare's infrastructure, never sold. For folks who want it to just work."
             features={[
-              'Every feature included — same as self-host',
-              'No setup, no terminal, no Ollama',
-              'Sign in with GitHub, you\'re in',
-              'Cancel anytime, your data exports as JSON',
+              'Every feature, same as self-host',
+              'No setup. No terminal. No Ollama install.',
+              'Sign in with GitHub. You\'re in.',
+              'Cancel anytime. Your data exports as JSON.',
             ]}
             cta="Reserve your spot — $10/mo"
             ctaHref="https://github.com/sponsors/arieslao"
             primary
-            badge="Launching ~6-8 weeks"
+            badge="Launching soon"
           />
         </div>
 
         {/* Price-anchor row */}
         <div
-          className="mt-12 rounded-xl p-6 text-center"
+          className="mt-14 rounded-2xl p-7 text-center"
           style={{
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle)',
           }}
         >
           <div
-            className="text-xs uppercase tracking-wider mb-3"
+            className="text-xs uppercase tracking-[0.16em] mb-4"
             style={{ color: 'var(--color-text-tertiary)' }}
           >
             For comparison
@@ -81,7 +83,7 @@ export function Pricing() {
                   {c.tool}
                 </span>
                 <span
-                  className="text-sm font-mono tabular-nums"
+                  className="text-sm tabular-nums"
                   style={{ color: 'var(--color-text-tertiary)' }}
                 >
                   {c.price}
@@ -118,78 +120,89 @@ function PricingCard({
 }) {
   return (
     <div
-      className="rounded-2xl p-7 sm:p-8 relative"
+      className="rounded-2xl p-8 sm:p-9 relative"
       style={{
-        background: primary ? 'var(--color-bg-card)' : 'var(--color-bg-elevated)',
+        background: 'var(--color-bg-elevated)',
         border: primary
-          ? '1px solid rgba(124, 158, 255, 0.4)'
+          ? '1px solid var(--color-accent)'
           : '1px solid var(--color-border-subtle)',
-        boxShadow: primary ? '0 16px 40px -12px rgba(124, 158, 255, 0.15)' : undefined,
+        boxShadow: primary ? '0 16px 40px -12px rgba(201, 83, 46, 0.18)' : undefined,
       }}
     >
       {badge && (
         <div
-          className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-wider font-medium px-2.5 py-1 rounded-md"
+          className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] uppercase tracking-[0.14em] font-medium px-3 py-1 rounded-full"
           style={{
             background: 'var(--color-accent)',
-            color: '#0a0a0f',
+            color: 'var(--color-accent-text)',
           }}
         >
           {badge}
         </div>
       )}
 
-      <div className="mb-5">
+      <div className="mb-6">
         <h3
-          className="text-xl font-semibold mb-1 tracking-tight"
-          style={{ color: 'var(--color-text-primary)' }}
+          className="text-2xl mb-2 tracking-tight"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            color: 'var(--color-text-primary)',
+            letterSpacing: '-0.02em',
+          }}
         >
           {name}
         </h3>
         <p
-          className="text-sm"
+          className="text-[15px] leading-relaxed"
           style={{ color: 'var(--color-text-secondary)' }}
         >
           {description}
         </p>
       </div>
 
-      <div className="mb-6 pb-6 border-b" style={{ borderColor: 'var(--color-border-subtle)' }}>
-        <div className="flex items-baseline gap-1">
+      <div className="mb-7 pb-7 border-b" style={{ borderColor: 'var(--color-border-subtle)' }}>
+        <div className="flex items-baseline gap-1.5">
           <span
-            className="text-4xl font-semibold tracking-tight"
-            style={{ color: 'var(--color-text-primary)' }}
+            className="text-5xl tracking-tight"
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontWeight: 500,
+              color: 'var(--color-text-primary)',
+              letterSpacing: '-0.03em',
+            }}
           >
             {price}
           </span>
         </div>
         <div
-          className="mt-1 text-xs"
+          className="mt-1.5 text-sm"
           style={{ color: 'var(--color-text-tertiary)' }}
         >
           {priceSubtext}
         </div>
       </div>
 
-      <ul className="space-y-2.5 mb-7">
+      <ul className="space-y-3 mb-8">
         {features.map((f) => (
           <li
             key={f}
-            className="flex items-start gap-2.5 text-sm"
+            className="flex items-start gap-3 text-[15px]"
             style={{ color: 'var(--color-text-secondary)' }}
           >
             <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
+              width="18"
+              height="18"
+              viewBox="0 0 18 18"
               fill="none"
               className="flex-shrink-0 mt-0.5"
               style={{ color: 'var(--color-success)' }}
             >
+              <circle cx="9" cy="9" r="8" stroke="currentColor" strokeWidth="1" opacity="0.25" />
               <path
-                d="M3 8.5l3 3 7-7"
+                d="M5 9l3 3 5-6"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -203,31 +216,33 @@ function PricingCard({
         href={ctaHref}
         target="_blank"
         rel="noopener noreferrer"
-        className="block text-center px-5 py-2.5 rounded-lg font-medium text-sm transition-all"
+        className="block text-center px-5 py-3 rounded-full text-[15px] transition-all"
         style={
           primary
             ? {
                 background: 'var(--color-accent)',
-                color: '#0a0a0f',
+                color: 'var(--color-accent-text)',
+                fontWeight: 500,
               }
             : {
                 background: 'transparent',
                 color: 'var(--color-text-primary)',
-                border: '1px solid var(--color-border-muted)',
+                border: '1px solid var(--color-border-strong)',
+                fontWeight: 500,
               }
         }
         onMouseEnter={(e) => {
           if (primary) {
             e.currentTarget.style.background = 'var(--color-accent-hover)'
           } else {
-            e.currentTarget.style.borderColor = 'var(--color-accent)'
+            e.currentTarget.style.background = 'var(--color-bg-card)'
           }
         }}
         onMouseLeave={(e) => {
           if (primary) {
             e.currentTarget.style.background = 'var(--color-accent)'
           } else {
-            e.currentTarget.style.borderColor = 'var(--color-border-muted)'
+            e.currentTarget.style.background = 'transparent'
           }
         }}
       >

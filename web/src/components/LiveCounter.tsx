@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fetchHealth, type Health } from '../lib/api'
 
 // Pulls live numbers from the Worker /health endpoint. Real data = trust.
-// Falls back gracefully if the API is unreachable (still says something useful).
+// Frame is conversational: "Right now, here's what's happening" not "STATS".
 
 export function LiveCounter() {
   const [health, setHealth] = useState<Health | null>(null)
@@ -18,7 +18,6 @@ export function LiveCounter() {
       }
     }
     load()
-    // Refresh every 60s — keeps the page feeling alive without hammering the API
     const id = setInterval(load, 60_000)
     return () => {
       cancelled = true
@@ -27,54 +26,55 @@ export function LiveCounter() {
   }, [])
 
   return (
-    <section className="px-5 sm:px-8 pb-16">
+    <section className="px-5 sm:px-8 pb-20 sm:pb-24">
       <div className="max-w-4xl mx-auto">
         <div
-          className="rounded-2xl p-6 sm:p-8"
+          className="rounded-3xl p-8 sm:p-10"
           style={{
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle)',
           }}
         >
-          <div className="flex items-center gap-2.5 mb-5">
+          {/* Lead-in copy — sets the human tone before any numbers */}
+          <div className="flex items-center gap-2.5 mb-6">
             <span
               className="w-2 h-2 rounded-full animate-pulse"
               style={{ background: health ? 'var(--color-success)' : 'var(--color-text-muted)' }}
               aria-hidden
             />
             <span
-              className="text-xs uppercase tracking-wider font-medium"
+              className="text-xs uppercase tracking-[0.16em] font-medium"
               style={{ color: 'var(--color-text-tertiary)' }}
             >
-              Live data from the open-source pipeline
+              Right now, in our database
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 sm:gap-10">
             <Stat
               value={health?.total_jobs}
-              label="Jobs being tracked"
+              label="Open jobs we're tracking for you"
               loaded={loaded}
             />
             <Stat
               value={health?.total_preprocessed}
-              label="AI-extracted job summaries"
+              label="Job descriptions an AI has read carefully"
               loaded={loaded}
               tooltip="Each job is parsed by an open-weight LLM (Llama 3.1 8B on Cloudflare's free tier) into structured fields: required skills, seniority, comp range, remote policy."
             />
             <Stat
               value={220}
-              label="Companies scraped daily"
+              label="Companies checked every 30 minutes"
               loaded
               static_
             />
           </div>
 
           <p
-            className="mt-6 text-xs"
+            className="mt-7 text-sm leading-relaxed"
             style={{ color: 'var(--color-text-tertiary)' }}
           >
-            Numbers refresh every 60s. Pulled directly from{' '}
+            These numbers refresh every 60 seconds — and they come straight from{' '}
             <a
               href="https://reverse-ats-ingest.aries-lao.workers.dev/health"
               target="_blank"
@@ -84,7 +84,7 @@ export function LiveCounter() {
             >
               our public health endpoint
             </a>
-            . No analytics theater — this is the real database.
+            . Not analytics theater. Real numbers from the real database.
           </p>
         </div>
       </div>
@@ -108,19 +108,25 @@ function Stat({
   return (
     <div title={tooltip}>
       <div
-        className="text-3xl sm:text-4xl font-semibold tabular-nums"
-        style={{ color: 'var(--color-text-primary)' }}
+        className="text-4xl sm:text-5xl tabular-nums"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 500,
+          color: 'var(--color-text-primary)',
+          letterSpacing: '-0.025em',
+          lineHeight: 1,
+        }}
       >
         {!loaded ? (
           <span style={{ color: 'var(--color-text-muted)' }}>—</span>
         ) : value == null ? (
-          <span style={{ color: 'var(--color-text-muted)' }}>?</span>
+          <span style={{ color: 'var(--color-text-muted)' }}>—</span>
         ) : (
           value.toLocaleString()
         )}
         {static_ && (
           <span
-            className="text-base ml-1"
+            className="text-xl ml-1"
             style={{ color: 'var(--color-text-tertiary)' }}
           >
             +
@@ -128,7 +134,7 @@ function Stat({
         )}
       </div>
       <div
-        className="mt-1.5 text-sm"
+        className="mt-3 text-sm leading-snug"
         style={{ color: 'var(--color-text-secondary)' }}
       >
         {label}

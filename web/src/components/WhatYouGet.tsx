@@ -1,57 +1,60 @@
 import { SectionHeader } from './HowItWorks'
 
-// What's included. Honest list — distinguishes "live now" from "coming."
-// Job seekers respect honesty more than aspirational marketing.
+// Honest list — distinguishes "live now" from "coming." Job seekers respect
+// honesty more than aspirational marketing.
 
 const FEATURES = [
-  { name: 'AI-scored job feed (Llama 3.3 70B)', status: 'live' },
+  { name: 'AI-scored job feed', status: 'live' },
   { name: '220+ companies scraped automatically', status: 'live' },
   { name: 'Filter by industry, location, score, freshness', status: 'live' },
   { name: 'Pipeline tracking (Saved → Applied → Offer)', status: 'live' },
-  { name: 'AI-drafted cover letters (5 styles)', status: 'live' },
+  { name: 'AI-drafted cover letters in five styles', status: 'live' },
   { name: 'Auto-suggest target roles from your resume', status: 'live' },
-  { name: 'Daily/weekly digest of new high-score jobs', status: 'live' },
-  { name: 'CSV/JSON export of your whole pipeline', status: 'live' },
-  { name: 'Career chatbot (ask anything)', status: 'soon' },
-  { name: 'Interview prep + Q&A per job', status: 'soon' },
+  { name: 'Daily or weekly digest of new high-fit jobs', status: 'live' },
+  { name: 'Export your whole pipeline as CSV or JSON', status: 'live' },
+  { name: 'Career chatbot — ask anything', status: 'soon' },
+  { name: 'Interview prep + practice questions per job', status: 'soon' },
   { name: 'Salary negotiation coach', status: 'soon' },
-  { name: 'SMS / Discord alerts for 90+ matches', status: 'soon' },
-  { name: 'Multi-resume support (different roles)', status: 'soon' },
-  { name: 'LinkedIn referral / intro drafter', status: 'planned' },
+  { name: 'Text or Discord alerts for 90+ matches', status: 'soon' },
+  { name: 'Multiple resume versions for different roles', status: 'soon' },
+  { name: 'LinkedIn referral and warm-intro drafter', status: 'planned' },
 ] as const
 
 type FeatureStatus = (typeof FEATURES)[number]['status']
 
-const STATUS_CONFIG: Record<FeatureStatus, { label: string; color: string; bg: string }> = {
+const STATUS_CONFIG: Record<FeatureStatus, { label: string; color: string; bg: string; border: string }> = {
   live: {
     label: 'Live',
     color: 'var(--color-success)',
-    bg: 'rgba(109, 217, 164, 0.1)',
+    bg: 'var(--color-success-soft)',
+    border: 'rgba(91, 129, 99, 0.25)',
   },
   soon: {
-    label: 'Coming this season',
+    label: 'Coming soon',
     color: 'var(--color-warning)',
-    bg: 'rgba(240, 184, 122, 0.1)',
+    bg: 'var(--color-warning-soft)',
+    border: 'rgba(192, 138, 62, 0.25)',
   },
   planned: {
     label: 'Planned',
     color: 'var(--color-text-tertiary)',
-    bg: 'rgba(122, 122, 146, 0.1)',
+    bg: 'var(--color-bg-card)',
+    border: 'var(--color-border-subtle)',
   },
 }
 
 export function WhatYouGet() {
   return (
     <section className="px-5 sm:px-8 py-20 sm:py-28">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-3xl mx-auto">
         <SectionHeader
           eyebrow="Everything included"
-          title="One price. No Pro tier. No upsells."
+          title="One price. No tiers. No upsells."
           subtitle="If we build it, you get it. The list below is the entire roadmap — color-coded by what's working today vs. what's coming."
         />
 
         <div
-          className="mt-10 rounded-2xl p-2"
+          className="mt-12 rounded-2xl overflow-hidden"
           style={{
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle)',
@@ -63,20 +66,20 @@ export function WhatYouGet() {
               return (
                 <li
                   key={feature.name}
-                  className="flex items-center justify-between gap-4 px-4 py-3.5"
+                  className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4"
                 >
                   <span
-                    className="text-sm sm:text-base"
+                    className="text-[15px]"
                     style={{ color: 'var(--color-text-primary)' }}
                   >
                     {feature.name}
                   </span>
                   <span
-                    className="flex-shrink-0 text-[11px] font-medium uppercase tracking-wider px-2.5 py-1 rounded-md"
+                    className="flex-shrink-0 text-[11px] font-medium uppercase tracking-[0.1em] px-2.5 py-1 rounded-full"
                     style={{
                       color: cfg.color,
                       background: cfg.bg,
-                      border: `1px solid ${cfg.color}33`,
+                      border: `1px solid ${cfg.border}`,
                     }}
                   >
                     {cfg.label}
@@ -88,10 +91,10 @@ export function WhatYouGet() {
         </div>
 
         <p
-          className="mt-6 text-sm text-center"
+          className="mt-7 text-sm text-center"
           style={{ color: 'var(--color-text-tertiary)' }}
         >
-          See the full feature roadmap →{' '}
+          The full roadmap, including what's behind each item →{' '}
           <a
             href="https://github.com/arieslao/reverse-ats/blob/main/backlog.md"
             target="_blank"
@@ -100,8 +103,7 @@ export function WhatYouGet() {
             style={{ color: 'var(--color-text-secondary)' }}
           >
             backlog.md
-          </a>{' '}
-          (yes, the actual roadmap is public)
+          </a>
         </p>
       </div>
     </section>

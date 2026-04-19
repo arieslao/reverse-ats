@@ -1,26 +1,29 @@
-// 3 steps. Plain language. No jargon.
+// Three steps. Plain language. No "AI-powered platform" jargon.
 
 const STEPS = [
   {
-    n: '01',
-    title: 'Tell it about you',
-    body: 'Paste your resume. Set the roles you want. Pick which industries (Tech, Healthcare, Consulting, Climate, etc.) to track. Takes 5 minutes.',
-    accent: 'rgba(124, 158, 255, 0.15)',
-    border: 'rgba(124, 158, 255, 0.3)',
+    n: 'One',
+    title: 'Tell us about you',
+    body: 'Paste your resume. Pick the kinds of roles you want. Choose which industries to follow — tech, healthcare, design, education, climate, whichever fits. Takes about 5 minutes.',
+    accent: 'var(--color-accent-soft)',
+    border: 'rgba(201, 83, 46, 0.18)',
+    accentText: 'var(--color-accent)',
   },
   {
-    n: '02',
-    title: 'AI does the searching',
-    body: 'Every 30 minutes, we check 220+ company career pages and score new openings against your resume. Wake up to a curated list of jobs that actually fit.',
-    accent: 'rgba(109, 217, 164, 0.12)',
-    border: 'rgba(109, 217, 164, 0.3)',
+    n: 'Two',
+    title: 'We do the searching',
+    body: 'Every 30 minutes, we quietly check 220+ employers. New openings get scored against your background — so when you sit down to look, the list is already short and relevant.',
+    accent: 'var(--color-success-soft)',
+    border: 'rgba(91, 129, 99, 0.2)',
+    accentText: 'var(--color-success)',
   },
   {
-    n: '03',
-    title: 'Apply, track, iterate',
-    body: 'Save jobs to your pipeline. Drag through stages (Applied → Phone Screen → Offer). Generate cover letters in one click. Get reminders to follow up.',
-    accent: 'rgba(240, 184, 122, 0.12)',
-    border: 'rgba(240, 184, 122, 0.3)',
+    n: 'Three',
+    title: 'You apply with less friction',
+    body: 'Save the ones you like. Drag through stages — Saved → Applied → Phone Screen → Offer. Generate a cover letter in one click. Get a nudge when it\'s time to follow up.',
+    accent: 'var(--color-warning-soft)',
+    border: 'rgba(192, 138, 62, 0.2)',
+    accentText: 'var(--color-warning)',
   },
 ]
 
@@ -30,38 +33,47 @@ export function HowItWorks() {
       <div className="max-w-5xl mx-auto">
         <SectionHeader
           eyebrow="How it works"
-          title="Three steps. About 10 minutes of setup."
-          subtitle="Not 'sign up and figure it out yourself.' We walk you through it."
+          title="Three steps. About ten minutes of setup."
+          subtitle="Not “sign up and figure it out yourself.” We walk you through it."
         />
 
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6">
           {STEPS.map((step) => (
             <div
               key={step.n}
-              className="rounded-xl p-6 transition-transform hover:translate-y-[-2px]"
+              className="rounded-2xl p-7 transition-transform hover:translate-y-[-3px]"
               style={{
-                background: 'var(--color-bg-card)',
+                background: 'var(--color-bg-elevated)',
                 border: '1px solid var(--color-border-subtle)',
               }}
             >
               <div
-                className="w-12 h-12 rounded-lg flex items-center justify-center font-mono font-semibold text-sm mb-5"
+                className="inline-flex items-center justify-center px-3 py-1 rounded-full mb-5"
                 style={{
                   background: step.accent,
                   border: `1px solid ${step.border}`,
-                  color: 'var(--color-text-primary)',
                 }}
               >
-                {step.n}
+                <span
+                  className="text-xs uppercase tracking-[0.14em] font-medium"
+                  style={{ color: step.accentText }}
+                >
+                  {step.n}
+                </span>
               </div>
               <h3
-                className="text-lg font-semibold mb-2 tracking-tight"
-                style={{ color: 'var(--color-text-primary)' }}
+                className="text-2xl mb-3 tracking-tight"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 500,
+                  color: 'var(--color-text-primary)',
+                  letterSpacing: '-0.02em',
+                }}
               >
                 {step.title}
               </h3>
               <p
-                className="text-sm leading-relaxed"
+                className="text-[15px] leading-relaxed"
                 style={{ color: 'var(--color-text-secondary)' }}
               >
                 {step.body}
@@ -86,20 +98,25 @@ export function SectionHeader({
   return (
     <div className="text-center max-w-2xl mx-auto">
       <div
-        className="text-xs uppercase tracking-wider font-medium mb-3"
-        style={{ color: 'var(--color-accent-hover)' }}
+        className="text-xs uppercase tracking-[0.16em] font-medium mb-4"
+        style={{ color: 'var(--color-accent)' }}
       >
         {eyebrow}
       </div>
       <h2
-        className="text-3xl sm:text-4xl font-semibold tracking-tight"
-        style={{ fontFamily: 'var(--font-display)', color: 'var(--color-text-primary)' }}
+        className="text-3xl sm:text-4xl md:text-5xl tracking-tight leading-[1.15]"
+        style={{
+          fontFamily: 'var(--font-display)',
+          fontWeight: 500,
+          color: 'var(--color-text-primary)',
+          letterSpacing: '-0.025em',
+        }}
       >
         {title}
       </h2>
       {subtitle && (
         <p
-          className="mt-3 text-base"
+          className="mt-4 text-base sm:text-lg leading-relaxed"
           style={{ color: 'var(--color-text-secondary)' }}
         >
           {subtitle}

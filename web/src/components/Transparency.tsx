@@ -1,74 +1,67 @@
 import { SectionHeader } from './HowItWorks'
 
-// THE transparency section. The user explicitly asked for this — be honest
-// about why we're holding back features and that it's for user safety.
-//
-// Most "we're in beta" pages are vague. This one is specific: phases, dates,
-// and the actual reason each phase comes when it does.
+// THE transparency section. Honest about why we're holding back features
+// and that it's for user safety. Phrased without engineering jargon so it
+// reads to anyone — a nurse, teacher, designer, recent grad.
 
 const ROLLOUT = [
   {
-    phase: 'Phase 0',
-    label: 'Live now',
+    phase: 'Today',
+    label: 'Live',
     status: 'done',
-    date: 'April 2026',
-    title: 'Open-source repo + headless scrape pipeline',
-    body: 'You can clone the repo today and self-host the entire app on your laptop. The cloud scrape pipeline (Cloudflare Workers + D1 + Workers AI) is also live, processing ~850 jobs every 30 minutes.',
+    title: 'You can run the full app yourself, free',
+    body: 'The whole project is open source. If you\'re comfortable with a terminal, follow the setup guide and you have the entire tool — running on your laptop, with your data staying on your machine.',
   },
   {
-    phase: 'Phase 1',
+    phase: 'This week',
     label: 'In progress',
     status: 'progress',
-    date: 'Late April 2026',
-    title: 'AI preprocessing tuning',
-    body: 'Improving how we extract structured fields (skills, seniority, comp range) from raw job descriptions. Better data here means better matches downstream.',
+    title: 'Improving how the AI reads jobs',
+    body: 'We\'re tuning the way the AI extracts skills, seniority, and salary ranges from raw job posts. Better understanding here means better matches when the hosted version opens.',
   },
   {
-    phase: 'Phase 1.5',
+    phase: 'Next few weeks',
     label: 'Next',
     status: 'next',
-    date: 'May 2026',
-    title: 'Coverage + dedup expansion',
-    body: 'Adding 4 new ATS types (SmartRecruiters, Workable, BambooHR, Recruitee) plus aggregator APIs (Adzuna, USAJobs). Goes from 220 → 1000+ companies. Semantic dedup catches the same job posted on multiple boards.',
+    title: 'More employers, better matching',
+    body: 'Expanding from 220 employers to over 1,000 — across more industries. Adding smart deduplication so the same job posted on three different boards shows up as one entry, not three.',
   },
   {
-    phase: 'Phases 2-3',
-    label: 'After 1.5',
+    phase: '1–2 weeks out',
+    label: 'Coming',
     status: 'later',
-    date: 'May-June 2026',
-    title: 'Multi-tenant API + tiered model routing',
-    body: 'Per-user data isolation, GitHub OAuth login, sponsor gate. Smart routing of LLM calls to the right model size for each task (cheap for routine, premium for high-stakes).',
+    title: 'Sign-in and reading the job feed',
+    body: 'Sponsors will be able to sign in with GitHub and browse the live job feed — read-only at first, no resume uploads yet. Lets us prove the sign-in flow is solid before any sensitive data is involved.',
   },
   {
-    phase: 'Phase 4-5',
-    label: 'Hosted launch',
+    phase: '~6–8 weeks out',
+    label: 'Hosted opens',
     status: 'later',
-    date: '~6-8 weeks out',
-    title: 'Hosted tier opens — sponsors get access',
-    body: 'Public app at hosted URL. Sign in with GitHub. If you sponsor at $10/mo, you\'re in. Self-host stays free forever.',
+    title: 'Full hosted version goes live',
+    body: 'Paste your resume, get your scored feed, drag jobs through your pipeline, generate cover letters, the whole thing. By this point all the safety pieces below are firmly in place.',
   },
 ]
 
 const SAFETY_REASONS = [
   {
-    title: 'Privacy policy + Terms of Service',
-    why: 'You\'ll be giving us your resume. That\'s sensitive personal data. We need formal documents stating exactly what we do with it (and don\'t do — we don\'t sell anything, ever) before we accept a single byte.',
+    title: 'A privacy promise we can stand behind',
+    why: 'You\'ll be giving us your resume — that\'s sensitive personal information. We need a real privacy policy and terms of service stating exactly what we do with it (almost nothing, for what it\'s worth) before we accept a single byte.',
   },
   {
-    title: 'Auth-grade security review',
-    why: 'GitHub OAuth eliminates the password-leak risk entirely, but we still need to test session management, token rotation, and authorization checks before storing your application history.',
+    title: 'Sign-in we\'d trust ourselves',
+    why: 'We use GitHub sign-in to avoid password leaks entirely. But we still want to test session management and access checks carefully before storing your application history.',
   },
   {
-    title: 'Daily encrypted backups',
-    why: 'Schema migrations happen as we build. We won\'t store your saved jobs, notes, or pipeline state until we have automatic daily backups and a tested restore procedure. Your work is too important to risk.',
+    title: 'Daily backups of your data',
+    why: 'Software changes as it grows. We won\'t store your saved jobs and notes until we have automatic daily backups and a tested way to restore them. Your work is too important to risk.',
   },
   {
-    title: 'GDPR/CCPA-ready data deletion',
-    why: 'When you cancel, your data should be downloadable as a single JSON file and fully deleted within 30 days. The export already works. The deletion automation needs to be airtight.',
+    title: 'A clean way to leave',
+    why: 'When you cancel, you should be able to download everything as a single file and have us delete the rest within 30 days. The download already works. The deletion needs to be airtight.',
   },
   {
-    title: 'Cost-cap safeguards',
-    why: 'Per-user daily compute limits ensure no abuse can spike Cloudflare bills and force a service shutdown. These caps protect the project so it stays around for you.',
+    title: 'Spending caps that protect everyone',
+    why: 'We\'re running on free cloud tiers to keep this affordable. Hard limits on per-account usage protect against abuse spiking our bills and forcing the service to shut down. Boring but important.',
   },
 ]
 
@@ -77,40 +70,44 @@ export function Transparency() {
     <section id="transparency" className="px-5 sm:px-8 py-20 sm:py-28">
       <div className="max-w-5xl mx-auto">
         <SectionHeader
-          eyebrow="Status & timeline"
+          eyebrow="Where we are"
           title="We're shipping in phases — on purpose."
-          subtitle="A note on why the hosted version isn't live yet, and why that's actually for your protection."
+          subtitle="A note on why the hosted version isn't live yet, and why holding back is actually the kindest thing we can do."
         />
 
-        {/* Phased rollout list */}
-        <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="mt-14 grid grid-cols-1 lg:grid-cols-2 gap-10">
+          {/* Rollout phases */}
           <div>
             <h3
-              className="text-sm uppercase tracking-wider font-medium mb-5"
-              style={{ color: 'var(--color-accent-hover)' }}
+              className="text-sm uppercase tracking-[0.16em] font-medium mb-5"
+              style={{ color: 'var(--color-accent)' }}
             >
-              Rollout plan (public roadmap)
+              The plan
             </h3>
             <ol className="space-y-3">
               {ROLLOUT.map((item) => (
                 <li
                   key={item.phase}
-                  className="rounded-xl p-4"
+                  className="rounded-2xl p-5"
                   style={{
-                    background: 'var(--color-bg-card)',
+                    background: 'var(--color-bg-elevated)',
                     border: '1px solid var(--color-border-subtle)',
-                    opacity: item.status === 'later' ? 0.7 : 1,
+                    opacity: item.status === 'later' ? 0.78 : 1,
                   }}
                 >
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
+                  <div className="flex items-start justify-between gap-3 mb-1">
                     <span
-                      className="text-sm font-semibold"
-                      style={{ color: 'var(--color-text-primary)' }}
+                      className="text-base"
+                      style={{
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 500,
+                        color: 'var(--color-text-primary)',
+                      }}
                     >
-                      {item.phase} — {item.title}
+                      {item.phase}
                     </span>
                     <span
-                      className="flex-shrink-0 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded"
+                      className="flex-shrink-0 text-[10px] uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
                       style={{
                         color:
                           item.status === 'done'
@@ -120,16 +117,16 @@ export function Transparency() {
                             : 'var(--color-text-tertiary)',
                         background:
                           item.status === 'done'
-                            ? 'rgba(109, 217, 164, 0.1)'
+                            ? 'var(--color-success-soft)'
                             : item.status === 'progress'
-                            ? 'rgba(240, 184, 122, 0.1)'
-                            : 'rgba(122, 122, 146, 0.1)',
+                            ? 'var(--color-warning-soft)'
+                            : 'var(--color-bg-card)',
                         border: `1px solid ${
                           item.status === 'done'
-                            ? 'rgba(109, 217, 164, 0.3)'
+                            ? 'rgba(91, 129, 99, 0.25)'
                             : item.status === 'progress'
-                            ? 'rgba(240, 184, 122, 0.3)'
-                            : 'rgba(122, 122, 146, 0.2)'
+                            ? 'rgba(192, 138, 62, 0.25)'
+                            : 'var(--color-border-subtle)'
                         }`,
                       }}
                     >
@@ -137,13 +134,13 @@ export function Transparency() {
                     </span>
                   </div>
                   <div
-                    className="text-xs mb-2"
-                    style={{ color: 'var(--color-text-tertiary)' }}
+                    className="text-sm font-medium mb-2"
+                    style={{ color: 'var(--color-text-secondary)' }}
                   >
-                    {item.date}
+                    {item.title}
                   </div>
                   <p
-                    className="text-sm leading-relaxed"
+                    className="text-[14px] leading-relaxed"
                     style={{ color: 'var(--color-text-secondary)' }}
                   >
                     {item.body}
@@ -156,27 +153,27 @@ export function Transparency() {
           {/* Why we're holding back */}
           <div>
             <h3
-              className="text-sm uppercase tracking-wider font-medium mb-5"
-              style={{ color: 'var(--color-accent-hover)' }}
+              className="text-sm uppercase tracking-[0.16em] font-medium mb-5"
+              style={{ color: 'var(--color-accent)' }}
             >
-              Why we're not shipping the hosted version yet
+              Why we're holding back
             </h3>
             <div
-              className="rounded-xl p-5 mb-5"
+              className="rounded-2xl p-6 mb-5"
               style={{
-                background: 'rgba(124, 158, 255, 0.06)',
-                border: '1px solid rgba(124, 158, 255, 0.2)',
+                background: 'var(--color-accent-soft)',
+                border: '1px solid rgba(201, 83, 46, 0.18)',
               }}
             >
               <p
-                className="text-sm leading-relaxed"
+                className="text-[15px] leading-relaxed"
                 style={{ color: 'var(--color-text-primary)' }}
               >
-                We could ship the hosted app today. We're choosing not to until the
-                items below are in place — because shipping a half-baked product that
-                holds your resume and application history is how trust gets broken.
-                Open-dev shipping fast doesn't excuse us from protecting your data.
-                These come <em>first</em>, then features.
+                We could ship the hosted version today and start charging for it.
+                We're choosing not to, until the items below are in place — because
+                shipping a half-baked product that holds your resume and
+                application history is how trust gets broken. These come{' '}
+                <em style={{ fontStyle: 'italic' }}>first</em>, then features.
               </p>
             </div>
 
@@ -184,42 +181,48 @@ export function Transparency() {
               {SAFETY_REASONS.map((reason) => (
                 <li
                   key={reason.title}
-                  className="rounded-xl p-4"
+                  className="rounded-2xl p-5"
                   style={{
-                    background: 'var(--color-bg-card)',
+                    background: 'var(--color-bg-elevated)',
                     border: '1px solid var(--color-border-subtle)',
                   }}
                 >
-                  <div
-                    className="flex items-center gap-2 mb-1.5"
-                    style={{ color: 'var(--color-text-primary)' }}
-                  >
+                  <div className="flex items-center gap-2.5 mb-2">
                     <svg
-                      width="16"
-                      height="16"
-                      viewBox="0 0 16 16"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
                       fill="none"
                       style={{ color: 'var(--color-success)' }}
                       className="flex-shrink-0"
                     >
                       <path
-                        d="M8 1.5L2 4v4c0 3.5 2.5 6.5 6 7 3.5-.5 6-3.5 6-7V4L8 1.5z"
+                        d="M9 1.5L2 4.5v5c0 4 3 7.5 7 8 4-.5 7-4 7-8v-5L9 1.5z"
                         stroke="currentColor"
                         strokeWidth="1.5"
                         strokeLinejoin="round"
                       />
                       <path
-                        d="M5.5 8l2 2 3-3.5"
+                        d="M6 9l2 2 4-4.5"
                         stroke="currentColor"
                         strokeWidth="1.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
                     </svg>
-                    <span className="font-semibold text-sm">{reason.title}</span>
+                    <span
+                      className="text-[15px]"
+                      style={{
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 500,
+                        color: 'var(--color-text-primary)',
+                      }}
+                    >
+                      {reason.title}
+                    </span>
                   </div>
                   <p
-                    className="text-sm leading-relaxed pl-6"
+                    className="text-[14px] leading-relaxed pl-7"
                     style={{ color: 'var(--color-text-secondary)' }}
                   >
                     {reason.why}
@@ -230,20 +233,19 @@ export function Transparency() {
           </div>
         </div>
 
-        {/* Footer link to actual technical roadmap */}
         <div
-          className="mt-10 rounded-xl p-5 text-center"
+          className="mt-12 rounded-2xl p-6 text-center"
           style={{
             background: 'var(--color-bg-elevated)',
             border: '1px solid var(--color-border-subtle)',
           }}
         >
           <p
-            className="text-sm"
+            className="text-[15px]"
             style={{ color: 'var(--color-text-secondary)' }}
           >
-            Want the technical detail? The full architecture, cost analysis,
-            and per-feature build estimates are public →{' '}
+            Want the technical detail? The full architecture, cost analysis, and
+            per-feature build estimates are public →{' '}
             <a
               href="https://github.com/arieslao/reverse-ats/blob/main/backlog.md"
               target="_blank"

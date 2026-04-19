@@ -1,17 +1,17 @@
-// Hero — first 2 seconds. Empathetic over aggressive: job hunting IS brutal,
-// we're not pretending otherwise. The site is for people who are tired.
+// Hero — written like a friend who's been there, not a SaaS pitch.
+// Universal: works for nurses, teachers, designers, engineers, career switchers.
 
 export function Hero() {
   return (
-    <section id="top" className="relative px-5 sm:px-8 pt-16 pb-20 sm:pt-24 sm:pb-28">
-      <div className="max-w-4xl mx-auto text-center">
-        {/* Eyebrow — subtle context before the headline lands */}
+    <section id="top" className="relative px-5 sm:px-8 pt-20 pb-24 sm:pt-28 sm:pb-32">
+      <div className="max-w-3xl mx-auto text-center">
+        {/* Eyebrow — quiet context */}
         <div
-          className="inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-full mb-6"
+          className="inline-flex items-center gap-2 text-xs px-3.5 py-1.5 rounded-full mb-8"
           style={{
-            background: 'var(--color-accent-soft)',
-            color: 'var(--color-accent-hover)',
-            border: '1px solid rgba(124, 158, 255, 0.2)',
+            background: 'var(--color-bg-card)',
+            color: 'var(--color-text-secondary)',
+            border: '1px solid var(--color-border-subtle)',
           }}
         >
           <span
@@ -21,69 +21,115 @@ export function Hero() {
           Open source · Self-host free · Hosted launching soon
         </div>
 
-        {/* Empathy-first headline. No "REVOLUTIONIZE YOUR CAREER!!" */}
+        {/* Display headline — serif, large, generous leading */}
         <h1
-          className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.1]"
-          style={{ fontFamily: 'var(--font-display)' }}
+          className="text-4xl sm:text-5xl md:text-6xl tracking-tight leading-[1.08]"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            color: 'var(--color-text-primary)',
+            letterSpacing: '-0.025em',
+          }}
         >
-          Job hunting is brutal.
-          <br />
-          <span style={{ color: 'var(--color-text-secondary)' }}>
-            We built a tool to make it less brutal.
-          </span>
+          A kinder way to find{' '}
+          <em style={{ color: 'var(--color-accent)', fontStyle: 'italic' }}>
+            your next role.
+          </em>
         </h1>
 
-        {/* Subhead — what it actually does, in one sentence */}
+        {/* Subhead — sets the human tone */}
         <p
-          className="mt-6 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed"
+          className="mt-7 text-lg sm:text-xl max-w-2xl mx-auto leading-[1.65]"
           style={{ color: 'var(--color-text-secondary)' }}
         >
-          Reverse ATS finds jobs at <strong style={{ color: 'var(--color-text-primary)' }}>220+ companies</strong>,
-          scores each one against your resume with AI, tracks every application, and
-          drafts personalized cover letters. Open source. Yours forever.
+          Most job tools work for the companies. This one works for{' '}
+          <span style={{ color: 'var(--color-text-primary)' }}>you</span>. It quietly
+          watches 220+ employers, scores each new opening against your experience,
+          drafts your cover letters, and keeps your applications organized — so you
+          can spend less time scrolling and more time interviewing.
         </p>
 
-        {/* CTAs — two clear paths, equal visual weight */}
-        <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+        {/* CTAs — equal visual weight, paired buttons */}
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
           <a
             href="https://github.com/sponsors/arieslao"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium text-base transition-all hover:translate-y-[-1px]"
+            className="w-full sm:w-auto px-7 py-3.5 rounded-full text-base transition-all hover:translate-y-[-1px]"
             style={{
               background: 'var(--color-accent)',
-              color: '#0a0a0f',
-              boxShadow: '0 8px 24px rgba(124, 158, 255, 0.25)',
+              color: 'var(--color-accent-text)',
+              fontWeight: 500,
+              boxShadow: '0 6px 20px -6px rgba(201, 83, 46, 0.4)',
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
           >
-            Sponsor for hosted access — $10/mo
+            Reserve hosted access — $10/mo
           </a>
           <a
             href="https://github.com/arieslao/reverse-ats#installation-guide-step-by-step"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium text-base transition-all"
+            className="w-full sm:w-auto px-7 py-3.5 rounded-full text-base transition-all"
             style={{
-              border: '1px solid var(--color-border-muted)',
+              border: '1px solid var(--color-border-strong)',
               color: 'var(--color-text-primary)',
-              background: 'var(--color-bg-elevated)',
+              background: 'transparent',
+              fontWeight: 500,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-accent)')}
-            onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--color-border-muted)')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-bg-card)'
+              e.currentTarget.style.borderColor = 'var(--color-text-tertiary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.borderColor = 'var(--color-border-strong)'
+            }}
           >
-            Self-host (always free) →
+            Run it yourself, free →
           </a>
         </div>
 
-        {/* Trust micro-copy under CTAs */}
+        {/* Trust micro-copy */}
         <p
-          className="mt-5 text-xs"
+          className="mt-6 text-sm"
           style={{ color: 'var(--color-text-tertiary)' }}
         >
-          No credit card to self-host · GitHub Sponsors handles billing · Cancel anytime
+          No credit card to self-host · Cancel hosted anytime · Your data exports as JSON
         </p>
+
+        {/* Who's it for — universal, with visible diversity of roles */}
+        <div className="mt-16">
+          <div
+            className="text-xs uppercase tracking-[0.18em] mb-4"
+            style={{ color: 'var(--color-text-tertiary)' }}
+          >
+            Built for everyone job-hunting
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 max-w-3xl mx-auto">
+            {[
+              'Engineers',
+              'Designers',
+              'Nurses',
+              'Teachers',
+              'Consultants',
+              'Marketers',
+              'PMs',
+              'Career switchers',
+              'New grads',
+              'Returning to work',
+            ].map((role) => (
+              <span
+                key={role}
+                className="text-sm"
+                style={{ color: 'var(--color-text-secondary)' }}
+              >
+                {role}
+              </span>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   )

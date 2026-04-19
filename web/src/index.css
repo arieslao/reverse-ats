@@ -1,46 +1,63 @@
 @import "tailwindcss";
 
-/* ─── Design tokens ───────────────────────────────────────────────────────────
+/* ─── Design tokens — warm, human, editorial ──────────────────────────────────
  *
- * Job seekers are stressed. The site should feel calm — not aggressive
- * marketing. Soft palette, generous whitespace, readable typography.
+ * Inspired by Claude.ai's restraint: warm cream background, serif display
+ * type for considered headings, generous whitespace, terracotta accents
+ * that feel hand-picked rather than computer-generated.
+ *
+ * The audience is everyone job-hunting — nurses, teachers, designers,
+ * career switchers. Not just engineers. The aesthetic should feel like
+ * a kind, capable person sitting next to you, not a Silicon Valley pitch.
  * ────────────────────────────────────────────────────────────────────────── */
+
 @theme {
-  /* Surface (dark mode is the default since job seekers often browse late) */
-  --color-bg-base:        #0a0a0f;
-  --color-bg-elevated:    #131320;
-  --color-bg-card:        #181828;
-  --color-bg-input:       #1f1f30;
+  /* Surfaces — warm cream tones, not stark white */
+  --color-bg-base:        #fbf9f4;
+  --color-bg-elevated:    #ffffff;
+  --color-bg-card:        #f5f1e8;
+  --color-bg-tinted:      #f1ebd9;
+  --color-bg-input:       #ffffff;
 
-  /* Borders */
-  --color-border-subtle:  #25253a;
-  --color-border-muted:   #2e2e44;
+  /* Borders — barely-there, hint at structure without shouting */
+  --color-border-subtle:  #ebe4d3;
+  --color-border-muted:   #d9d0b8;
+  --color-border-strong:  #b9ad8f;
 
-  /* Text */
-  --color-text-primary:   #f5f5fa;
-  --color-text-secondary: #b8b8cc;
-  --color-text-tertiary:  #7a7a92;
-  --color-text-muted:     #5a5a72;
+  /* Text — warm near-blacks, never #000 */
+  --color-text-primary:   #1f1d18;
+  --color-text-secondary: #4a463d;
+  --color-text-tertiary:  #847e6f;
+  --color-text-muted:     #b3ac99;
 
-  /* Accents — calmer palette than typical SaaS blues */
-  --color-accent:         #7c9eff;  /* periwinkle blue */
-  --color-accent-hover:   #95b3ff;
-  --color-accent-soft:    #1f2645;
-  --color-success:        #6dd9a4;  /* sage green */
-  --color-warning:        #f0b87a;  /* warm amber */
-  --color-danger:         #ef7d8e;  /* dusty rose */
+  /* Accents — earthy, considered, never neon */
+  --color-accent:         #c9532e;   /* terracotta */
+  --color-accent-hover:   #b04525;
+  --color-accent-soft:    #f5dcd1;
+  --color-accent-text:    #ffffff;
+  --color-success:        #5b8163;   /* sage */
+  --color-success-soft:   #e1ebd9;
+  --color-warning:        #c08a3e;   /* warm amber */
+  --color-warning-soft:   #f5e6cc;
+  --color-info:           #5c6e8a;   /* slate blue */
+  --color-info-soft:      #dfe5ee;
 
-  /* Type ramp */
-  --font-display: ui-sans-serif, system-ui, -apple-system, "SF Pro Display",
-                  "Segoe UI", "Inter", sans-serif;
-  --font-body:    ui-sans-serif, system-ui, -apple-system, "SF Pro Text",
-                  "Segoe UI", "Inter", sans-serif;
+  /* Type — Lora for display (warm serif), Inter for body */
+  --font-display: "Lora", "Charter", "Source Serif Pro", "Iowan Old Style",
+                  Georgia, "Times New Roman", serif;
+  --font-body:    "Inter", ui-sans-serif, system-ui, -apple-system,
+                  "Segoe UI", "Helvetica Neue", sans-serif;
 }
 
-/* ─── Global ──────────────────────────────────────────────────────────────── */
+/* ─── Web fonts ──────────────────────────────────────────────────────────── */
+
+@import url("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700&family=Inter:wght@400;450;500;600&display=swap");
+
+/* ─── Global ─────────────────────────────────────────────────────────────── */
 
 html {
   scroll-behavior: smooth;
+  background: var(--color-bg-base);
 }
 
 body {
@@ -48,37 +65,73 @@ body {
   color: var(--color-text-primary);
   font-family: var(--font-body);
   font-feature-settings: "ss01", "cv11";
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.55;
 }
 
-/* Subtle ambient gradient — keeps the page from feeling flat */
+/* Headings always serif — quiet authority */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-feature-settings: "kern", "liga";
+}
+
+/* Subtle paper-grain ambient — keeps the page from feeling like a screen */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 158, 255, 0.08), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(109, 217, 164, 0.04), transparent 50%);
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201, 83, 46, 0.04), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(91, 129, 99, 0.03), transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Page content stays above the gradient */
 #root {
   position: relative;
   z-index: 1;
 }
 
-/* Smoother focus rings (accessibility but not jarring) */
 *:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 3px;
   border-radius: 4px;
 }
 
-/* Selection feels intentional */
 ::selection {
-  background: rgba(124, 158, 255, 0.3);
-  color: #fff;
+  background: var(--color-accent-soft);
+  color: var(--color-text-primary);
+}
+
+/* Honor system dark mode preference but use warm dark tones, not pitch black */
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-bg-base:        #1a1814;
+    --color-bg-elevated:    #232019;
+    --color-bg-card:        #2a261d;
+    --color-bg-tinted:      #322d22;
+    --color-bg-input:       #232019;
+
+    --color-border-subtle:  #38332a;
+    --color-border-muted:   #4a4438;
+    --color-border-strong:  #6b6452;
+
+    --color-text-primary:   #f5f0e3;
+    --color-text-secondary: #c2bba9;
+    --color-text-tertiary:  #8e8773;
+    --color-text-muted:     #5e5847;
+
+    --color-accent-soft:    #3d2418;
+    --color-success-soft:   #1f2d20;
+    --color-warning-soft:   #2d2515;
+    --color-info-soft:      #1d242e;
+  }
+
+  body::before {
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201, 83, 46, 0.06), transparent 60%),
+      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(91, 129, 99, 0.04), transparent 50%);
+  }
 }
