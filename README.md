@@ -25,6 +25,23 @@ Anyone looking for a job. Whether you're a software engineer, nurse, teacher, co
 
 ---
 
+## Don't want to self-host?
+
+Self-hosting is **always free** and always will be — that's the core promise of this project. But if you'd rather not run anything on your own computer, you can support development and get a managed cloud deployment for the price of a coffee:
+
+| Tier | Price | What you get |
+|---|---|---|
+| **Self-host** | Free, MIT-licensed | The whole repo. Run it on your laptop. Always your data, always private. |
+| ☕ **Supporter** | $5/mo via [GitHub Sponsors](https://github.com/sponsors/arieslao) | Name in the README. Warm fuzzies. Helps keep the project alive. |
+| 🚀 **Hosted** *(coming soon)* | $7/mo via GitHub Sponsors | We host it for you. Sign in with GitHub. Bring your own LLM key. No setup. |
+| ⭐ **Hosted Pro** *(coming soon)* | $19/mo via GitHub Sponsors | Hosted + bundled AI scoring credits, daily email digest of new high-score jobs, premium cover letter styles, SMS/Discord alerts. |
+
+The hosted tier is being built openly — see [backlog.md](backlog.md) and [cloudflare/](cloudflare/) for the cloud architecture in progress. Sponsoring at any level today helps fund the buildout. **Cancel anytime, your data is exportable.**
+
+If hosted launches and you'd rather self-host, just clone this repo and follow the install guide. Your data exports as a single JSON file — drop it into your local instance and keep going.
+
+---
+
 ## System Requirements
 
 This runs on any modern laptop or desktop computer:
@@ -231,11 +248,12 @@ Three layers of protection so you don't lose your application history:
 |----------|------|---------|-----------------|
 | **Keyword Only** | Free | Basic matching | None — works immediately |
 | **Ollama (local)** | Free | Good | Easy — one download |
+| **Groq (Llama 3.3 70B)** | Free up to 14,400 scores/day | Excellent | Easy — just sign up at [groq.com](https://groq.com) for an API key, no card required |
 | **OpenAI (GPT-4o-mini)** | ~$0.01-0.03/job | Excellent | Easy — just need API key |
 | **Anthropic (Claude)** | ~$0.01-0.03/job | Excellent | Easy — just need API key |
 | **OpenAI-Compatible** | Varies | Varies | Moderate — need a running endpoint |
 
-**Our recommendation:** Start with **Keyword Only** (zero setup). If you want better matching, install **Ollama** for free local AI. If you want the best results and don't mind a few cents per job, use **OpenAI**.
+**Our recommendation:** **Groq** is the new best-in-class default — Llama 3.3 70B quality at zero cost up to 14,400 scores/day, no card required. Use **Ollama** if you want everything to stay local on your hardware. Fall back to **Keyword Only** if you want zero setup. Use **OpenAI** or **Anthropic** if you want premium models and don't mind a few cents per job.
 
 ---
 

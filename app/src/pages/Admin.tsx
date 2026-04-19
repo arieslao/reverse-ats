@@ -1242,6 +1242,13 @@ const LLM_PROVIDERS: { id: string; name: string; default_url: string; default_mo
     requires_key: false,
   },
   {
+    id: 'groq',
+    name: 'Groq (Free Llama / Qwen)',
+    default_url: 'https://api.groq.com/openai/v1/chat/completions',
+    default_model: 'llama-3.3-70b-versatile',
+    requires_key: true,
+  },
+  {
     id: 'openai_compatible',
     name: 'OpenAI-Compatible',
     default_url: 'http://localhost:8080/v1/chat/completions',
@@ -1261,7 +1268,8 @@ const PROVIDER_DESCRIPTIONS: Record<string, string> = {
   openai: 'Use GPT-4o, GPT-4o-mini, or any OpenAI model',
   anthropic: 'Use Claude Sonnet, Haiku, or any Anthropic model',
   ollama: 'Free, runs locally. No API key needed.',
-  openai_compatible: 'llama.cpp, vLLM, LiteLLM, Groq, Together AI, etc.',
+  groq: 'Free hosted Llama 3.3 70B or Qwen — fast, generous free tier',
+  openai_compatible: 'llama.cpp, vLLM, LiteLLM, Together AI, Fireworks, etc.',
   keyword_only: 'No LLM. Uses keyword matching only (free, no setup needed)',
 }
 
@@ -1273,8 +1281,10 @@ const PROVIDER_SETUP_HINTS: Record<string, string> = {
     "First install Ollama (ollama.com), then in a terminal run 'ollama pull <model>' and 'ollama serve'. Recommended starter model: qwen2.5:3b (small, fast) or llama3.1:8b (balanced).",
   openai: 'Get an API key at platform.openai.com/api-keys and paste it above.',
   anthropic: 'Get an API key at console.anthropic.com and paste it above.',
+  groq:
+    "Sign up free at groq.com → 'Build with Groq', generate an API key, paste above. Free tier = 14,400 requests/day, 30 req/min. Fast Llama 3.3 70B and Qwen models — no card required.",
   openai_compatible:
-    'Point API URL at any OpenAI-compatible endpoint (llama.cpp server, vLLM, Groq, Together AI, etc.) and paste the API key if required.',
+    'Point API URL at any OpenAI-compatible endpoint (llama.cpp server, vLLM, Together AI, Fireworks, etc.) and paste the API key if required.',
   keyword_only: '',
 }
 
@@ -1282,6 +1292,7 @@ const PROVIDER_COST_NOTES: Record<string, string> = {
   openai: '~$0.01–0.03 per job scored with gpt-4o-mini',
   anthropic: '~$0.01–0.03 per job scored with Claude Haiku',
   ollama: 'Free — runs on your hardware',
+  groq: 'Free up to 14,400 scores/day (then $0 — Groq has no overage on free tier, just rate-limits)',
   openai_compatible: 'Depends on your endpoint',
   keyword_only: 'Free — no API calls',
 }

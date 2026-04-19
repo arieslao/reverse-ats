@@ -54,6 +54,16 @@ PROVIDERS: dict[str, dict] = {
         "requires_key": False,
         "format": "openai",
     },
+    "groq": {
+        # Groq runs open-weight models (Llama, Qwen, Mixtral) on their LPU
+        # hardware with a generous free tier (14,400 req/day, 30 req/min).
+        # Excellent quality + speed combo for free LLM scoring.
+        "name": "Groq (Free Llama / Qwen)",
+        "default_url": "https://api.groq.com/openai/v1/chat/completions",
+        "default_model": "llama-3.3-70b-versatile",
+        "requires_key": True,
+        "format": "openai",
+    },
     "openai_compatible": {
         "name": "OpenAI-Compatible (llama.cpp, vLLM, LiteLLM, Groq, Together AI, etc.)",
         "default_url": "http://localhost:8080/v1/chat/completions",
