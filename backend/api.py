@@ -746,13 +746,13 @@ def list_feed_industries():
 def list_feed_locations(
     filter: Optional[str] = Query(
         None,
-        description="Comma-separated location tokens. If set, only aggregates jobs whose location contains ANY token — used by the picker to narrow the other columns hierarchically (pick country → only see its states/cities).",
+        description="Comma-separated location tokens. If set, the picker narrows hierarchically: only aggregates STRUCTURED records whose country/state/city matches a selected token. Picking 'Canada' surfaces only Canadian states/cities, not co-occurring US locations from multi-location postings.",
     ),
 ):
     """
-    Parse active job locations into city/state/country tokens with counts.
-    Powers the Locations multi-select on the Feed page, with optional
-    hierarchical narrowing via the `filter` query param.
+    Parse active job locations into structured city/state/country records,
+    then aggregate matching records into bucketed counts. Powers the
+    Locations multi-select on the Feed page.
 
     Returns:
       {
@@ -764,32 +764,21 @@ def list_feed_locations(
     """
     from location_parser import aggregate
 
-    base_sql = (
-        "SELECT location FROM jobs "
-        "WHERE dismissed = 0 AND expired = 0 "
-        "AND location IS NOT NULL AND location != ''"
-    )
-
-    params: dict = {}
     needles = (
-        [s.strip() for s in (filter or "").split(",") if s.strip()] if filter else []
+        [s.strip() for s in (filter or "").split(",") if s.strip()] if filter else None
     )
-    if needles:
-        # OR-match on any selected token (mirrors /api/jobs locations filter)
-        clauses = []
-        for idx, n in enumerate(needles):
-            param_name = f"loc_{idx}"
-            clauses.append(f"LOWER(location) LIKE :{param_name}")
-            params[param_name] = f"%{n.lower()}%"
-        base_sql += " AND (" + " OR ".join(clauses) + ")"
 
     conn = _conn()
     try:
-        rows = conn.execute(base_sql, params).fetchall()
+        rows = conn.execute(
+            "SELECT location FROM jobs "
+            "WHERE dismissed = 0 AND expired = 0 "
+            "AND location IS NOT NULL AND location != ''"
+        ).fetchall()
     finally:
         conn.close()
 
-    return aggregate(row["location"] for row in rows)
+    return aggregate((row["location"] for row in rows), filter_tokens=needles)
 
 
 # ---------------------------------------------------------------------------

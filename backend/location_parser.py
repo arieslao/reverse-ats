@@ -223,8 +223,170 @@ def parse_one(location: str) -> dict[str, list[str]]:
     }
 
 
-def aggregate(locations: Iterable[str]) -> dict[str, list[dict]]:
-    """Aggregate parsed tokens across many job locations into ranked buckets.
+def parse_records(location: str) -> list[dict]:
+    """Parse a location string into STRUCTURED records — one per geo group.
+
+    Preserves parent-child relationships so picking "Canada" can correctly
+    narrow the picker's other columns to only Canadian states/cities,
+    instead of surfacing every US locale that happened to co-occur in the
+    same multi-location string:
+
+        "San Francisco, CA, US; Toronto, ON, Canada"
+        → [
+            {"country": "United States", "state": "California", "city": "San Francisco", "remote": False},
+            {"country": "Canada",        "state": None,         "city": "Toronto",       "remote": False},
+          ]
+    """
+    if not location:
+        return []
+
+    # 1. Strip parenthetical content FIRST — parens contain commas and "or"s
+    #    ("ON, AB, BC, or NS Only") that would otherwise wreck splitting.
+    cleaned = re.sub(r"\([^)]*\)", "", location)
+
+    # 2. Split into geo groups on strong separators: semicolon, bullet,
+    #    pipe, AND " or " (after parens are gone, "or" is now safe).
+    groups = re.split(r"[;•·|]|\s+or\s+", cleaned)
+
+    records: list[dict] = []
+    for group in groups:
+        group = group.strip()
+        if not group:
+            continue
+        records.extend(_parse_one_group_to_records(group))
+    return records
+
+
+def _states_equal(a: str, b: str) -> bool:
+    """True if a and b refer to the same US state (any combo of name/code)."""
+    name_a = STATE_CODE_TO_NAME[a] if a in US_STATE_CODES else a
+    name_b = STATE_CODE_TO_NAME[b] if b in US_STATE_CODES else b
+    return name_a == name_b
+
+
+def _parse_one_group_to_records(group: str) -> list[dict]:
+    """Parse a single comma-separated group into one or more records.
+
+    Handles the common pattern where a single comma-separated string
+    encodes MULTIPLE geos: "San Francisco, CA, New York, NY, Portland, OR"
+    → 3 records. Each (state-code-or-name) closes the current record;
+    each (country) closes the current record AND assigns its country.
+    """
+    is_remote = False
+
+    # Detect + strip remote phrases within this group
+    if re.search(r"\bremote\b", group, re.I):
+        is_remote = True
+        group = re.sub(r"^\s*remote\s+(within|in)\s+", "", group, flags=re.I)
+        group = re.sub(r"^\s*remote\s*[-–:,]?\s*", "", group, flags=re.I)
+        group = re.sub(r"\s*[-–]\s*remote\s*$", "", group, flags=re.I)
+        group = re.sub(r"\bremote\b", "", group, flags=re.I)
+        group = group.strip(" ,-")
+
+    if not group:
+        return [{"country": None, "state": None, "city": None, "remote": is_remote}]
+
+    parts = [p.strip().rstrip(".") for p in group.split(",") if p and p.strip()]
+    if not parts:
+        return [{"country": None, "state": None, "city": None, "remote": is_remote}]
+
+    records: list[dict] = []
+    current_city_parts: list[str] = []
+    current_state: Optional[str] = None
+
+    def flush(country: Optional[str] = None) -> None:
+        nonlocal current_city_parts, current_state
+        has_anything = bool(current_city_parts or current_state or country)
+        if has_anything:
+            city_str = " ".join(current_city_parts).strip() if current_city_parts else None
+            # Drop ZIP-like trailing digits from the city
+            if city_str:
+                city_str = re.sub(r"\s+\d{4,}.*$", "", city_str).strip() or None
+            country_str = country
+            if country_str is None and current_state:
+                country_str = "United States"
+            records.append({
+                "country": country_str,
+                "state": current_state,
+                "city": city_str,
+                "remote": is_remote,
+            })
+        current_city_parts = []
+        current_state = None
+
+    i = 0
+    while i < len(parts):
+        p = parts[i]
+        nxt = parts[i + 1] if i + 1 < len(parts) else None
+        p_is_state = p in US_STATE_NAMES or p in US_STATE_CODES
+        nxt_is_state = bool(nxt and (nxt in US_STATE_NAMES or nxt in US_STATE_CODES))
+
+        # Country marker — closes current record with this country
+        if p in COUNTRY_ALIASES:
+            flush(country=COUNTRY_ALIASES[p])
+            i += 1
+            continue
+
+        # "<State Name>, <State Code>" pattern (e.g. "New York, NY") where
+        # both refer to the same state — interpret as city = state name,
+        # state = the code. This is the convention some boards use for
+        # large cities that share their state's name.
+        if p_is_state and nxt_is_state and _states_equal(p, nxt):
+            flush()
+            current_city_parts.append(p)
+            current_state = STATE_CODE_TO_NAME.get(nxt, nxt) if nxt in US_STATE_CODES else nxt
+            flush()
+            i += 2
+            continue
+
+        # Plain state — close any in-progress record first, then start fresh
+        if p_is_state:
+            if current_state is not None:
+                flush()
+            current_state = STATE_CODE_TO_NAME.get(p, p) if p in US_STATE_CODES else p
+            i += 1
+            continue
+
+        # Anything else — accumulate into current city
+        current_city_parts.append(p)
+        i += 1
+
+    flush()
+
+    if not records:
+        return [{"country": None, "state": None, "city": None, "remote": is_remote}]
+
+    # Propagate is_remote flag to all emitted records (already done in flush
+    # since we close over is_remote, but defensively ensure)
+    for r in records:
+        r["remote"] = r["remote"] or is_remote
+
+    return records
+
+
+def _record_matches(record: dict, needles_lower: set[str]) -> bool:
+    """Return True if this record matches any of the selected location names.
+
+    Match is case-insensitive equality against country / state / city.
+    "Remote" as a needle is special-cased to match the remote flag.
+    """
+    if "remote" in needles_lower and record.get("remote"):
+        return True
+    for field in ("country", "state", "city"):
+        v = record.get(field)
+        if v and v.lower() in needles_lower:
+            return True
+    return False
+
+
+def aggregate(locations: Iterable[str], filter_tokens: Optional[Iterable[str]] = None) -> dict[str, list[dict]]:
+    """Aggregate parsed records across many job locations into ranked buckets.
+
+    Args:
+        locations: iterable of raw location strings (one per job).
+        filter_tokens: if provided, only records that match any of these
+            (case-insensitive equality on country/state/city or the remote
+            flag) are counted. Powers hierarchical column narrowing.
 
     Returns:
         {
@@ -234,21 +396,25 @@ def aggregate(locations: Iterable[str]) -> dict[str, list[dict]]:
           'remote':    {'count': 567}
         }
     """
+    needles = {n.strip().lower() for n in (filter_tokens or []) if n and n.strip()}
+
     country_counts: Counter[str] = Counter()
     state_counts: Counter[str] = Counter()
     city_counts: Counter[str] = Counter()
     remote_count = 0
 
     for loc in locations:
-        parsed = parse_one(loc or "")
-        if parsed["remote"]:
-            remote_count += 1
-        for c in parsed["countries"]:
-            country_counts[c] += 1
-        for s in parsed["states"]:
-            state_counts[s] += 1
-        for city in parsed["cities"]:
-            city_counts[city] += 1
+        for record in parse_records(loc or ""):
+            if needles and not _record_matches(record, needles):
+                continue
+            if record.get("remote"):
+                remote_count += 1
+            if record.get("country"):
+                country_counts[record["country"]] += 1
+            if record.get("state"):
+                state_counts[record["state"]] += 1
+            if record.get("city"):
+                city_counts[record["city"]] += 1
 
     def _rank(counter: Counter[str]) -> list[dict]:
         return [{"name": name, "count": n} for name, n in counter.most_common()]
