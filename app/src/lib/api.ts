@@ -149,6 +149,19 @@ export const suggestRoles = () =>
 export const fetchFeedIndustries = () =>
   request<{ id: string; label: string; count: number }[]>('/api/feed/industries')
 
+// Feed locations — parsed city/state/country tokens from active jobs
+export interface LocationToken { name: string; count: number }
+export interface FeedLocations {
+  countries: LocationToken[]
+  states: LocationToken[]
+  cities: LocationToken[]
+  remote: { count: number }
+}
+export const fetchFeedLocations = (filter?: string[]) => {
+  const qs = filter && filter.length > 0 ? `?filter=${encodeURIComponent(filter.join(','))}` : ''
+  return request<FeedLocations>(`/api/feed/locations${qs}`)
+}
+
 // Industry Packs
 export const fetchIndustryPacks = () =>
   request<{ id: string; name: string; description: string; count: number }[]>('/api/admin/industry-packs')

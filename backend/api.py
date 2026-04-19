@@ -113,12 +113,18 @@ def list_jobs(
     search: Optional[str] = Query(None, description="Search title/company"),
     sort_by: str = Query("score", description="Sort: score, newest, oldest, company, title"),
     exclude_companies: Optional[str] = Query(None, description="Comma-separated company names to exclude"),
+    locations: Optional[str] = Query(None, description="Comma-separated location tokens (city/state/country) — match if location contains ANY"),
 ):
     conn = _conn()
     try:
         exc_companies = (
             [c.strip() for c in exclude_companies.split(",") if c.strip()]
             if exclude_companies
+            else None
+        ) or None
+        loc_list = (
+            [l.strip() for l in locations.split(",") if l.strip()]
+            if locations
             else None
         ) or None
         jobs_raw, total = get_jobs(
@@ -134,6 +140,7 @@ def list_jobs(
             search=search,
             sort_by=sort_by,
             exclude_companies=exc_companies,
+            locations=loc_list,
         )
         jobs = [JobOut.model_validate(j) for j in jobs_raw]
         return JobListResponse(jobs=jobs, total=total, page=page, per_page=per_page)
@@ -733,6 +740,56 @@ def list_feed_industries():
     # Sort: non-empty first (by count desc), then empty packs alphabetically by label
     industries.sort(key=lambda i: (0 if i["count"] > 0 else 1, -i["count"], i["label"]))
     return industries
+
+
+@app.get("/api/feed/locations")
+def list_feed_locations(
+    filter: Optional[str] = Query(
+        None,
+        description="Comma-separated location tokens. If set, only aggregates jobs whose location contains ANY token — used by the picker to narrow the other columns hierarchically (pick country → only see its states/cities).",
+    ),
+):
+    """
+    Parse active job locations into city/state/country tokens with counts.
+    Powers the Locations multi-select on the Feed page, with optional
+    hierarchical narrowing via the `filter` query param.
+
+    Returns:
+      {
+        "countries": [{"name": "United States", "count": 525}, ...],
+        "states":    [{"name": "California",    "count": 181}, ...],
+        "cities":    [{"name": "San Francisco", "count": 148}, ...],
+        "remote":    {"count": 455}
+      }
+    """
+    from location_parser import aggregate
+
+    base_sql = (
+        "SELECT location FROM jobs "
+        "WHERE dismissed = 0 AND expired = 0 "
+        "AND location IS NOT NULL AND location != ''"
+    )
+
+    params: dict = {}
+    needles = (
+        [s.strip() for s in (filter or "").split(",") if s.strip()] if filter else []
+    )
+    if needles:
+        # OR-match on any selected token (mirrors /api/jobs locations filter)
+        clauses = []
+        for idx, n in enumerate(needles):
+            param_name = f"loc_{idx}"
+            clauses.append(f"LOWER(location) LIKE :{param_name}")
+            params[param_name] = f"%{n.lower()}%"
+        base_sql += " AND (" + " OR ".join(clauses) + ")"
+
+    conn = _conn()
+    try:
+        rows = conn.execute(base_sql, params).fetchall()
+    finally:
+        conn.close()
+
+    return aggregate(row["location"] for row in rows)
 
 
 # ---------------------------------------------------------------------------

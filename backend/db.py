@@ -583,6 +583,7 @@ def get_jobs(
     search: str = None,           # free-text search against title + company
     sort_by: str = "score",       # score, newest, oldest, company, title
     exclude_companies: list[str] = None,
+    locations: list[str] = None,  # Match if j.location contains ANY of these (case-insensitive partial)
 ) -> tuple[list[dict], int]:
     """
     Paginated job listing with filters.
@@ -629,6 +630,21 @@ def get_jobs(
             param_name = f"exc_comp_{idx}"
             conditions.append(f"LOWER(j.company) NOT LIKE :{param_name}")
             params[param_name] = f"%{needle}%"
+
+    if locations:
+        # Match if location contains ANY of the selected tokens (case-insensitive
+        # partial). OR'd together so picking "California" AND "New York" returns
+        # jobs in either, which matches user intent for a multi-select filter.
+        loc_clauses = []
+        for idx, loc in enumerate(locations):
+            needle = loc.strip().lower()
+            if not needle:
+                continue
+            param_name = f"loc_{idx}"
+            loc_clauses.append(f"LOWER(j.location) LIKE :{param_name}")
+            params[param_name] = f"%{needle}%"
+        if loc_clauses:
+            conditions.append("(" + " OR ".join(loc_clauses) + ")")
 
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
 

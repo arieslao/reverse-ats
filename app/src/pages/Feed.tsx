@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import { fetchJobs, fetchFeedIndustries } from '../lib/api'
+import { fetchJobs, fetchFeedIndustries, fetchFeedLocations } from '../lib/api'
 import { JobCard } from '../components/JobCard'
 import { FilterBar } from '../components/FilterBar'
 
@@ -15,9 +15,11 @@ interface FilterState {
   since_days: number
   sort_by: string
   exclude_companies: string
+  locations: string[]
 }
 
 function parseFilters(params: URLSearchParams): FilterState {
+  const rawLocs = params.get('locations') || ''
   return {
     search: params.get('search') || '',
     category: params.get('category') || '',
@@ -26,6 +28,7 @@ function parseFilters(params: URLSearchParams): FilterState {
     since_days: Number(params.get('since_days') || 0),
     sort_by: params.get('sort_by') || 'score',
     exclude_companies: params.get('exclude_companies') || '',
+    locations: rawLocs ? rawLocs.split(',').map((s) => s.trim()).filter(Boolean) : [],
   }
 }
 
@@ -51,6 +54,7 @@ export function Feed() {
   if (filters.since_days > 0) queryParams.since_days = filters.since_days
   if (filters.sort_by && filters.sort_by !== 'score') queryParams.sort_by = filters.sort_by
   if (filters.exclude_companies) queryParams.exclude_companies = filters.exclude_companies
+  if (filters.locations.length > 0) queryParams.locations = filters.locations.join(',')
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['jobs', queryParams],
@@ -67,6 +71,15 @@ export function Feed() {
     queryKey: ['feed-industries'],
     queryFn: fetchFeedIndustries,
     staleTime: 5 * 60 * 1000,
+  })
+
+  // Hierarchical narrowing: refetch the location buckets keyed off the
+  // current selection. Picking "United States" reduces the States/Cities
+  // columns to only those that appear in US-tagged jobs.
+  const { data: locationsData } = useQuery({
+    queryKey: ['feed-locations', filters.locations.join(',')],
+    queryFn: () => fetchFeedLocations(filters.locations),
+    staleTime: 60 * 1000,
   })
 
   const industryOptions = useMemo(
@@ -88,6 +101,7 @@ export function Feed() {
     if (newFilters.since_days > 0) params.since_days = String(newFilters.since_days)
     if (newFilters.sort_by && newFilters.sort_by !== 'score') params.sort_by = newFilters.sort_by
     if (newFilters.exclude_companies) params.exclude_companies = newFilters.exclude_companies
+    if (newFilters.locations.length > 0) params.locations = newFilters.locations.join(',')
     setSearchParams(params, { replace: true })
   }
 
@@ -168,7 +182,14 @@ export function Feed() {
       </div>
 
       {/* Filters */}
-      <FilterBar filters={filters} onChange={handleFilterChange} industries={industryOptions} />
+      <FilterBar
+        filters={filters}
+        onChange={handleFilterChange}
+        industries={industryOptions}
+        locationsData={locationsData}
+        matchingCount={data?.total ?? null}
+        isLoading={isLoading}
+      />
 
       {/* Stats bar */}
       {data && (
@@ -230,7 +251,8 @@ export function Feed() {
               filters.category ||
               filters.min_score > 0 ||
               filters.exclude_companies ||
-              filters.since_days > 0,
+              filters.since_days > 0 ||
+              filters.locations.length > 0,
           )}
           totalEverScraped={data?.total ?? 0}
           isRefreshing={isRefreshing}

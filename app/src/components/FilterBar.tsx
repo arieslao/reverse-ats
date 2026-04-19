@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import type { FeedLocations } from '../lib/api'
 
 interface FilterState {
   search: string
@@ -8,6 +9,7 @@ interface FilterState {
   since_days: number
   sort_by: string
   exclude_companies: string
+  locations: string[]
 }
 
 interface IndustryOption {
@@ -19,6 +21,11 @@ interface FilterBarProps {
   filters: FilterState
   onChange: (filters: FilterState) => void
   industries?: IndustryOption[]
+  locationsData?: FeedLocations
+  // Live result count from the parent's job query — shown inside the
+  // Locations popover so users can see filter impact without closing it.
+  matchingCount?: number | null
+  isLoading?: boolean
 }
 
 const DEFAULT_INDUSTRY_OPTIONS: IndustryOption[] = [
@@ -59,7 +66,7 @@ const rowStyle: React.CSSProperties = {
   flexWrap: 'wrap',
 }
 
-export function FilterBar({ filters, onChange, industries }: FilterBarProps) {
+export function FilterBar({ filters, onChange, industries, locationsData, matchingCount, isLoading }: FilterBarProps) {
   const [local, setLocal] = useState(filters)
 
   useEffect(() => {
@@ -84,6 +91,7 @@ export function FilterBar({ filters, onChange, industries }: FilterBarProps) {
     local.remote_only ||
     local.since_days > 0 ||
     local.exclude_companies ||
+    local.locations.length > 0 ||
     (local.sort_by && local.sort_by !== 'score')
 
   return (
@@ -236,6 +244,7 @@ export function FilterBar({ filters, onChange, industries }: FilterBarProps) {
                 since_days: 0,
                 sort_by: 'score',
                 exclude_companies: '',
+                locations: [],
               })
             }
             style={{
@@ -253,6 +262,355 @@ export function FilterBar({ filters, onChange, industries }: FilterBarProps) {
           </button>
         )}
       </div>
+
+      {/* Row 3: Locations multi-select + chips */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <LocationsPicker
+          selected={local.locations}
+          onChange={(next) => update({ locations: next })}
+          data={locationsData}
+          matchingCount={matchingCount}
+          isLoading={isLoading}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── Locations Multi-Select ──────────────────────────────────────────────────
+//
+// A dropdown that opens to a panel with a search box and three grouped
+// checkbox sections (Countries, States, Cities) plus a Remote toggle.
+// Selected items render below as removable chips. Multi-selecting any
+// combination ORs the matches in the backend.
+
+function LocationsPicker({
+  selected,
+  onChange,
+  data,
+  matchingCount,
+  isLoading,
+}: {
+  selected: string[]
+  onChange: (next: string[]) => void
+  data?: FeedLocations
+  matchingCount?: number | null
+  isLoading?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const popoverRef = useRef<HTMLDivElement>(null)
+
+  // Close popover on outside click / escape
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('keydown', handleEsc)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('keydown', handleEsc)
+    }
+  }, [open])
+
+  const selectedLower = useMemo(() => new Set(selected.map((s) => s.toLowerCase())), [selected])
+
+  const toggle = (name: string) => {
+    if (selectedLower.has(name.toLowerCase())) {
+      onChange(selected.filter((s) => s.toLowerCase() !== name.toLowerCase()))
+    } else {
+      onChange([...selected, name])
+    }
+  }
+
+  const remove = (name: string) => {
+    onChange(selected.filter((s) => s.toLowerCase() !== name.toLowerCase()))
+  }
+
+  const matchesQuery = (name: string) =>
+    !query || name.toLowerCase().includes(query.toLowerCase())
+
+  const filtered = useMemo(() => {
+    if (!data) return { countries: [], states: [], cities: [], remote: { count: 0 } }
+    return {
+      countries: data.countries.filter((t) => matchesQuery(t.name)),
+      states: data.states.filter((t) => matchesQuery(t.name)),
+      cities: data.cities.filter((t) => matchesQuery(t.name)),
+      remote: data.remote,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, query])
+
+  return (
+    <div style={{ position: 'relative' }} ref={popoverRef}>
+      <label style={labelStyle}>Locations</label>
+
+      {/* Trigger / chip box */}
+      <div
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          ...inputStyle,
+          minHeight: 32,
+          padding: '4px 8px',
+          cursor: 'pointer',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 4,
+          alignItems: 'center',
+        }}
+      >
+        {selected.length === 0 ? (
+          <span style={{ color: '#71717a', fontSize: 13 }}>
+            Click to filter by city, state, or country…
+          </span>
+        ) : (
+          <>
+            {selected.map((s) => (
+              <span
+                key={s}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  remove(s)
+                }}
+                style={{
+                  background: 'rgba(59,130,246,0.15)',
+                  border: '1px solid rgba(59,130,246,0.4)',
+                  borderRadius: 4,
+                  color: '#bfdbfe',
+                  fontSize: 12,
+                  padding: '2px 8px',
+                  cursor: 'pointer',
+                }}
+                title="Click to remove"
+              >
+                {s} ×
+              </span>
+            ))}
+          </>
+        )}
+        <span style={{ marginLeft: 'auto', color: '#71717a', fontSize: 11 }}>
+          {open ? '▴' : '▾'}
+        </span>
+      </div>
+
+      {/* Popover */}
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            background: '#1a1d27',
+            border: '1px solid #2e3140',
+            borderRadius: 8,
+            boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+            zIndex: 50,
+            padding: 12,
+            maxHeight: 420,
+            overflow: 'auto',
+          }}
+        >
+          <input
+            type="text"
+            placeholder="Filter (e.g. San Francisco, California, US)…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+            style={{
+              ...inputStyle,
+              width: '100%',
+              boxSizing: 'border-box',
+              marginBottom: 10,
+            }}
+          />
+
+          {!data && (
+            <div style={{ fontSize: 12, color: '#71717a', padding: 8, textAlign: 'center' }}>
+              Loading locations…
+            </div>
+          )}
+
+          {data && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+              <LocationGroup
+                title="Countries"
+                items={filtered.countries}
+                selectedLower={selectedLower}
+                onToggle={toggle}
+                accent="#22c55e"
+              />
+              <LocationGroup
+                title="States"
+                items={filtered.states}
+                selectedLower={selectedLower}
+                onToggle={toggle}
+                accent="#3b82f6"
+              />
+              <LocationGroup
+                title="Cities"
+                items={filtered.cities}
+                selectedLower={selectedLower}
+                onToggle={toggle}
+                accent="#f59e0b"
+              />
+            </div>
+          )}
+
+          {data && (
+            <div
+              style={{
+                marginTop: 10,
+                paddingTop: 10,
+                borderTop: '1px solid #2e3140',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 10,
+                fontSize: 11,
+                color: '#71717a',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                {selected.length === 0 ? (
+                  <span>Pick locations to narrow your feed.</span>
+                ) : (
+                  <span>
+                    {selected.length} selected — narrowing other columns to match.
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {/* Live result count from the parent's job query */}
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color:
+                      matchingCount === 0
+                        ? '#f87171'
+                        : matchingCount && matchingCount > 0
+                          ? '#22c55e'
+                          : '#a1a1aa',
+                  }}
+                >
+                  {isLoading
+                    ? 'Loading…'
+                    : matchingCount == null
+                      ? '—'
+                      : `${matchingCount.toLocaleString()} job${matchingCount === 1 ? '' : 's'} match`}
+                </span>
+                {selected.length > 0 && (
+                  <button
+                    onClick={() => onChange([])}
+                    style={{
+                      background: 'transparent',
+                      border: '1px solid #2e3140',
+                      borderRadius: 4,
+                      color: '#a1a1aa',
+                      fontSize: 11,
+                      padding: '3px 8px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Clear all
+                  </button>
+                )}
+                <button
+                  onClick={() => setOpen(false)}
+                  style={{
+                    background: '#3b82f6',
+                    border: '1px solid #3b82f6',
+                    borderRadius: 4,
+                    color: '#fff',
+                    fontSize: 11,
+                    fontWeight: 600,
+                    padding: '3px 12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LocationGroup({
+  title,
+  items,
+  selectedLower,
+  onToggle,
+  accent,
+}: {
+  title: string
+  items: { name: string; count: number }[]
+  selectedLower: Set<string>
+  onToggle: (name: string) => void
+  accent: string
+}) {
+  return (
+    <div>
+      <div
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: accent,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginBottom: 6,
+        }}
+      >
+        {title} {items.length > 0 && <span style={{ color: '#52525b', fontWeight: 400 }}>({items.length})</span>}
+      </div>
+      {items.length === 0 ? (
+        <div style={{ fontSize: 11, color: '#52525b', padding: '6px 0' }}>—</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 280, overflow: 'auto' }}>
+          {items.map((t) => {
+            const isSelected = selectedLower.has(t.name.toLowerCase())
+            return (
+              <label
+                key={t.name}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  color: isSelected ? '#e4e4e7' : '#a1a1aa',
+                  padding: '3px 4px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  background: isSelected ? 'rgba(59,130,246,0.08)' : 'transparent',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggle(t.name)}
+                  style={{ accentColor: accent, cursor: 'pointer', flexShrink: 0 }}
+                />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {t.name}
+                </span>
+                <span style={{ fontSize: 10, color: '#52525b', flexShrink: 0 }}>{t.count}</span>
+              </label>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
