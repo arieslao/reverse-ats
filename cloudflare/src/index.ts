@@ -29,14 +29,20 @@ const handler: ExportedHandler<Env> = {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
 
+    // CORS preflight — the marketing site (different origin) hits /health and
+    // /jobs from the browser. Permissive on read-only endpoints, strict on /ingest.
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
     if (request.method === "POST" && url.pathname === "/ingest") {
       return handleIngest(request, env, ctx);
     }
     if (request.method === "GET" && url.pathname === "/jobs") {
-      return handleListJobs(request, env);
+      return withCors(await handleListJobs(request, env));
     }
     if (request.method === "GET" && url.pathname === "/health") {
-      return handleHealth(env);
+      return withCors(await handleHealth(env));
     }
     return jsonResponse({ ok: false, error: "not found" }, 404);
   },
@@ -349,4 +355,30 @@ function jsonResponse(body: unknown, status: number): Response {
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+// ─── CORS ──────────────────────────────────────────────────────────────────
+//
+// /health and /jobs are public read-only endpoints — the marketing site
+// (deployed to a different origin on Cloudflare Pages) hits them from the
+// browser. /ingest stays uncors-d since it requires the bearer secret anyway
+// and is only ever called server-to-server from GitHub Actions.
+
+function corsHeaders(): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(corsHeaders())) headers.set(k, v);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

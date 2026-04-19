@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/* ─── Design tokens ───────────────────────────────────────────────────────────
+ *
+ * Job seekers are stressed. The site should feel calm — not aggressive
+ * marketing. Soft palette, generous whitespace, readable typography.
+ * ────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Surface (dark mode is the default since job seekers often browse late) */
+  --color-bg-base:        #0a0a0f;
+  --color-bg-elevated:    #131320;
+  --color-bg-card:        #181828;
+  --color-bg-input:       #1f1f30;
+
+  /* Borders */
+  --color-border-subtle:  #25253a;
+  --color-border-muted:   #2e2e44;
+
+  /* Text */
+  --color-text-primary:   #f5f5fa;
+  --color-text-secondary: #b8b8cc;
+  --color-text-tertiary:  #7a7a92;
+  --color-text-muted:     #5a5a72;
+
+  /* Accents — calmer palette than typical SaaS blues */
+  --color-accent:         #7c9eff;  /* periwinkle blue */
+  --color-accent-hover:   #95b3ff;
+  --color-accent-soft:    #1f2645;
+  --color-success:        #6dd9a4;  /* sage green */
+  --color-warning:        #f0b87a;  /* warm amber */
+  --color-danger:         #ef7d8e;  /* dusty rose */
+
+  /* Type ramp */
+  --font-display: ui-sans-serif, system-ui, -apple-system, "SF Pro Display",
+                  "Segoe UI", "Inter", sans-serif;
+  --font-body:    ui-sans-serif, system-ui, -apple-system, "SF Pro Text",
+                  "Segoe UI", "Inter", sans-serif;
+}
+
+/* ─── Global ──────────────────────────────────────────────────────────────── */
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle ambient gradient — keeps the page from feeling flat */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(124, 158, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(109, 217, 164, 0.04), transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Page content stays above the gradient */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+/* Smoother focus rings (accessibility but not jarring) */
+*:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Selection feels intentional */
+::selection {
+  background: rgba(124, 158, 255, 0.3);
+  color: #fff;
+}
