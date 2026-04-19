@@ -31,7 +31,7 @@ crons = ["*/30 * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "reverse-ats-jobs"
-database_id = "REPLACE_WITH_D1_ID_AFTER_CREATE"
+database_id = "REPLACE_WITH_YOUR_D1_ID_AFTER_CREATE"
 
 # Cloudflare Workers AI — preprocessing + embeddings on free tier
 [ai]

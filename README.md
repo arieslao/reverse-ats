@@ -27,16 +27,18 @@ Anyone looking for a job. Whether you're a software engineer, nurse, teacher, co
 
 ## Don't want to self-host?
 
-Self-hosting is **always free** and always will be — that's the core promise of this project. But if you'd rather not run anything on your own computer, you can support development and get a managed cloud deployment for the price of a coffee:
+Self-hosting is **always free** and always will be — that's the core promise of this project. But if you'd rather not run anything on your own computer, a managed cloud version is being built openly:
 
-| Tier | Price | What you get |
+| Option | Price | What you get |
 |---|---|---|
-| **Self-host** | Free, MIT-licensed | The whole repo. Run it on your laptop. Always your data, always private. |
-| ☕ **Supporter** | $5/mo via [GitHub Sponsors](https://github.com/sponsors/arieslao) | Name in the README. Warm fuzzies. Helps keep the project alive. |
-| 🚀 **Hosted** *(coming soon)* | $7/mo via GitHub Sponsors | We host it for you. Sign in with GitHub. Bring your own LLM key. No setup. |
-| ⭐ **Hosted Pro** *(coming soon)* | $19/mo via GitHub Sponsors | Hosted + bundled AI scoring credits, daily email digest of new high-score jobs, premium cover letter styles, SMS/Discord alerts. |
+| **Self-host** | **Free**, MIT-licensed | The whole repo. Run it on your laptop. Always your data, always private. |
+| **Hosted** *(coming soon)* | **$10/mo** via [GitHub Sponsors](https://github.com/sponsors/arieslao) | We host it for you. Every feature included — AI scoring, cover letters in 5 styles, daily digest, interview prep, chatbot, the whole roadmap. No Pro tier. No upsells. |
 
-The hosted tier is being built openly — see [backlog.md](backlog.md) and [cloudflare/](cloudflare/) for the cloud architecture in progress. Sponsoring at any level today helps fund the buildout. **Cancel anytime, your data is exportable.**
+**Why one flat price:** job seekers are often unemployed and price-sensitive. Tiered pricing means deciding "should I pay more?" while you're already stressed. $10 flat says: *here's everything, here's the fair price, cancel anytime, your data exports as JSON.*
+
+GitHub Sponsors lets fans contribute custom amounts above $10 if they want to support the project beyond their own use — same hosted access, the extra funds the buildout.
+
+The hosted tier is being built openly — see [backlog.md](backlog.md) and [cloudflare/](cloudflare/) for the cloud architecture in progress. Sponsoring today helps fund it. **Cancel anytime, your data is yours.**
 
 If hosted launches and you'd rather self-host, just clone this repo and follow the install guide. Your data exports as a single JSON file — drop it into your local instance and keep going.
 

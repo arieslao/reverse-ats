@@ -153,6 +153,37 @@ At 1000 active users on the free tier:
 Validate by watching `/health` and the Cloudflare dashboard usage
 graphs over the first 2 weeks.
 
+### Per-user cost at $10 flat tier
+
+Even with every roadmap feature turned on (chatbot, cover letters in
+5 styles, interview prep, salary coach, multi-resume), heavy-user
+compute cost is **~$0.05/user/month**. At $10/mo revenue that's a
+99.5% margin. Detailed breakdown in [`backlog.md`](../backlog.md#hard-cost-safeguards-bake-into-phase-1).
+
+---
+
+## Cost safeguards (must be enforced from Phase 1 onward)
+
+Bootstrap-friendly hard ceilings to ensure the unit economics never
+break, even under abuse or unexpected viral growth:
+
+| Safeguard | Cap | Why |
+|---|---|---|
+| Per-user daily neuron cap | **2,000 neurons/day** | Single kill switch — prevents one user from eating the free tier. Worst case: $0.66/user/mo. |
+| Chatbot context size | **4K tokens/turn**, last 10 turns | Long convos stay cheap; no unbounded context growth |
+| Cover letter generation | **5/day per user** | Real users apply to 5-10 jobs/week max |
+| Detailed re-scoring (premium model) | **100/day per user** | Bounds Llama 70B usage |
+| Interview prep generation | **10/day per user** | Way more than anyone needs |
+| Per-IP rate limit | **30 req/min** | Anti-abuse / anti-DoS |
+| Cloudflare account spend alert | Email at $25/mo | Margin protection |
+| Cloudflare account hard stop | Auto-throttle at $50/mo | Catastrophic failsafe |
+| Model whitelist | Only `@cf/...` models we've costed | Prevents accidental enabling of expensive models |
+| Lazy preprocessing | Only preprocess jobs filtered/viewed | Saves 80% of preprocess compute |
+| Background scoring gate | Only for users active in past 14 days | Saves ~30% scoring compute |
+
+Implement in Phase 1 alongside the multi-tenant API — easier to bake
+in upfront than retrofit after launch.
+
 ---
 
 ## Useful commands
