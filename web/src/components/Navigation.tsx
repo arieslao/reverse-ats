@@ -1,58 +1,47 @@
-// Quiet, editorial nav. Logo as simple wordmark in serif italic.
-// Mobile: collapses to wordmark + Sponsor button.
+import { ThemeToggle } from './ThemeToggle'
+
+// Slim Apple-style top nav. Backdrop-blurred. Bold wordmark.
+// Mobile: collapses to wordmark + theme toggle + Sponsor button.
 
 const NAV_LINKS = [
   { href: '#how-it-works', label: 'How it works' },
   { href: '#pricing', label: 'Pricing' },
-  { href: '#transparency', label: 'Where we are' },
+  { href: '#transparency', label: 'Roadmap' },
   { href: '#faq', label: 'FAQ' },
 ]
 
 export function Navigation() {
   return (
     <header
-      className="sticky top-0 z-50 backdrop-blur-md"
+      className="sticky top-0 z-50 backdrop-blur-xl"
       style={{
-        background: 'rgba(251, 249, 244, 0.85)',
+        background: 'color-mix(in srgb, var(--color-bg-base) 80%, transparent)',
         borderBottom: '1px solid var(--color-border-subtle)',
       }}
     >
-      <nav className="max-w-5xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
-        {/* Wordmark — serif italic, more bookshop than startup */}
-        <a href="#top" className="flex items-baseline gap-2.5 group">
+      <nav className="max-w-7xl mx-auto px-5 sm:px-8 py-3.5 flex items-center justify-between gap-4">
+        {/* Wordmark — bold, tight tracking, premium */}
+        <a href="#top" className="flex items-center gap-2.5">
           <span
-            className="text-xl"
+            className="text-[17px] tracking-tight"
             style={{
-              fontFamily: 'var(--font-display)',
-              fontStyle: 'italic',
-              fontWeight: 600,
-              color: 'var(--color-accent)',
-              letterSpacing: '-0.02em',
+              fontWeight: 700,
+              color: 'var(--color-text-primary)',
+              letterSpacing: '-0.022em',
             }}
           >
-            reverse
+            Reverse ATS
           </span>
           <span
-            className="text-base"
+            className="hidden sm:inline-block text-[10px] uppercase tracking-[0.12em] px-1.5 py-0.5 rounded"
             style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 500,
-              color: 'var(--color-text-secondary)',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            ats
-          </span>
-          <span
-            className="hidden sm:inline-block text-[10px] uppercase tracking-[0.12em] px-2 py-0.5 rounded-full ml-1"
-            style={{
-              color: 'var(--color-warning)',
-              background: 'var(--color-warning-soft)',
+              color: 'var(--color-text-tertiary)',
+              border: '1px solid var(--color-border-muted)',
               fontWeight: 500,
             }}
-            title="This site is under active development. See 'Where we are' for details."
+            title="This site is under active development. See Roadmap for details."
           >
-            in beta
+            Beta
           </span>
         </a>
 
@@ -62,7 +51,7 @@ export function Navigation() {
             <a
               key={link.href}
               href={link.href}
-              className="text-sm transition-colors"
+              className="text-[13px] transition-colors"
               style={{ color: 'var(--color-text-secondary)' }}
               onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
               onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
@@ -72,24 +61,34 @@ export function Navigation() {
           ))}
         </div>
 
-        {/* Right-side CTAs */}
-        <div className="flex items-center gap-2">
+        {/* Right cluster */}
+        <div className="flex items-center gap-1">
+          <ThemeToggle />
           <a
             href="https://github.com/arieslao/reverse-ats"
             target="_blank"
             rel="noopener noreferrer"
-            className="hidden sm:inline-block text-sm px-3.5 py-1.5 rounded-full transition-all"
+            className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors"
             style={{ color: 'var(--color-text-secondary)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'var(--color-bg-tinted)'
+              e.currentTarget.style.color = 'var(--color-text-primary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = 'var(--color-text-secondary)'
+            }}
+            aria-label="GitHub repository"
           >
-            GitHub
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2 0 1.9 1.2 1.9 1.2 1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.8.1 3.2.8.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1.1.9 2.3v3.3c0 .3.1.7.8.6A12 12 0 0 0 12 .3" />
+            </svg>
           </a>
           <a
             href="https://github.com/sponsors/arieslao"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm font-medium px-4 py-2 rounded-full transition-all"
+            className="ml-1 text-[13px] font-medium px-4 py-2 rounded-full transition-colors"
             style={{
               background: 'var(--color-accent)',
               color: 'var(--color-accent-text)',

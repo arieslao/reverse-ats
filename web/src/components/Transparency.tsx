@@ -1,9 +1,5 @@
 import { SectionHeader } from './HowItWorks'
 
-// THE transparency section. Honest about why we're holding back features
-// and that it's for user safety. Phrased without engineering jargon so it
-// reads to anyone — a nurse, teacher, designer, recent grad.
-
 const ROLLOUT = [
   {
     phase: 'Today',
@@ -67,19 +63,19 @@ const SAFETY_REASONS = [
 
 export function Transparency() {
   return (
-    <section id="transparency" className="px-5 sm:px-8 py-20 sm:py-28">
-      <div className="max-w-5xl mx-auto">
+    <section id="transparency" className="px-5 sm:px-8 py-24 sm:py-32">
+      <div className="max-w-6xl mx-auto">
         <SectionHeader
           eyebrow="Where we are"
-          title="We're shipping in phases — on purpose."
+          title="Shipping in phases — on purpose."
           subtitle="A note on why the hosted version isn't live yet, and why holding back is actually the kindest thing we can do."
         />
 
-        <div className="mt-14 grid grid-cols-1 lg:grid-cols-2 gap-10">
+        <div className="mt-16 sm:mt-20 grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Rollout phases */}
           <div>
             <h3
-              className="text-sm uppercase tracking-[0.16em] font-medium mb-5"
+              className="text-[12px] uppercase tracking-[0.18em] font-medium mb-6"
               style={{ color: 'var(--color-accent)' }}
             >
               The plan
@@ -90,18 +86,19 @@ export function Transparency() {
                   key={item.phase}
                   className="rounded-2xl p-5"
                   style={{
-                    background: 'var(--color-bg-elevated)',
+                    background: 'var(--color-bg-card)',
                     border: '1px solid var(--color-border-subtle)',
                     opacity: item.status === 'later' ? 0.78 : 1,
                   }}
                 >
-                  <div className="flex items-start justify-between gap-3 mb-1">
+                  <div className="flex items-start justify-between gap-3 mb-1.5">
                     <span
-                      className="text-base"
+                      className="text-[15px]"
                       style={{
                         fontFamily: 'var(--font-display)',
-                        fontWeight: 500,
+                        fontWeight: 600,
                         color: 'var(--color-text-primary)',
+                        letterSpacing: '-0.022em',
                       }}
                     >
                       {item.phase}
@@ -120,27 +117,21 @@ export function Transparency() {
                             ? 'var(--color-success-soft)'
                             : item.status === 'progress'
                             ? 'var(--color-warning-soft)'
-                            : 'var(--color-bg-card)',
-                        border: `1px solid ${
-                          item.status === 'done'
-                            ? 'rgba(91, 129, 99, 0.25)'
-                            : item.status === 'progress'
-                            ? 'rgba(192, 138, 62, 0.25)'
-                            : 'var(--color-border-subtle)'
-                        }`,
+                            : 'var(--color-bg-tinted)',
+                        fontWeight: 500,
                       }}
                     >
                       {item.label}
                     </span>
                   </div>
                   <div
-                    className="text-sm font-medium mb-2"
-                    style={{ color: 'var(--color-text-secondary)' }}
+                    className="text-[14px] mb-2"
+                    style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}
                   >
                     {item.title}
                   </div>
                   <p
-                    className="text-[14px] leading-relaxed"
+                    className="text-[14px] leading-[1.55]"
                     style={{ color: 'var(--color-text-secondary)' }}
                   >
                     {item.body}
@@ -153,20 +144,20 @@ export function Transparency() {
           {/* Why we're holding back */}
           <div>
             <h3
-              className="text-sm uppercase tracking-[0.16em] font-medium mb-5"
+              className="text-[12px] uppercase tracking-[0.18em] font-medium mb-6"
               style={{ color: 'var(--color-accent)' }}
             >
               Why we're holding back
             </h3>
             <div
-              className="rounded-2xl p-6 mb-5"
+              className="rounded-2xl p-6 mb-3"
               style={{
                 background: 'var(--color-accent-soft)',
-                border: '1px solid rgba(201, 83, 46, 0.18)',
+                border: '1px solid color-mix(in srgb, var(--color-accent) 25%, transparent)',
               }}
             >
               <p
-                className="text-[15px] leading-relaxed"
+                className="text-[15px] leading-[1.55]"
                 style={{ color: 'var(--color-text-primary)' }}
               >
                 We could ship the hosted version today and start charging for it.
@@ -183,7 +174,7 @@ export function Transparency() {
                   key={reason.title}
                   className="rounded-2xl p-5"
                   style={{
-                    background: 'var(--color-bg-elevated)',
+                    background: 'var(--color-bg-card)',
                     border: '1px solid var(--color-border-subtle)',
                   }}
                 >
@@ -214,15 +205,16 @@ export function Transparency() {
                       className="text-[15px]"
                       style={{
                         fontFamily: 'var(--font-display)',
-                        fontWeight: 500,
+                        fontWeight: 600,
                         color: 'var(--color-text-primary)',
+                        letterSpacing: '-0.022em',
                       }}
                     >
                       {reason.title}
                     </span>
                   </div>
                   <p
-                    className="text-[14px] leading-relaxed pl-7"
+                    className="text-[14px] leading-[1.55] pl-7"
                     style={{ color: 'var(--color-text-secondary)' }}
                   >
                     {reason.why}
@@ -234,9 +226,9 @@ export function Transparency() {
         </div>
 
         <div
-          className="mt-12 rounded-2xl p-6 text-center"
+          className="mt-12 rounded-3xl p-7 text-center"
           style={{
-            background: 'var(--color-bg-elevated)',
+            background: 'var(--color-bg-section)',
             border: '1px solid var(--color-border-subtle)',
           }}
         >

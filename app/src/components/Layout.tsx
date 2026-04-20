@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { triggerScrape } from '../lib/api'
+import { useTheme } from '../lib/theme'
 
 const NAV_ITEMS = [
   {
@@ -48,16 +49,17 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const scrapeMut = useMutation({ mutationFn: triggerScrape })
+  const { theme, toggle: toggleTheme } = useTheme()
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#0f1117' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#000000' }}>
       {/* Sidebar */}
       <aside
         style={{
           width: 220,
           flexShrink: 0,
-          background: '#111318',
-          borderRight: '1px solid #1e2030',
+          background: '#000000',
+          borderRight: '1px solid #1d1d1f',
           display: 'flex',
           flexDirection: 'column',
           height: '100vh',
@@ -67,7 +69,7 @@ export function Layout() {
         <div
           style={{
             padding: '20px 20px 16px',
-            borderBottom: '1px solid #1e2030',
+            borderBottom: '1px solid #1d1d1f',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -76,7 +78,7 @@ export function Layout() {
                 width: 28,
                 height: 28,
                 borderRadius: 6,
-                background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+                background: 'linear-gradient(135deg, #2997ff 0%, #1d4ed8 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -88,10 +90,10 @@ export function Layout() {
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#e4e4e7', letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#f5f5f7', letterSpacing: '-0.01em' }}>
                 Reverse ATS
               </div>
-              <div style={{ fontSize: 10, color: '#52525b', letterSpacing: '0.05em' }}>JOB TRACKER</div>
+              <div style={{ fontSize: 10, color: '#515154', letterSpacing: '0.05em' }}>JOB TRACKER</div>
             </div>
           </div>
         </div>
@@ -113,7 +115,7 @@ export function Layout() {
                 textDecoration: 'none',
                 transition: 'background 0.15s, color 0.15s',
                 background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                color: isActive ? '#3b82f6' : '#a1a1aa',
+                color: isActive ? '#2997ff' : '#c0c0c4',
               })}
             >
               {item.icon}
@@ -123,7 +125,48 @@ export function Layout() {
         </nav>
 
         {/* Footer */}
-        <div style={{ padding: '12px 10px', borderTop: '1px solid #1e2030' }}>
+        <div style={{ padding: '12px 10px', borderTop: '1px solid var(--color-border-subtle)' }}>
+          {/* Theme toggle — light/dark switch matching the marketing site */}
+          <button
+            onClick={toggleTheme}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: '1px solid var(--color-border-muted)',
+              borderRadius: 6,
+              color: 'var(--color-text-secondary)',
+              fontSize: 12,
+              padding: '7px 12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              marginBottom: 8,
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-border-strong)'
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-border-muted)'
+            }}
+          >
+            {theme === 'dark' ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+              </svg>
+            )}
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          </button>
           <button
             onClick={() => scrapeMut.mutate()}
             disabled={scrapeMut.isPending}
@@ -134,7 +177,7 @@ export function Layout() {
                 : 'rgba(59, 130, 246, 0.1)',
               border: '1px solid rgba(59, 130, 246, 0.25)',
               borderRadius: 6,
-              color: scrapeMut.isPending ? '#6b7280' : '#3b82f6',
+              color: scrapeMut.isPending ? '#6b7280' : '#2997ff',
               fontSize: 12,
               fontWeight: 500,
               padding: '8px 12px',
@@ -155,7 +198,7 @@ export function Layout() {
           </button>
 
           {scrapeMut.isSuccess && (
-            <div style={{ fontSize: 11, color: '#22c55e', textAlign: 'center', marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: '#34a853', textAlign: 'center', marginTop: 6 }}>
               Scrape triggered
             </div>
           )}
@@ -172,7 +215,7 @@ export function Layout() {
         style={{
           flex: 1,
           overflow: 'auto',
-          background: '#0f1117',
+          background: '#000000',
         }}
       >
         <Outlet />

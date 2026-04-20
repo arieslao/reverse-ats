@@ -49,8 +49,8 @@ function DragHandle() {
     >
       {[0, 1, 2].map((i) => (
         <div key={i} style={{ display: 'flex', gap: 3 }}>
-          <div style={{ width: 2, height: 2, borderRadius: '50%', background: '#a1a1aa' }} />
-          <div style={{ width: 2, height: 2, borderRadius: '50%', background: '#a1a1aa' }} />
+          <div style={{ width: 2, height: 2, borderRadius: '50%', background: '#c0c0c4' }} />
+          <div style={{ width: 2, height: 2, borderRadius: '50%', background: '#c0c0c4' }} />
         </div>
       ))}
     </div>
@@ -101,7 +101,7 @@ function CoverLetterPanel({
             background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(139,92,246,0.15)',
             border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(139,92,246,0.3)'}`,
             borderRadius: 4,
-            color: copied ? '#22c55e' : '#a78bfa',
+            color: copied ? '#34a853' : '#a78bfa',
             fontSize: 11,
             fontWeight: 500,
             padding: '3px 10px',
@@ -169,7 +169,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
   const location = entry.location || entry.job?.location || null
   const score = entry.llm_score ?? entry.keyword_score ?? entry.job?.llm_score ?? entry.job?.keyword_score ?? null
   const appliedDays = daysSince(entry.applied_at)
-  const stageColor = STAGE_CONFIG[entry.stage]?.color || '#52525b'
+  const stageColor = STAGE_CONFIG[entry.stage]?.color || '#515154'
   const coverLetter = entry.cover_letter || null
   const notesPreview = entry.notes ? entry.notes.slice(0, 40) + (entry.notes.length > 40 ? '…' : '') : null
   const url = entry.url || entry.job?.url
@@ -214,8 +214,8 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
       onMouseLeave={() => setHovered(false)}
       onClick={() => !showArchiveConfirm && setExpanded((v) => !v)}
       style={{
-        background: isDragging ? '#242736' : '#1a1d27',
-        border: `1px solid ${hovered && !isDragging ? stageColor + '44' : '#2e3140'}`,
+        background: isDragging ? '#2a2a2d' : '#1d1d1f',
+        border: `1px solid ${hovered && !isDragging ? stageColor + '44' : '#424245'}`,
         borderLeft: `3px solid ${stageColor}`,
         borderRadius: 8,
         padding: '12px 12px 12px 10px',
@@ -263,7 +263,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
 
           {/* Location */}
           {location && (
-            <div style={{ fontSize: 11, color: '#71717a', marginTop: 4, wordBreak: 'break-word', lineHeight: 1.3 }}>
+            <div style={{ fontSize: 11, color: '#86868b', marginTop: 4, wordBreak: 'break-word', lineHeight: 1.3 }}>
               {location}
             </div>
           )}
@@ -282,7 +282,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
             style={{
               background: 'none',
               border: 'none',
-              color: hovered ? '#71717a' : 'transparent',
+              color: hovered ? '#86868b' : 'transparent',
               cursor: 'pointer',
               fontSize: 14,
               lineHeight: 1,
@@ -317,7 +317,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
 
       {/* Notes preview */}
       {notesPreview && !expanded && (
-        <div style={{ fontSize: 12, color: '#71717a', marginTop: 6, fontStyle: 'italic', lineHeight: 1.4 }}>
+        <div style={{ fontSize: 12, color: '#86868b', marginTop: 6, fontStyle: 'italic', lineHeight: 1.4 }}>
           {notesPreview}
         </div>
       )}
@@ -330,7 +330,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
           marginTop: 8,
           alignItems: 'center',
           fontSize: 11,
-          color: '#52525b',
+          color: '#515154',
           flexWrap: 'wrap',
         }}
       >
@@ -341,7 +341,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
           <span>{appliedDays}d ago</span>
         )}
         {entry.next_step_date && (
-          <span style={{ color: '#f59e0b' }}>
+          <span style={{ color: '#b06a00' }}>
             Next: {formatDate(entry.next_step_date)}
           </span>
         )}
@@ -388,9 +388,9 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
               }}
               style={{
                 background: 'none',
-                border: '1px solid #2e3140',
+                border: '1px solid #424245',
                 borderRadius: 4,
-                color: '#71717a',
+                color: '#86868b',
                 fontSize: 11,
                 padding: '4px 10px',
                 cursor: 'pointer',
@@ -546,7 +546,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
               onClick={handleSave}
               disabled={updateMut.isPending}
               style={{
-                background: '#3b82f6',
+                background: '#2997ff',
                 border: 'none',
                 borderRadius: 5,
                 color: '#fff',
@@ -565,7 +565,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: 12, color: '#3b82f6', textDecoration: 'none' }}
+                style={{ fontSize: 12, color: '#2997ff', textDecoration: 'none' }}
                 onClick={(e) => e.stopPropagation()}
               >
                 View Posting ↗
@@ -589,7 +589,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label
         style={{
           fontSize: 10,
-          color: '#52525b',
+          color: '#515154',
           display: 'block',
           marginBottom: 3,
           textTransform: 'uppercase',
@@ -604,10 +604,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#0f1117',
-  border: '1px solid #2e3140',
+  background: '#000000',
+  border: '1px solid #424245',
   borderRadius: 4,
-  color: '#e4e4e7',
+  color: '#f5f5f7',
   fontSize: 12,
   padding: '5px 8px',
   outline: 'none',
@@ -713,13 +713,13 @@ export function Pipeline() {
               margin: 0,
               fontSize: 22,
               fontWeight: 700,
-              color: '#e4e4e7',
+              color: '#f5f5f7',
               letterSpacing: '-0.02em',
             }}
           >
             Pipeline
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#86868b' }}>
             {total} total &middot; {activeCount} active
           </p>
         </div>
@@ -727,7 +727,7 @@ export function Pipeline() {
       </div>
 
       {isLoading && (
-        <div style={{ color: '#52525b', textAlign: 'center', marginTop: 48 }}>
+        <div style={{ color: '#515154', textAlign: 'center', marginTop: 48 }}>
           Loading pipeline…
         </div>
       )}
@@ -759,7 +759,7 @@ export function Pipeline() {
             const entries: PipelineEntry[] = byStage[stage] || []
             const isDragTarget = dragOverStage === stage
             const isArchiveCol = ARCHIVE_STAGES.includes(stage)
-            const stageColor = STAGE_CONFIG[stage]?.color || '#52525b'
+            const stageColor = STAGE_CONFIG[stage]?.color || '#515154'
 
             return (
               <div
@@ -785,8 +785,8 @@ export function Pipeline() {
                 style={{
                   flexShrink: 0,
                   width: 280,
-                  background: isDragTarget ? 'rgba(59,130,246,0.04)' : '#111318',
-                  border: `1px solid ${isDragTarget ? '#3b82f6' : '#1e2030'}`,
+                  background: isDragTarget ? 'rgba(59,130,246,0.04)' : '#000000',
+                  border: `1px solid ${isDragTarget ? '#2997ff' : '#1d1d1f'}`,
                   borderRadius: 8,
                   display: 'flex',
                   flexDirection: 'column',
@@ -798,7 +798,7 @@ export function Pipeline() {
                 <div
                   style={{
                     padding: '10px 12px',
-                    borderBottom: `1px solid ${isDragTarget ? 'rgba(59,130,246,0.2)' : '#1e2030'}`,
+                    borderBottom: `1px solid ${isDragTarget ? 'rgba(59,130,246,0.2)' : '#1d1d1f'}`,
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
@@ -840,8 +840,8 @@ export function Pipeline() {
 
                     <span
                       style={{
-                        background: '#242736',
-                        color: '#71717a',
+                        background: '#2a2a2d',
+                        color: '#86868b',
                         borderRadius: 10,
                         padding: '1px 7px',
                         fontSize: 11,
@@ -858,7 +858,7 @@ export function Pipeline() {
                   <div
                     style={{
                       height: 2,
-                      background: 'linear-gradient(90deg, transparent, #3b82f6, transparent)',
+                      background: 'linear-gradient(90deg, transparent, #2997ff, transparent)',
                       flexShrink: 0,
                     }}
                   />
@@ -879,9 +879,9 @@ export function Pipeline() {
                         padding: '20px 0',
                         textAlign: 'center',
                         fontSize: 12,
-                        color: isDragTarget ? '#3b82f6' : '#3f3f46',
+                        color: isDragTarget ? '#2997ff' : '#424245',
                         borderRadius: 6,
-                        border: `1px dashed ${isDragTarget ? '#3b82f650' : '#1e2030'}`,
+                        border: `1px dashed ${isDragTarget ? '#2997ff50' : '#1d1d1f'}`,
                         transition: 'all 0.15s',
                       }}
                     >
@@ -947,9 +947,9 @@ function ExportButtons({ disabled }: { disabled: boolean }) {
 
   const btn: React.CSSProperties = {
     background: 'transparent',
-    border: '1px solid #2e3140',
+    border: '1px solid #424245',
     borderRadius: 6,
-    color: disabled ? '#3f3f46' : '#a1a1aa',
+    color: disabled ? '#424245' : '#c0c0c4',
     fontSize: 12,
     padding: '6px 12px',
     cursor: disabled || busy ? 'not-allowed' : 'pointer',

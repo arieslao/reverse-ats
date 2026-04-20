@@ -15,15 +15,15 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  discovered: '#71717a',
-  saved: '#3b82f6',
+  discovered: '#86868b',
+  saved: '#2997ff',
   applied: '#818cf8',
   phone_screen: '#c084fc',
-  technical: '#f59e0b',
+  technical: '#b06a00',
   final: '#fb923c',
-  offer: '#22c55e',
+  offer: '#34a853',
   rejected: '#f87171',
-  withdrawn: '#52525b',
+  withdrawn: '#515154',
 }
 
 function FunnelChart({ funnel }: { funnel: { stage: string; count: number }[] }) {
@@ -33,14 +33,14 @@ function FunnelChart({ funnel }: { funnel: { stage: string; count: number }[] })
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {funnel.map((item) => {
         const pct = (item.count / max) * 100
-        const color = STAGE_COLORS[item.stage] || '#3b82f6'
+        const color = STAGE_COLORS[item.stage] || '#2997ff'
 
         return (
           <div key={item.stage} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 100, fontSize: 12, color: '#a1a1aa', textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ width: 100, fontSize: 12, color: '#c0c0c4', textAlign: 'right', flexShrink: 0 }}>
               {STAGE_LABELS[item.stage] || item.stage}
             </div>
-            <div style={{ flex: 1, height: 24, background: '#1a1d27', borderRadius: 4, overflow: 'hidden', border: '1px solid #2e3140' }}>
+            <div style={{ flex: 1, height: 24, background: '#1d1d1f', borderRadius: 4, overflow: 'hidden', border: '1px solid #424245' }}>
               <div
                 style={{
                   width: `${pct}%`,
@@ -53,7 +53,7 @@ function FunnelChart({ funnel }: { funnel: { stage: string; count: number }[] })
                 }}
               />
             </div>
-            <div style={{ width: 30, fontSize: 12, fontWeight: 700, color: '#e4e4e7', fontFamily: 'monospace' }}>
+            <div style={{ width: 30, fontSize: 12, fontWeight: 700, color: '#f5f5f7', fontFamily: 'monospace' }}>
               {item.count}
             </div>
           </div>
@@ -65,7 +65,7 @@ function FunnelChart({ funnel }: { funnel: { stage: string; count: number }[] })
 
 function WeeklyChart({ data }: { data: { week: string; discovered: number; applied: number }[] }) {
   if (!data || data.length === 0) {
-    return <div style={{ color: '#52525b', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No weekly data yet</div>
+    return <div style={{ color: '#515154', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>No weekly data yet</div>
   }
 
   const maxVal = Math.max(...data.flatMap((d) => [d.discovered, d.applied]), 1)
@@ -99,7 +99,7 @@ function WeeklyChart({ data }: { data: { week: string; discovered: number; appli
               title={`Applied: ${week.applied}`}
             />
           </div>
-          <div style={{ fontSize: 10, color: '#52525b', whiteSpace: 'nowrap', textAlign: 'center' }}>
+          <div style={{ fontSize: 10, color: '#515154', whiteSpace: 'nowrap', textAlign: 'center' }}>
             {week.week.slice(5)}
           </div>
         </div>
@@ -112,19 +112,19 @@ function MetricCard({ label, value, sub, color }: { label: string; value: string
   return (
     <div
       style={{
-        background: '#1a1d27',
-        border: '1px solid #2e3140',
+        background: '#1d1d1f',
+        border: '1px solid #424245',
         borderRadius: 8,
         padding: '16px 20px',
       }}
     >
-      <div style={{ fontSize: 11, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <div style={{ fontSize: 11, color: '#515154', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </div>
-      <div style={{ fontSize: 28, fontWeight: 700, color: color || '#e4e4e7', fontFamily: 'monospace', marginTop: 4 }}>
+      <div style={{ fontSize: 28, fontWeight: 700, color: color || '#f5f5f7', fontFamily: 'monospace', marginTop: 4 }}>
         {value}
       </div>
-      {sub && <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 11, color: '#86868b', marginTop: 2 }}>{sub}</div>}
     </div>
   )
 }
@@ -137,7 +137,7 @@ export function Analytics() {
 
   if (isLoading) {
     return (
-      <div style={{ padding: 24, color: '#52525b', textAlign: 'center', marginTop: 48 }}>
+      <div style={{ padding: 24, color: '#515154', textAlign: 'center', marginTop: 48 }}>
         Loading analytics...
       </div>
     )
@@ -162,10 +162,10 @@ export function Analytics() {
   return (
     <div style={{ padding: '24px', maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#e4e4e7', letterSpacing: '-0.02em' }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f5f5f7', letterSpacing: '-0.02em' }}>
           Analytics
         </h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#86868b' }}>
           Application funnel and pipeline metrics
         </p>
       </div>
@@ -187,7 +187,7 @@ export function Analytics() {
           label="Response Rate"
           value={`${responseRatePct}%`}
           sub="Interviews / Applications"
-          color={responseRatePct >= 20 ? '#22c55e' : responseRatePct >= 10 ? '#f59e0b' : '#f87171'}
+          color={responseRatePct >= 20 ? '#34a853' : responseRatePct >= 10 ? '#b06a00' : '#f87171'}
         />
       </div>
 
@@ -195,19 +195,19 @@ export function Analytics() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
         <div
           style={{
-            background: '#1a1d27',
-            border: '1px solid #2e3140',
+            background: '#1d1d1f',
+            border: '1px solid #424245',
             borderRadius: 8,
             padding: '16px 20px',
           }}
         >
-          <h3 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600, color: '#c0c0c4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Application Funnel
           </h3>
           {analytics.funnel && analytics.funnel.length > 0 ? (
             <FunnelChart funnel={analytics.funnel} />
           ) : (
-            <div style={{ color: '#52525b', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
+            <div style={{ color: '#515154', fontSize: 13, textAlign: 'center', padding: '24px 0' }}>
               No funnel data yet
             </div>
           )}
@@ -215,13 +215,13 @@ export function Analytics() {
 
         <div
           style={{
-            background: '#1a1d27',
-            border: '1px solid #2e3140',
+            background: '#1d1d1f',
+            border: '1px solid #424245',
             borderRadius: 8,
             padding: '16px 20px',
           }}
         >
-          <h3 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <h3 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600, color: '#c0c0c4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Weekly Activity
           </h3>
           <div style={{ display: 'flex', gap: 16, marginBottom: 8 }}>
@@ -235,18 +235,18 @@ export function Analytics() {
       {/* Company breakdown */}
       <div
         style={{
-          background: '#1a1d27',
-          border: '1px solid #2e3140',
+          background: '#1d1d1f',
+          border: '1px solid #424245',
           borderRadius: 8,
           padding: '16px 20px',
         }}
       >
-        <h3 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <h3 style={{ margin: '0 0 14px', fontSize: 13, fontWeight: 600, color: '#c0c0c4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Company Breakdown
         </h3>
 
         {companyRows.length === 0 ? (
-          <div style={{ color: '#52525b', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
+          <div style={{ color: '#515154', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
             No company data yet
           </div>
         ) : (
@@ -260,10 +260,10 @@ export function Analytics() {
                       textAlign: 'left',
                       padding: '6px 8px',
                       fontSize: 11,
-                      color: '#52525b',
+                      color: '#515154',
                       textTransform: 'uppercase',
                       letterSpacing: '0.05em',
-                      borderBottom: '1px solid #2e3140',
+                      borderBottom: '1px solid #424245',
                     }}
                   >
                     {col}
@@ -278,28 +278,28 @@ export function Analytics() {
                   : 0
                 return (
                   <tr key={company}>
-                    <td style={{ padding: '7px 8px', color: '#e4e4e7', borderBottom: '1px solid #1e2030' }}>
+                    <td style={{ padding: '7px 8px', color: '#f5f5f7', borderBottom: '1px solid #1d1d1f' }}>
                       {company}
                     </td>
-                    <td style={{ padding: '7px 8px', color: '#a1a1aa', fontFamily: 'monospace', borderBottom: '1px solid #1e2030' }}>
+                    <td style={{ padding: '7px 8px', color: '#c0c0c4', fontFamily: 'monospace', borderBottom: '1px solid #1d1d1f' }}>
                       {stats.discovered}
                     </td>
-                    <td style={{ padding: '7px 8px', color: '#818cf8', fontFamily: 'monospace', borderBottom: '1px solid #1e2030' }}>
+                    <td style={{ padding: '7px 8px', color: '#818cf8', fontFamily: 'monospace', borderBottom: '1px solid #1d1d1f' }}>
                       {stats.in_pipeline}
                     </td>
-                    <td style={{ padding: '7px 8px', borderBottom: '1px solid #1e2030' }}>
+                    <td style={{ padding: '7px 8px', borderBottom: '1px solid #1d1d1f' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 60, height: 6, background: '#242736', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: 60, height: 6, background: '#2a2a2d', borderRadius: 3, overflow: 'hidden' }}>
                           <div
                             style={{
                               width: `${pct}%`,
                               height: '100%',
-                              background: pct >= 20 ? '#22c55e' : '#3b82f6',
+                              background: pct >= 20 ? '#34a853' : '#2997ff',
                               borderRadius: 3,
                             }}
                           />
                         </div>
-                        <span style={{ fontSize: 11, color: '#71717a', fontFamily: 'monospace' }}>
+                        <span style={{ fontSize: 11, color: '#86868b', fontFamily: 'monospace' }}>
                           {pct}%
                         </span>
                       </div>
@@ -319,7 +319,7 @@ function Legend({ color, label }: { color: string; label: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 12, height: 10, background: color, borderRadius: 2 }} />
-      <span style={{ fontSize: 11, color: '#71717a' }}>{label}</span>
+      <span style={{ fontSize: 11, color: '#86868b' }}>{label}</span>
     </div>
   )
 }

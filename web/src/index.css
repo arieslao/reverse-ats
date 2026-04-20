@@ -1,63 +1,86 @@
 @import "tailwindcss";
 
-/* ─── Design tokens — warm, human, editorial ──────────────────────────────────
+/* ─── Design tokens — Apple.com-inspired premium ──────────────────────────────
  *
- * Inspired by Claude.ai's restraint: warm cream background, serif display
- * type for considered headings, generous whitespace, terracotta accents
- * that feel hand-picked rather than computer-generated.
+ * Pure backgrounds, theatrical whitespace, dramatic typography. The signal
+ * is "this is a serious, considered product" — without being cold.
  *
- * The audience is everyone job-hunting — nurses, teachers, designers,
- * career switchers. Not just engineers. The aesthetic should feel like
- * a kind, capable person sitting next to you, not a Silicon Valley pitch.
+ * Theme is user-controlled via [data-theme="light"|"dark"] on <html>.
+ * Defaults to system preference; persists to localStorage on toggle.
  * ────────────────────────────────────────────────────────────────────────── */
 
 @theme {
-  /* Surfaces — warm cream tones, not stark white */
-  --color-bg-base:        #fbf9f4;
+  /* Default = light theme tokens (Apple's near-white) */
+  --color-bg-base:        #fbfbfd;
   --color-bg-elevated:    #ffffff;
-  --color-bg-card:        #f5f1e8;
-  --color-bg-tinted:      #f1ebd9;
-  --color-bg-input:       #ffffff;
+  --color-bg-section:     #f5f5f7;
+  --color-bg-tinted:      #ededf0;
+  --color-bg-card:        #ffffff;
 
-  /* Borders — barely-there, hint at structure without shouting */
-  --color-border-subtle:  #ebe4d3;
-  --color-border-muted:   #d9d0b8;
-  --color-border-strong:  #b9ad8f;
+  --color-border-subtle:  #e8e8ed;
+  --color-border-muted:   #d2d2d7;
+  --color-border-strong:  #86868b;
 
-  /* Text — warm near-blacks, never #000 */
-  --color-text-primary:   #1f1d18;
-  --color-text-secondary: #4a463d;
-  --color-text-tertiary:  #847e6f;
-  --color-text-muted:     #b3ac99;
+  --color-text-primary:   #1d1d1f;
+  --color-text-secondary: #515154;
+  --color-text-tertiary:  #86868b;
+  --color-text-muted:     #b1b1b6;
 
-  /* Accents — earthy, considered, never neon */
-  --color-accent:         #c9532e;   /* terracotta */
-  --color-accent-hover:   #b04525;
-  --color-accent-soft:    #f5dcd1;
+  --color-accent:         #0071e3;
+  --color-accent-hover:   #0077ed;
   --color-accent-text:    #ffffff;
-  --color-success:        #5b8163;   /* sage */
-  --color-success-soft:   #e1ebd9;
-  --color-warning:        #c08a3e;   /* warm amber */
-  --color-warning-soft:   #f5e6cc;
-  --color-info:           #5c6e8a;   /* slate blue */
-  --color-info-soft:      #dfe5ee;
+  --color-accent-soft:    #e8f1fc;
 
-  /* Type — Lora for display (warm serif), Inter for body */
-  --font-display: "Lora", "Charter", "Source Serif Pro", "Iowan Old Style",
-                  Georgia, "Times New Roman", serif;
-  --font-body:    "Inter", ui-sans-serif, system-ui, -apple-system,
-                  "Segoe UI", "Helvetica Neue", sans-serif;
+  --color-success:        #34a853;
+  --color-success-soft:   #e6f4ea;
+  --color-warning:        #b06a00;
+  --color-warning-soft:   #fbf2e3;
+  --color-danger:         #c8243a;
+  --color-danger-soft:    #fce4e7;
+
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display",
+                  "Helvetica Neue", "Helvetica", "Arial", sans-serif;
+  --font-body:    "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+                  "Helvetica Neue", "Helvetica", "Arial", sans-serif;
 }
 
 /* ─── Web fonts ──────────────────────────────────────────────────────────── */
 
-@import url("https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;0,700&family=Inter:wght@400;450;500;600&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+
+/* ─── Theme override (user toggles via <html data-theme="dark">) ─────────── */
+
+:root[data-theme="dark"] {
+  --color-bg-base:        #000000;
+  --color-bg-elevated:    #1d1d1f;
+  --color-bg-section:     #1d1d1f;
+  --color-bg-tinted:      #2a2a2d;
+  --color-bg-card:        #1d1d1f;
+
+  --color-border-subtle:  #2a2a2d;
+  --color-border-muted:   #424245;
+  --color-border-strong:  #6e6e73;
+
+  --color-text-primary:   #f5f5f7;
+  --color-text-secondary: #c0c0c4;
+  --color-text-tertiary:  #86868b;
+  --color-text-muted:     #515154;
+
+  --color-accent:         #2997ff;
+  --color-accent-hover:   #4ba6ff;
+  --color-accent-soft:    #1a3458;
+
+  --color-success-soft:   #1e3024;
+  --color-warning-soft:   #3a2a14;
+  --color-danger-soft:    #3d1820;
+}
 
 /* ─── Global ─────────────────────────────────────────────────────────────── */
 
 html {
   scroll-behavior: smooth;
   background: var(--color-bg-base);
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -68,30 +91,16 @@ body {
   font-weight: 400;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.55;
+  line-height: 1.47;
+  /* Smooth theme transition without making it feel laggy */
+  transition: background-color 200ms ease, color 200ms ease;
 }
 
-/* Headings always serif — quiet authority */
-h1, h2, h3, h4 {
+h1, h2, h3, h4, h5 {
   font-family: var(--font-display);
-  font-feature-settings: "kern", "liga";
-}
-
-/* Subtle paper-grain ambient — keeps the page from feeling like a screen */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201, 83, 46, 0.04), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(91, 129, 99, 0.03), transparent 50%);
-  pointer-events: none;
-  z-index: 0;
-}
-
-#root {
-  position: relative;
-  z-index: 1;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.05;
 }
 
 *:focus-visible {
@@ -101,37 +110,25 @@ body::before {
 }
 
 ::selection {
-  background: var(--color-accent-soft);
-  color: var(--color-text-primary);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
 }
 
-/* Honor system dark mode preference but use warm dark tones, not pitch black */
-@media (prefers-color-scheme: dark) {
-  @theme {
-    --color-bg-base:        #1a1814;
-    --color-bg-elevated:    #232019;
-    --color-bg-card:        #2a261d;
-    --color-bg-tinted:      #322d22;
-    --color-bg-input:       #232019;
-
-    --color-border-subtle:  #38332a;
-    --color-border-muted:   #4a4438;
-    --color-border-strong:  #6b6452;
-
-    --color-text-primary:   #f5f0e3;
-    --color-text-secondary: #c2bba9;
-    --color-text-tertiary:  #8e8773;
-    --color-text-muted:     #5e5847;
-
-    --color-accent-soft:    #3d2418;
-    --color-success-soft:   #1f2d20;
-    --color-warning-soft:   #2d2515;
-    --color-info-soft:      #1d242e;
+/* Subtle reveal-on-scroll for sections — Apple uses a lot of these */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 700ms ease, transform 700ms ease;
   }
-
-  body::before {
-    background:
-      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201, 83, 46, 0.06), transparent 60%),
-      radial-gradient(ellipse 60% 40% at 90% 100%, rgba(91, 129, 99, 0.04), transparent 50%);
+  .reveal.in-view {
+    opacity: 1;
+    transform: none;
   }
+}
+
+/* Selection color in dark theme stays readable */
+:root[data-theme="dark"] ::selection {
+  background: var(--color-accent);
+  color: #ffffff;
 }

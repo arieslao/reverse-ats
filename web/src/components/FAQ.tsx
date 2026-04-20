@@ -1,9 +1,6 @@
 import { useState } from 'react'
 import { SectionHeader } from './HowItWorks'
 
-// Honest answers to questions job seekers actually have. Universal —
-// not just engineer-centric. Plain language.
-
 const FAQS = [
   {
     q: 'Is this really free if I run it myself?',
@@ -47,7 +44,11 @@ export function FAQ() {
   const [openIdx, setOpenIdx] = useState<number | null>(0)
 
   return (
-    <section id="faq" className="px-5 sm:px-8 py-20 sm:py-28">
+    <section
+      id="faq"
+      className="px-5 sm:px-8 py-24 sm:py-32"
+      style={{ background: 'var(--color-bg-section)' }}
+    >
       <div className="max-w-3xl mx-auto">
         <SectionHeader
           eyebrow="FAQ"
@@ -55,7 +56,7 @@ export function FAQ() {
           subtitle="If your question isn't here, open a GitHub issue or email aries@arieslabs.ai."
         />
 
-        <div className="mt-12 space-y-3">
+        <div className="mt-14 space-y-3">
           {FAQS.map((faq, i) => {
             const open = openIdx === i
             return (
@@ -63,17 +64,17 @@ export function FAQ() {
                 key={faq.q}
                 className="rounded-2xl overflow-hidden transition-all"
                 style={{
-                  background: 'var(--color-bg-elevated)',
-                  border: `1px solid ${open ? 'var(--color-border-muted)' : 'var(--color-border-subtle)'}`,
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border-subtle)',
                 }}
               >
                 <button
                   onClick={() => setOpenIdx(open ? null : i)}
-                  className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left transition-colors"
+                  className="w-full px-6 py-5 flex items-center justify-between gap-4 text-left transition-colors"
                   aria-expanded={open}
                 >
                   <span
-                    className="text-[15px] sm:text-base"
+                    className="text-[15px] sm:text-[16px]"
                     style={{
                       color: 'var(--color-text-primary)',
                       fontWeight: 500,
@@ -82,9 +83,9 @@ export function FAQ() {
                     {faq.q}
                   </span>
                   <svg
-                    width="18"
-                    height="18"
-                    viewBox="0 0 18 18"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 20 20"
                     fill="none"
                     className="flex-shrink-0 transition-transform"
                     style={{
@@ -93,7 +94,7 @@ export function FAQ() {
                     }}
                   >
                     <path
-                      d="M4.5 7l4.5 4.5L13.5 7"
+                      d="M5 8l5 5 5-5"
                       stroke="currentColor"
                       strokeWidth="1.5"
                       strokeLinecap="round"
@@ -103,7 +104,7 @@ export function FAQ() {
                 </button>
                 {open && (
                   <div
-                    className="px-6 pb-5 text-[15px] leading-relaxed"
+                    className="px-6 pb-6 text-[15px] leading-[1.55]"
                     style={{ color: 'var(--color-text-secondary)' }}
                   >
                     {faq.a}

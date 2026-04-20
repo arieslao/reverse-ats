@@ -1,8 +1,5 @@
 import { SectionHeader } from './HowItWorks'
 
-// Honest list — distinguishes "live now" from "coming." Job seekers respect
-// honesty more than aspirational marketing.
-
 const FEATURES = [
   { name: 'AI-scored job feed', status: 'live' },
   { name: '220+ companies scraped automatically', status: 'live' },
@@ -22,30 +19,27 @@ const FEATURES = [
 
 type FeatureStatus = (typeof FEATURES)[number]['status']
 
-const STATUS_CONFIG: Record<FeatureStatus, { label: string; color: string; bg: string; border: string }> = {
+const STATUS_CONFIG: Record<FeatureStatus, { label: string; color: string; bg: string }> = {
   live: {
     label: 'Live',
     color: 'var(--color-success)',
     bg: 'var(--color-success-soft)',
-    border: 'rgba(91, 129, 99, 0.25)',
   },
   soon: {
     label: 'Coming soon',
     color: 'var(--color-warning)',
     bg: 'var(--color-warning-soft)',
-    border: 'rgba(192, 138, 62, 0.25)',
   },
   planned: {
     label: 'Planned',
     color: 'var(--color-text-tertiary)',
-    bg: 'var(--color-bg-card)',
-    border: 'var(--color-border-subtle)',
+    bg: 'var(--color-bg-tinted)',
   },
 }
 
 export function WhatYouGet() {
   return (
-    <section className="px-5 sm:px-8 py-20 sm:py-28">
+    <section className="px-5 sm:px-8 py-24 sm:py-32">
       <div className="max-w-3xl mx-auto">
         <SectionHeader
           eyebrow="Everything included"
@@ -54,9 +48,9 @@ export function WhatYouGet() {
         />
 
         <div
-          className="mt-12 rounded-2xl overflow-hidden"
+          className="mt-16 rounded-3xl overflow-hidden"
           style={{
-            background: 'var(--color-bg-elevated)',
+            background: 'var(--color-bg-card)',
             border: '1px solid var(--color-border-subtle)',
           }}
         >
@@ -66,20 +60,20 @@ export function WhatYouGet() {
               return (
                 <li
                   key={feature.name}
-                  className="flex items-center justify-between gap-4 px-5 sm:px-6 py-4"
+                  className="flex items-center justify-between gap-4 px-6 sm:px-7 py-5"
                 >
                   <span
-                    className="text-[15px]"
+                    className="text-[15px] sm:text-[16px]"
                     style={{ color: 'var(--color-text-primary)' }}
                   >
                     {feature.name}
                   </span>
                   <span
-                    className="flex-shrink-0 text-[11px] font-medium uppercase tracking-[0.1em] px-2.5 py-1 rounded-full"
+                    className="flex-shrink-0 text-[11px] uppercase tracking-[0.1em] px-2.5 py-1 rounded-full"
                     style={{
                       color: cfg.color,
                       background: cfg.bg,
-                      border: `1px solid ${cfg.border}`,
+                      fontWeight: 500,
                     }}
                   >
                     {cfg.label}
@@ -91,7 +85,7 @@ export function WhatYouGet() {
         </div>
 
         <p
-          className="mt-7 text-sm text-center"
+          className="mt-8 text-[14px] text-center"
           style={{ color: 'var(--color-text-tertiary)' }}
         >
           The full roadmap, including what's behind each item →{' '}

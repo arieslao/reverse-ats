@@ -47,8 +47,8 @@ function TagInput({
   return (
     <div
       style={{
-        background: '#0f1117',
-        border: '1px solid #2e3140',
+        background: '#000000',
+        border: '1px solid #424245',
         borderRadius: 6,
         padding: '6px 8px',
         minHeight: 36,
@@ -108,7 +108,7 @@ function TagInput({
         style={{
           background: 'none',
           border: 'none',
-          color: '#e4e4e7',
+          color: '#f5f5f7',
           fontSize: 12,
           outline: 'none',
           minWidth: 120,
@@ -165,7 +165,7 @@ function ProfileTab() {
 
   const SENIORITY_OPTIONS = ['', 'intern', 'junior', 'mid', 'senior', 'staff', 'principal', 'director', 'vp', 'c-level']
 
-  if (isLoading) return <div style={{ color: '#52525b', padding: 24 }}>Loading profile...</div>
+  if (isLoading) return <div style={{ color: '#515154', padding: 24 }}>Loading profile...</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -293,7 +293,7 @@ function ProfileTab() {
               width: 44,
               height: 24,
               borderRadius: 12,
-              background: form.remote_only ? '#3b82f6' : '#2e3140',
+              background: form.remote_only ? '#2997ff' : '#424245',
               position: 'relative',
               cursor: 'pointer',
               transition: 'background 0.2s',
@@ -329,7 +329,7 @@ function ProfileTab() {
                   gap: 6,
                   cursor: 'pointer',
                   fontSize: 13,
-                  color: selected ? '#e4e4e7' : '#71717a',
+                  color: selected ? '#f5f5f7' : '#86868b',
                 }}
               >
                 <input
@@ -344,7 +344,7 @@ function ProfileTab() {
                         : [...cats, cat],
                     }))
                   }}
-                  style={{ accentColor: '#3b82f6' }}
+                  style={{ accentColor: '#2997ff' }}
                 />
                 {cat}
               </label>
@@ -361,7 +361,7 @@ function ProfileTab() {
         >
           {updateMut.isPending ? 'Saving...' : 'Save Profile'}
         </button>
-        {saved && <span style={{ fontSize: 12, color: '#22c55e' }}>Saved successfully</span>}
+        {saved && <span style={{ fontSize: 12, color: '#34a853' }}>Saved successfully</span>}
         {updateMut.isError && <span style={{ fontSize: 12, color: '#ef4444' }}>Save failed</span>}
       </div>
     </div>
@@ -423,9 +423,9 @@ function SuggestRolesPanel({
       title="Use AI to suggest roles based on your resume"
       style={{
         background: 'transparent',
-        border: '1px solid #3b82f6',
+        border: '1px solid #2997ff',
         borderRadius: 6,
-        color: mut.isPending ? '#52525b' : '#3b82f6',
+        color: mut.isPending ? '#515154' : '#2997ff',
         fontSize: 11,
         padding: '4px 10px',
         cursor: mut.isPending ? 'wait' : 'pointer',
@@ -442,18 +442,18 @@ function SuggestRolesPanel({
     <div
       style={{
         marginBottom: 16,
-        background: '#1a1d27',
-        border: '1px solid #2e3140',
+        background: '#1d1d1f',
+        border: '1px solid #424245',
         borderRadius: 8,
         padding: 14,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e4e4e7' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7' }}>
             AI Role Suggestions
           </div>
-          <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: '#86868b', marginTop: 2 }}>
             Recommends roles you fit today + natural next-step roles. Pick what to add to Target Roles.
           </div>
         </div>
@@ -477,7 +477,7 @@ function SuggestRolesPanel({
             <SuggestionList
               heading="Strong fit now"
               subheading="Based on your current experience"
-              accentColor="#22c55e"
+              accentColor="#34a853"
               suggestions={data.current_fit}
               existingTargets={existingTargets}
               picked={picked}
@@ -486,7 +486,7 @@ function SuggestRolesPanel({
             <SuggestionList
               heading="Natural next step"
               subheading="One level up — career progression"
-              accentColor="#3b82f6"
+              accentColor="#2997ff"
               suggestions={data.next_step}
               existingTargets={existingTargets}
               picked={picked}
@@ -503,7 +503,7 @@ function SuggestRolesPanel({
               gap: 10,
             }}
           >
-            <div style={{ fontSize: 11, color: '#71717a' }}>
+            <div style={{ fontSize: 11, color: '#86868b' }}>
               {pickedCount} role{pickedCount === 1 ? '' : 's'} selected · provider: {data.provider}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -511,9 +511,9 @@ function SuggestRolesPanel({
                 onClick={() => { setOpen(false); mut.reset(); setPicked({}) }}
                 style={{
                   background: 'transparent',
-                  border: '1px solid #2e3140',
+                  border: '1px solid #424245',
                   borderRadius: 6,
-                  color: '#a1a1aa',
+                  color: '#c0c0c4',
                   fontSize: 12,
                   padding: '6px 12px',
                   cursor: 'pointer',
@@ -525,10 +525,10 @@ function SuggestRolesPanel({
                 onClick={handleAdd}
                 disabled={pickedCount === 0}
                 style={{
-                  background: pickedCount === 0 ? '#1a1d27' : '#3b82f6',
-                  border: '1px solid #3b82f6',
+                  background: pickedCount === 0 ? '#1d1d1f' : '#2997ff',
+                  border: '1px solid #2997ff',
                   borderRadius: 6,
-                  color: pickedCount === 0 ? '#52525b' : '#fff',
+                  color: pickedCount === 0 ? '#515154' : '#fff',
                   fontSize: 12,
                   fontWeight: 600,
                   padding: '6px 12px',
@@ -567,10 +567,10 @@ function SuggestionList({
     <div>
       <div style={{ marginBottom: 6 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: accentColor }}>{heading}</div>
-        <div style={{ fontSize: 10, color: '#52525b' }}>{subheading}</div>
+        <div style={{ fontSize: 10, color: '#515154' }}>{subheading}</div>
       </div>
       {suggestions.length === 0 ? (
-        <div style={{ fontSize: 12, color: '#52525b', padding: '12px 0' }}>
+        <div style={{ fontSize: 12, color: '#515154', padding: '12px 0' }}>
           No suggestions returned.
         </div>
       ) : (
@@ -585,8 +585,8 @@ function SuggestionList({
                   display: 'flex',
                   gap: 8,
                   padding: '8px 10px',
-                  background: '#0f1117',
-                  border: `1px solid ${isPicked ? accentColor : '#2e3140'}`,
+                  background: '#000000',
+                  border: `1px solid ${isPicked ? accentColor : '#424245'}`,
                   borderRadius: 6,
                   cursor: alreadyAdded ? 'default' : 'pointer',
                   opacity: alreadyAdded ? 0.5 : 1,
@@ -600,16 +600,16 @@ function SuggestionList({
                   style={{ marginTop: 2, accentColor, cursor: 'pointer', flexShrink: 0 }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#e4e4e7' }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#f5f5f7' }}>
                     {s.title}
                     {alreadyAdded && (
-                      <span style={{ marginLeft: 6, fontSize: 10, color: '#71717a', fontWeight: 400 }}>
+                      <span style={{ marginLeft: 6, fontSize: 10, color: '#86868b', fontWeight: 400 }}>
                         (already in targets)
                       </span>
                     )}
                   </div>
                   {s.reasoning && (
-                    <div style={{ fontSize: 11, color: '#71717a', marginTop: 2, lineHeight: 1.4 }}>
+                    <div style={{ fontSize: 11, color: '#86868b', marginTop: 2, lineHeight: 1.4 }}>
                       {s.reasoning}
                     </div>
                   )}
@@ -670,10 +670,10 @@ function IndustryPacks() {
 
   return (
     <div style={{ marginBottom: 24 }}>
-      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
+      <h3 style={{ fontSize: 14, fontWeight: 600, color: '#f5f5f7', marginBottom: 8 }}>
         Industry Packs
       </h3>
-      <p style={{ fontSize: 12, color: '#71717a', marginBottom: 12 }}>
+      <p style={{ fontSize: 12, color: '#86868b', marginBottom: 12 }}>
         Quickly add companies from any industry. Each pack includes ~15-30 companies with their career page configurations.
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
@@ -683,17 +683,17 @@ function IndustryPacks() {
             <div
               key={pack.id}
               style={{
-                background: '#1a1d27',
-                border: '1px solid #2e3140',
+                background: '#1d1d1f',
+                border: '1px solid #424245',
                 borderRadius: 8,
                 padding: '12px 14px',
               }}
             >
-              <div style={{ fontWeight: 600, fontSize: 13, color: '#e4e4e7' }}>{pack.name}</div>
-              <div style={{ fontSize: 11, color: '#71717a', marginTop: 2 }}>{pack.description}</div>
-              <div style={{ fontSize: 11, color: '#52525b', marginTop: 4 }}>{pack.count} companies</div>
+              <div style={{ fontWeight: 600, fontSize: 13, color: '#f5f5f7' }}>{pack.name}</div>
+              <div style={{ fontSize: 11, color: '#86868b', marginTop: 2 }}>{pack.description}</div>
+              <div style={{ fontSize: 11, color: '#515154', marginTop: 4 }}>{pack.count} companies</div>
               {result ? (
-                <div style={{ fontSize: 11, color: '#22c55e', marginTop: 8 }}>
+                <div style={{ fontSize: 11, color: '#34a853', marginTop: 8 }}>
                   Added {result.installed}, {result.skipped} already existed
                 </div>
               ) : (
@@ -705,7 +705,7 @@ function IndustryPacks() {
                     background: 'rgba(59,130,246,0.12)',
                     border: '1px solid rgba(59,130,246,0.3)',
                     borderRadius: 5,
-                    color: '#3b82f6',
+                    color: '#2997ff',
                     fontSize: 12,
                     fontWeight: 500,
                     padding: '5px 12px',
@@ -780,7 +780,7 @@ function CompanyTab() {
     })
   }
 
-  if (isLoading) return <div style={{ color: '#52525b', padding: 24 }}>Loading companies...</div>
+  if (isLoading) return <div style={{ color: '#515154', padding: 24 }}>Loading companies...</div>
 
   const list = companies || []
 
@@ -800,7 +800,7 @@ function CompanyTab() {
           {CATEGORY_OPTIONS.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
 
-        <span style={{ fontSize: 12, color: '#52525b', marginLeft: 4 }}>{list.length} companies</span>
+        <span style={{ fontSize: 12, color: '#515154', marginLeft: 4 }}>{list.length} companies</span>
 
         <button
           onClick={() => setShowAdd((v) => !v)}
@@ -814,14 +814,14 @@ function CompanyTab() {
       {showAdd && (
         <div
           style={{
-            background: '#1a1d27',
-            border: '1px solid #2e3140',
+            background: '#1d1d1f',
+            border: '1px solid #424245',
             borderRadius: 8,
             padding: 16,
             marginBottom: 14,
           }}
         >
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e4e4e7', marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#f5f5f7', marginBottom: 12 }}>
             Add New Company
           </div>
           <CompanyFormFields form={addForm} setForm={setAddForm} />
@@ -839,10 +839,10 @@ function CompanyTab() {
       )}
 
       {/* Table */}
-      <div style={{ border: '1px solid #2e3140', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ border: '1px solid #424245', borderRadius: 8, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ background: '#111318' }}>
+            <tr style={{ background: '#000000' }}>
               {['Company', 'ATS', 'Category', 'Slug', 'Enabled', 'Actions'].map((h) => (
                 <th
                   key={h}
@@ -850,11 +850,11 @@ function CompanyTab() {
                     textAlign: 'left',
                     padding: '8px 12px',
                     fontSize: 11,
-                    color: '#52525b',
+                    color: '#515154',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     fontWeight: 600,
-                    borderBottom: '1px solid #2e3140',
+                    borderBottom: '1px solid #424245',
                   }}
                 >
                   {h}
@@ -865,7 +865,7 @@ function CompanyTab() {
           <tbody>
             {list.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: '#52525b' }}>
+                <td colSpan={6} style={{ textAlign: 'center', padding: '32px 0', color: '#515154' }}>
                   No companies found
                 </td>
               </tr>
@@ -874,12 +874,12 @@ function CompanyTab() {
               <>
                 <tr
                   key={company.id}
-                  style={{ borderBottom: '1px solid #1e2030' }}
+                  style={{ borderBottom: '1px solid #1d1d1f' }}
                 >
-                  <td style={{ padding: '8px 12px', color: '#e4e4e7', fontWeight: 500 }}>{company.name}</td>
-                  <td style={{ padding: '8px 12px', color: '#a1a1aa' }}>{company.ats}</td>
-                  <td style={{ padding: '8px 12px', color: '#a1a1aa' }}>{company.category}</td>
-                  <td style={{ padding: '8px 12px', color: '#71717a', fontFamily: 'monospace', fontSize: 11 }}>{company.slug}</td>
+                  <td style={{ padding: '8px 12px', color: '#f5f5f7', fontWeight: 500 }}>{company.name}</td>
+                  <td style={{ padding: '8px 12px', color: '#c0c0c4' }}>{company.ats}</td>
+                  <td style={{ padding: '8px 12px', color: '#c0c0c4' }}>{company.category}</td>
+                  <td style={{ padding: '8px 12px', color: '#86868b', fontFamily: 'monospace', fontSize: 11 }}>{company.slug}</td>
                   <td style={{ padding: '8px 12px' }}>
                     <div
                       onClick={() => toggleEnabled(company)}
@@ -887,7 +887,7 @@ function CompanyTab() {
                         width: 32,
                         height: 18,
                         borderRadius: 9,
-                        background: company.enabled ? '#3b82f6' : '#2e3140',
+                        background: company.enabled ? '#2997ff' : '#424245',
                         position: 'relative',
                         cursor: 'pointer',
                         transition: 'background 0.2s',
@@ -930,7 +930,7 @@ function CompanyTab() {
                       ) : (
                         <button
                           onClick={() => setDeleteConfirm(company.id)}
-                          style={{ ...ghostBtnStyle, color: '#71717a' }}
+                          style={{ ...ghostBtnStyle, color: '#86868b' }}
                         >
                           Delete
                         </button>
@@ -939,8 +939,8 @@ function CompanyTab() {
                   </td>
                 </tr>
                 {editingId === company.id && (
-                  <tr key={`edit-${company.id}`} style={{ borderBottom: '1px solid #1e2030' }}>
-                    <td colSpan={6} style={{ padding: '12px 16px', background: '#111318' }}>
+                  <tr key={`edit-${company.id}`} style={{ borderBottom: '1px solid #1d1d1f' }}>
+                    <td colSpan={6} style={{ padding: '12px 16px', background: '#000000' }}>
                       <CompanyFormFields form={editForm} setForm={setEditForm} />
                       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
                         <button
@@ -1059,21 +1059,21 @@ function ScrapeTab() {
         >
           {triggerMut.isPending ? 'Triggering...' : 'Run Scrape Now'}
         </button>
-        {triggerMut.isSuccess && <span style={{ fontSize: 12, color: '#22c55e' }}>Scrape triggered — check back in a minute</span>}
+        {triggerMut.isSuccess && <span style={{ fontSize: 12, color: '#34a853' }}>Scrape triggered — check back in a minute</span>}
         {triggerMut.isError && <span style={{ fontSize: 12, color: '#ef4444' }}>Failed to trigger</span>}
       </div>
 
-      {isLoading && <div style={{ color: '#52525b' }}>Loading scrape status...</div>}
+      {isLoading && <div style={{ color: '#515154' }}>Loading scrape status...</div>}
 
       {!isLoading && !status && (
-        <div style={{ color: '#52525b', padding: 24, textAlign: 'center', border: '1px dashed #2e3140', borderRadius: 8 }}>
+        <div style={{ color: '#515154', padding: 24, textAlign: 'center', border: '1px dashed #424245', borderRadius: 8 }}>
           No scrape runs recorded yet
         </div>
       )}
 
       {status && (
-        <div style={{ background: '#1a1d27', border: '1px solid #2e3140', borderRadius: 8, padding: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#a1a1aa', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ background: '#1d1d1f', border: '1px solid #424245', borderRadius: 8, padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#c0c0c4', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             Last Scrape Run
           </div>
 
@@ -1081,7 +1081,7 @@ function ScrapeTab() {
             <StatRow label="Started" value={formatDatetime(status.started_at)} />
             <StatRow label="Completed" value={formatDatetime(status.completed_at)} />
             <StatRow label="Total Fetched" value={status.total_fetched} highlight />
-            <StatRow label="New Jobs" value={status.new_jobs} highlight color="#22c55e" />
+            <StatRow label="New Jobs" value={status.new_jobs} highlight color="#34a853" />
             <StatRow label="Updated" value={status.updated_jobs} />
             <StatRow label="Expired" value={status.expired_jobs} color="#f87171" />
             <StatRow label="LLM Scored" value={status.llm_scored} color="#818cf8" />
@@ -1089,12 +1089,12 @@ function ScrapeTab() {
 
           {status.errors && status.errors.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, color: '#52525b', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: 11, color: '#515154', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Errors ({status.errors.length})
               </div>
               <div
                 style={{
-                  background: '#0f1117',
+                  background: '#000000',
                   border: '1px solid rgba(239,68,68,0.2)',
                   borderRadius: 6,
                   padding: 10,
@@ -1136,27 +1136,27 @@ function BackupsCard() {
     })
 
   return (
-    <div style={{ background: '#1a1d27', border: '1px solid #2e3140', borderRadius: 8, padding: 20 }}>
+    <div style={{ background: '#1d1d1f', border: '1px solid #424245', borderRadius: 8, padding: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#c0c0c4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Database Backups
         </div>
         <button
           onClick={() => backupMut.mutate()}
           disabled={backupMut.isPending}
-          style={{ ...ghostBtnStyle, color: '#a1a1aa', padding: '6px 12px', fontSize: 12 }}
+          style={{ ...ghostBtnStyle, color: '#c0c0c4', padding: '6px 12px', fontSize: 12 }}
         >
           {backupMut.isPending ? 'Backing up...' : 'Backup now'}
         </button>
       </div>
 
-      <div style={{ fontSize: 12, color: '#71717a', marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 12, color: '#86868b', marginBottom: 12, lineHeight: 1.5 }}>
         Backups are taken automatically before destructive ops (e.g. Re-score all). Last 10 are kept.
-        To restore: stop the backend, copy a backup file over <code style={{ color: '#a1a1aa' }}>reverse_ats.db</code>, restart.
+        To restore: stop the backend, copy a backup file over <code style={{ color: '#c0c0c4' }}>reverse_ats.db</code>, restart.
       </div>
 
       {!backups || backups.length === 0 ? (
-        <div style={{ fontSize: 12, color: '#52525b', padding: '12px 0', textAlign: 'center' }}>
+        <div style={{ fontSize: 12, color: '#515154', padding: '12px 0', textAlign: 'center' }}>
           No backups yet. Click "Backup now" or trigger a re-score to create one.
         </div>
       ) : (
@@ -1170,14 +1170,14 @@ function BackupsCard() {
                 alignItems: 'center',
                 gap: 12,
                 padding: '6px 10px',
-                background: '#0f1117',
-                border: '1px solid #2e3140',
+                background: '#000000',
+                border: '1px solid #424245',
                 borderRadius: 4,
                 fontSize: 12,
               }}
             >
-              <span style={{ color: '#e4e4e7', fontFamily: 'monospace' }}>{b.filename ?? b.path.split('/').pop()}</span>
-              <span style={{ color: '#71717a', display: 'flex', gap: 12 }}>
+              <span style={{ color: '#f5f5f7', fontFamily: 'monospace' }}>{b.filename ?? b.path.split('/').pop()}</span>
+              <span style={{ color: '#86868b', display: 'flex', gap: 12 }}>
                 <span>{fmtSize(b.size_bytes)}</span>
                 <span>{fmtTime(b.created_at)}</span>
               </span>
@@ -1202,12 +1202,12 @@ function StatRow({
 }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-      <span style={{ fontSize: 12, color: '#71717a' }}>{label}</span>
+      <span style={{ fontSize: 12, color: '#86868b' }}>{label}</span>
       <span
         style={{
           fontSize: highlight ? 16 : 13,
           fontWeight: highlight ? 700 : 500,
-          color: color || (highlight ? '#e4e4e7' : '#a1a1aa'),
+          color: color || (highlight ? '#f5f5f7' : '#c0c0c4'),
           fontFamily: 'monospace',
         }}
       >
@@ -1377,7 +1377,7 @@ function LLMTab() {
   const showUrlField = provider !== 'keyword_only'
   const showModelField = provider !== 'keyword_only'
 
-  if (isLoading) return <div style={{ color: '#52525b', padding: 24 }}>Loading LLM settings...</div>
+  if (isLoading) return <div style={{ color: '#515154', padding: 24 }}>Loading LLM settings...</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 720 }}>
@@ -1412,8 +1412,8 @@ function LLMTab() {
                   gap: 12,
                   padding: '10px 14px',
                   borderRadius: 8,
-                  border: `1px solid ${selected ? '#3b82f6' : '#2e3140'}`,
-                  background: selected ? 'rgba(59,130,246,0.07)' : '#1a1d27',
+                  border: `1px solid ${selected ? '#2997ff' : '#424245'}`,
+                  background: selected ? 'rgba(59,130,246,0.07)' : '#1d1d1f',
                   cursor: 'pointer',
                   transition: 'border-color 0.15s, background 0.15s',
                 }}
@@ -1424,18 +1424,18 @@ function LLMTab() {
                   value={p.id}
                   checked={selected}
                   onChange={() => handleProviderChange(p.id)}
-                  style={{ accentColor: '#3b82f6', marginTop: 2, flexShrink: 0 }}
+                  style={{ accentColor: '#2997ff', marginTop: 2, flexShrink: 0 }}
                 />
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 500, color: selected ? '#e4e4e7' : '#a1a1aa' }}>
+                    <span style={{ fontSize: 13, fontWeight: 500, color: selected ? '#f5f5f7' : '#c0c0c4' }}>
                       {p.name}
                     </span>
-                    <span style={{ fontSize: 11, color: selected ? '#60a5fa' : '#52525b', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, color: selected ? '#60a5fa' : '#515154', whiteSpace: 'nowrap' }}>
                       {PROVIDER_COST_NOTES[p.id]}
                     </span>
                   </div>
-                  <div style={{ fontSize: 12, color: '#71717a', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: '#86868b', marginTop: 2 }}>
                     {PROVIDER_DESCRIPTIONS[p.id]}
                   </div>
                 </div>
@@ -1468,7 +1468,7 @@ function LLMTab() {
                       transform: 'translateY(-50%)',
                       background: 'none',
                       border: 'none',
-                      color: '#71717a',
+                      color: '#86868b',
                       fontSize: 11,
                       cursor: 'pointer',
                       padding: '2px 6px',
@@ -1513,9 +1513,9 @@ function LLMTab() {
                   step={0.1}
                   value={temperature}
                   onChange={(e) => setTemperature(Number(e.target.value))}
-                  style={{ width: '100%', accentColor: '#3b82f6', marginTop: 6 }}
+                  style={{ width: '100%', accentColor: '#2997ff', marginTop: 6 }}
                 />
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#52525b', marginTop: 2 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#515154', marginTop: 2 }}>
                   <span>0.0 (focused)</span>
                   <span>1.0 (creative)</span>
                 </div>
@@ -1568,14 +1568,14 @@ function LLMTab() {
           disabled={testMut.isPending}
           style={{
             ...ghostBtnStyle,
-            color: '#a1a1aa',
+            color: '#c0c0c4',
             padding: '7px 16px',
             fontSize: 13,
           }}
         >
           {testMut.isPending ? 'Testing...' : 'Test Connection'}
         </button>
-        {saved && <span style={{ fontSize: 12, color: '#22c55e' }}>Saved successfully</span>}
+        {saved && <span style={{ fontSize: 12, color: '#34a853' }}>Saved successfully</span>}
         {saveMut.isError && <span style={{ fontSize: 12, color: '#ef4444' }}>Save failed</span>}
       </div>
 
@@ -1587,7 +1587,7 @@ function LLMTab() {
       {testResult && (
         <div
           style={{
-            background: '#1a1d27',
+            background: '#1d1d1f',
             border: `1px solid ${testResult.health.healthy ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
             borderRadius: 8,
             padding: 16,
@@ -1599,39 +1599,39 @@ function LLMTab() {
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: testResult.health.healthy ? '#22c55e' : '#ef4444',
+                background: testResult.health.healthy ? '#34a853' : '#ef4444',
                 flexShrink: 0,
               }}
             />
-            <span style={{ fontSize: 13, fontWeight: 600, color: testResult.health.healthy ? '#22c55e' : '#ef4444' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: testResult.health.healthy ? '#34a853' : '#ef4444' }}>
               {testResult.health.healthy ? 'Connection OK' : 'Connection Failed'}
             </span>
-            <span style={{ fontSize: 12, color: '#71717a', marginLeft: 4 }}>
+            <span style={{ fontSize: 12, color: '#86868b', marginLeft: 4 }}>
               Provider: {testResult.provider}
             </span>
           </div>
-          <div style={{ fontSize: 12, color: '#a1a1aa', marginBottom: 6 }}>
+          <div style={{ fontSize: 12, color: '#c0c0c4', marginBottom: 6 }}>
             {testResult.health.message}
           </div>
           {testResult.test_score && (
             <div
               style={{
-                background: '#0f1117',
-                border: '1px solid #2e3140',
+                background: '#000000',
+                border: '1px solid #424245',
                 borderRadius: 6,
                 padding: '10px 12px',
                 marginTop: 8,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <span style={{ fontSize: 11, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: 11, color: '#515154', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Test Score
                 </span>
-                <span style={{ fontSize: 18, fontWeight: 700, color: '#e4e4e7', fontFamily: 'monospace' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: '#f5f5f7', fontFamily: 'monospace' }}>
                   {testResult.test_score.score}
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: '#71717a', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 12, color: '#86868b', lineHeight: 1.5 }}>
                 {testResult.test_score.reasoning}
               </div>
             </div>
@@ -1695,8 +1695,8 @@ function RescoreCard() {
   return (
     <div
       style={{
-        background: '#1a1d27',
-        border: '1px solid #2e3140',
+        background: '#1d1d1f',
+        border: '1px solid #424245',
         borderRadius: 8,
         padding: 16,
         display: 'flex',
@@ -1705,27 +1705,27 @@ function RescoreCard() {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#c0c0c4', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Score Coverage
         </div>
-        <div style={{ fontSize: 12, color: '#71717a' }}>
+        <div style={{ fontSize: 12, color: '#86868b' }}>
           {scored.toLocaleString()} / {total.toLocaleString()} active jobs scored ({pct}%)
         </div>
       </div>
 
       {/* Progress bar */}
-      <div style={{ height: 6, background: '#0f1117', borderRadius: 3, overflow: 'hidden' }}>
+      <div style={{ height: 6, background: '#000000', borderRadius: 3, overflow: 'hidden' }}>
         <div
           style={{
             width: `${pct}%`,
             height: '100%',
-            background: pct >= 90 ? '#22c55e' : pct >= 50 ? '#3b82f6' : '#f59e0b',
+            background: pct >= 90 ? '#34a853' : pct >= 50 ? '#2997ff' : '#b06a00',
             transition: 'width 0.3s',
           }}
         />
       </div>
 
-      <div style={{ fontSize: 12, color: '#71717a', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 12, color: '#86868b', lineHeight: 1.5 }}>
         Scores are computed once when a job is first scraped. If you just configured an LLM
         provider, updated your resume, or switched models, use these to backfill or refresh.
       </div>
@@ -1749,7 +1749,7 @@ function RescoreCard() {
           disabled={rescoreMut.isPending || total === 0}
           style={{
             ...ghostBtnStyle,
-            color: '#a1a1aa',
+            color: '#c0c0c4',
             padding: '7px 16px',
             fontSize: 13,
           }}
@@ -1757,7 +1757,7 @@ function RescoreCard() {
           {rescoreMut.isPending && mode === 'all' ? 'Starting...' : 'Re-score all'}
         </button>
         {rescoreMut.isSuccess && (
-          <span style={{ fontSize: 12, color: '#22c55e' }}>
+          <span style={{ fontSize: 12, color: '#34a853' }}>
             Started — running in background. Stats refresh every 15s.
           </span>
         )}
@@ -1784,16 +1784,16 @@ export function Admin() {
   return (
     <div style={{ padding: '24px', maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#e4e4e7', letterSpacing: '-0.02em' }}>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f5f5f7', letterSpacing: '-0.02em' }}>
           Admin
         </h1>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#86868b' }}>
           Profile settings, company management, and scrape controls
         </p>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid #2e3140', paddingBottom: 0 }}>
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid #424245', paddingBottom: 0 }}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -1801,8 +1801,8 @@ export function Admin() {
             style={{
               background: 'none',
               border: 'none',
-              borderBottom: `2px solid ${activeTab === tab.id ? '#3b82f6' : 'transparent'}`,
-              color: activeTab === tab.id ? '#3b82f6' : '#71717a',
+              borderBottom: `2px solid ${activeTab === tab.id ? '#2997ff' : 'transparent'}`,
+              color: activeTab === tab.id ? '#2997ff' : '#86868b',
               fontSize: 13,
               fontWeight: 500,
               padding: '8px 16px',
@@ -1850,7 +1850,7 @@ function Section({
           style={{
             display: 'block',
             fontSize: 11,
-            color: '#52525b',
+            color: '#515154',
             textTransform: 'uppercase',
             letterSpacing: '0.06em',
             fontWeight: 600,
@@ -1868,7 +1868,7 @@ function Section({
 function FieldWrap({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: 10, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+      <label style={{ display: 'block', fontSize: 10, color: '#515154', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
         {label}
       </label>
       {children}
@@ -1877,10 +1877,10 @@ function FieldWrap({ label, children }: { label: string; children: React.ReactNo
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#0f1117',
-  border: '1px solid #2e3140',
+  background: '#000000',
+  border: '1px solid #424245',
   borderRadius: 6,
-  color: '#e4e4e7',
+  color: '#f5f5f7',
   fontSize: 13,
   padding: '7px 10px',
   outline: 'none',
@@ -1900,7 +1900,7 @@ const textareaStyle: React.CSSProperties = {
 }
 
 const primaryBtnStyle: React.CSSProperties = {
-  background: '#3b82f6',
+  background: '#2997ff',
   border: 'none',
   borderRadius: 6,
   color: '#fff',
@@ -1912,9 +1912,9 @@ const primaryBtnStyle: React.CSSProperties = {
 
 const ghostBtnStyle: React.CSSProperties = {
   background: 'transparent',
-  border: '1px solid #2e3140',
+  border: '1px solid #424245',
   borderRadius: 5,
-  color: '#a1a1aa',
+  color: '#c0c0c4',
   fontSize: 12,
   padding: '4px 10px',
   cursor: 'pointer',

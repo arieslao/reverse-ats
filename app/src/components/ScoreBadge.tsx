@@ -9,8 +9,8 @@ export function ScoreBadge({ score, label, size = 'md' }: ScoreBadgeProps) {
     return (
       <span
         style={{
-          background: '#2e3140',
-          color: '#a1a1aa',
+          background: '#424245',
+          color: '#c0c0c4',
           borderRadius: 4,
           padding: size === 'sm' ? '1px 6px' : '2px 8px',
           fontSize: size === 'sm' ? 11 : 12,
@@ -29,19 +29,19 @@ export function ScoreBadge({ score, label, size = 'md' }: ScoreBadgeProps) {
 
   if (score >= 90) {
     bg = 'rgba(245, 158, 11, 0.15)'
-    color = '#f59e0b'
+    color = '#b06a00'
   } else if (score >= 70) {
     bg = 'rgba(34, 197, 94, 0.15)'
-    color = '#22c55e'
+    color = '#34a853'
   } else if (score >= 50) {
     bg = 'rgba(59, 130, 246, 0.15)'
-    color = '#3b82f6'
+    color = '#2997ff'
   } else if (score >= 30) {
     bg = 'rgba(234, 179, 8, 0.12)'
     color = '#ca8a04'
   } else {
     bg = 'rgba(161, 161, 170, 0.1)'
-    color = '#71717a'
+    color = '#86868b'
   }
 
   return (

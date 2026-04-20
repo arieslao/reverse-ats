@@ -134,10 +134,10 @@ export function Feed() {
       {/* Header */}
       <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#e4e4e7', letterSpacing: '-0.02em' }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f5f5f7', letterSpacing: '-0.02em' }}>
             Job Feed
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#71717a' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#86868b' }}>
             Browse and filter discovered opportunities
           </p>
         </div>
@@ -149,9 +149,9 @@ export function Feed() {
             alignItems: 'center',
             gap: 6,
             background: 'transparent',
-            border: '1px solid #2e3140',
+            border: '1px solid #424245',
             borderRadius: 6,
-            color: isRefreshing ? '#52525b' : '#a1a1aa',
+            color: isRefreshing ? '#515154' : '#c0c0c4',
             fontSize: 13,
             padding: '6px 12px',
             cursor: isRefreshing || isLoading ? 'not-allowed' : 'pointer',
@@ -159,13 +159,13 @@ export function Feed() {
           }}
           onMouseEnter={(e) => {
             if (!isRefreshing && !isLoading) {
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#3b82f6'
-              ;(e.currentTarget as HTMLButtonElement).style.color = '#3b82f6'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#2997ff'
+              ;(e.currentTarget as HTMLButtonElement).style.color = '#2997ff'
             }
           }}
           onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#2e3140'
-            ;(e.currentTarget as HTMLButtonElement).style.color = isRefreshing ? '#52525b' : '#a1a1aa'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#424245'
+            ;(e.currentTarget as HTMLButtonElement).style.color = isRefreshing ? '#515154' : '#c0c0c4'
           }}
         >
           <span
@@ -199,24 +199,24 @@ export function Feed() {
             gap: 24,
             margin: '14px 0',
             padding: '10px 16px',
-            background: '#1a1d27',
-            border: '1px solid #2e3140',
+            background: '#1d1d1f',
+            border: '1px solid #424245',
             borderRadius: 6,
             alignItems: 'center',
             flexWrap: 'wrap',
           }}
         >
           <Stat label="Total Results" value={data.total} />
-          <div style={{ width: 1, background: '#2e3140', alignSelf: 'stretch' }} />
-          <Stat label="New Today" value={newToday} color="#22c55e" />
-          <div style={{ width: 1, background: '#2e3140', alignSelf: 'stretch' }} />
-          <Stat label="Avg Score" value={avgScore} color={avgScore >= 70 ? '#22c55e' : avgScore >= 50 ? '#3b82f6' : '#a1a1aa'} />
-          <div style={{ width: 1, background: '#2e3140', alignSelf: 'stretch' }} />
+          <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
+          <Stat label="New Today" value={newToday} color="#34a853" />
+          <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
+          <Stat label="Avg Score" value={avgScore} color={avgScore >= 70 ? '#34a853' : avgScore >= 50 ? '#2997ff' : '#c0c0c4'} />
+          <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
           <Stat label="Page" value={`${page} / ${totalPages}`} />
           {scrapeStatus?.last_run && (
             <>
-              <div style={{ width: 1, background: '#2e3140', alignSelf: 'stretch' }} />
-              <Stat label="Last Scraped" value={timeAgoFromNow(scrapeStatus.last_run)} color="#71717a" />
+              <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
+              <Stat label="Last Scraped" value={timeAgoFromNow(scrapeStatus.last_run)} color="#86868b" />
             </>
           )}
         </div>
@@ -224,7 +224,7 @@ export function Feed() {
 
       {/* Job list */}
       {isLoading && (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: '#52525b' }}>
+        <div style={{ textAlign: 'center', padding: '48px 0', color: '#515154' }}>
           Loading jobs...
         </div>
       )}
@@ -303,9 +303,9 @@ export function Feed() {
                   height: 32,
                   borderRadius: 4,
                   border: '1px solid',
-                  borderColor: pageNum === page ? '#3b82f6' : '#2e3140',
+                  borderColor: pageNum === page ? '#2997ff' : '#424245',
                   background: pageNum === page ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                  color: pageNum === page ? '#3b82f6' : '#a1a1aa',
+                  color: pageNum === page ? '#2997ff' : '#c0c0c4',
                   fontSize: 13,
                   cursor: 'pointer',
                 }}
@@ -343,9 +343,9 @@ function EmptyFeed({
   // Filters narrowed everything away
   if (hasFilters && totalEverScraped === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '64px 0', color: '#52525b' }}>
+      <div style={{ textAlign: 'center', padding: '64px 0', color: '#515154' }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>—</div>
-        <div style={{ fontSize: 15, color: '#3f3f46' }}>No jobs match your filters</div>
+        <div style={{ fontSize: 15, color: '#424245' }}>No jobs match your filters</div>
       </div>
     )
   }
@@ -356,17 +356,17 @@ function EmptyFeed({
       style={{
         textAlign: 'center',
         padding: '48px 24px',
-        background: '#1a1d27',
-        border: '1px solid #2e3140',
+        background: '#1d1d1f',
+        border: '1px solid #424245',
         borderRadius: 8,
-        color: '#a1a1aa',
+        color: '#c0c0c4',
       }}
     >
       <div style={{ fontSize: 28, marginBottom: 16 }}>👋</div>
-      <div style={{ fontSize: 17, fontWeight: 600, color: '#e4e4e7', marginBottom: 8 }}>
+      <div style={{ fontSize: 17, fontWeight: 600, color: '#f5f5f7', marginBottom: 8 }}>
         Welcome to Reverse ATS
       </div>
-      <div style={{ fontSize: 13, color: '#71717a', maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
+      <div style={{ fontSize: 13, color: '#86868b', maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
         No jobs scraped yet. To get the best results, set up your profile first
         so the LLM can score jobs against your background.
       </div>
@@ -376,19 +376,19 @@ function EmptyFeed({
           maxWidth: 480,
           margin: '0 auto 28px',
           fontSize: 13,
-          color: '#a1a1aa',
+          color: '#c0c0c4',
           lineHeight: 1.9,
           paddingLeft: 24,
         }}
       >
         <li>
-          Go to <a href="/admin" style={{ color: '#3b82f6' }}>Admin → Profile &amp; Resume</a> and paste your resume + target roles
+          Go to <a href="/admin" style={{ color: '#2997ff' }}>Admin → Profile &amp; Resume</a> and paste your resume + target roles
         </li>
         <li>
-          (Optional) Configure an LLM provider in <a href="/admin" style={{ color: '#3b82f6' }}>Admin → LLM Settings</a> for AI-scored matches
+          (Optional) Configure an LLM provider in <a href="/admin" style={{ color: '#2997ff' }}>Admin → LLM Settings</a> for AI-scored matches
         </li>
         <li>
-          Add or pick companies to track in <a href="/admin" style={{ color: '#3b82f6' }}>Admin → Company Manager</a>
+          Add or pick companies to track in <a href="/admin" style={{ color: '#2997ff' }}>Admin → Company Manager</a>
         </li>
         <li>Click the button below to run your first scrape</li>
       </ol>
@@ -396,7 +396,7 @@ function EmptyFeed({
         onClick={onTriggerScrape}
         disabled={isRefreshing}
         style={{
-          background: '#3b82f6',
+          background: '#2997ff',
           color: 'white',
           border: 'none',
           borderRadius: 6,
@@ -409,7 +409,7 @@ function EmptyFeed({
       >
         {isRefreshing ? 'Scraping…' : 'Run first scrape'}
       </button>
-      <div style={{ fontSize: 11, color: '#52525b', marginTop: 12 }}>
+      <div style={{ fontSize: 11, color: '#515154', marginTop: 12 }}>
         First scrape takes 1–2 minutes (about 1 second per company)
       </div>
     </div>
@@ -437,10 +437,10 @@ function Stat({
 }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <div style={{ fontSize: 10, color: '#515154', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: color || '#e4e4e7', fontFamily: 'monospace', marginTop: 1 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: color || '#f5f5f7', fontFamily: 'monospace', marginTop: 1 }}>
         {value}
       </div>
     </div>
@@ -463,9 +463,9 @@ function PagBtn({
       style={{
         padding: '6px 12px',
         borderRadius: 4,
-        border: '1px solid #2e3140',
+        border: '1px solid #424245',
         background: 'transparent',
-        color: disabled ? '#3f3f46' : '#a1a1aa',
+        color: disabled ? '#424245' : '#c0c0c4',
         fontSize: 13,
         cursor: disabled ? 'not-allowed' : 'pointer',
       }}

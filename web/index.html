@@ -16,6 +16,17 @@
     <meta property="og:type" content="website" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Apply persisted theme BEFORE React paints — eliminates the flash
+         of wrong theme on first load. Mirrors NO_FLASH_SCRIPT in lib/theme.tsx. -->
+    <script>
+      (function() {
+        try {
+          var stored = localStorage.getItem('reverse-ats-theme');
+          var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="antialiased">
     <div id="root"></div>
