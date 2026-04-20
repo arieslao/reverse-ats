@@ -6,7 +6,7 @@ const FEATURES = [
   { name: 'Filter by industry, location, score, freshness', status: 'live' },
   { name: 'Pipeline tracking (Saved → Applied → Offer)', status: 'live' },
   { name: 'AI-drafted cover letters in five styles', status: 'live' },
-  { name: 'Auto-suggest target roles from your resume', status: 'live' },
+  { name: 'AI suggests roles you fit + stretch roles for career growth', status: 'live' },
   { name: 'Daily or weekly digest of new high-fit jobs', status: 'live' },
   { name: 'Export your whole pipeline as CSV or JSON', status: 'live' },
   { name: 'Career chatbot — ask anything', status: 'soon' },

@@ -41,10 +41,10 @@ const SORT_OPTIONS = [
 ]
 
 const inputStyle: React.CSSProperties = {
-  background: '#1d1d1f',
-  border: '1px solid #424245',
+  background: 'var(--color-bg-elevated)',
+  border: '1px solid var(--color-border-muted)',
   borderRadius: 6,
-  color: '#f5f5f7',
+  color: 'var(--color-text-primary)',
   fontSize: 13,
   padding: '6px 10px',
   outline: 'none',
@@ -52,7 +52,7 @@ const inputStyle: React.CSSProperties = {
 
 const labelStyle: React.CSSProperties = {
   fontSize: 11,
-  color: '#c0c0c4',
+  color: 'var(--color-text-secondary)',
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
   marginBottom: 2,
@@ -97,8 +97,8 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
   return (
     <div
       style={{
-        background: '#1d1d1f',
-        border: '1px solid #424245',
+        background: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border-muted)',
         borderRadius: 8,
         padding: '12px 16px',
         display: 'flex',
@@ -165,7 +165,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
             step={5}
             value={local.min_score}
             onChange={(e) => update({ min_score: Number(e.target.value) })}
-            style={{ width: 120, accentColor: '#2997ff', cursor: 'pointer' }}
+            style={{ width: 120, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
           />
         </div>
 
@@ -195,7 +195,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
                 width: 36,
                 height: 20,
                 borderRadius: 10,
-                background: local.remote_only ? '#2997ff' : '#424245',
+                background: local.remote_only ? 'var(--color-accent)' : 'var(--color-border-muted)',
                 position: 'relative',
                 cursor: 'pointer',
                 transition: 'background 0.2s',
@@ -206,7 +206,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
                   width: 14,
                   height: 14,
                   borderRadius: '50%',
-                  background: '#fff',
+                  background: 'var(--color-bg-elevated)',
                   position: 'absolute',
                   top: 3,
                   left: local.remote_only ? 19 : 3,
@@ -214,7 +214,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
                 }}
               />
             </div>
-            <span style={{ fontSize: 12, color: '#f5f5f7', textTransform: 'none', letterSpacing: 'normal' }}>
+            <span style={{ fontSize: 12, color: 'var(--color-text-primary)', textTransform: 'none', letterSpacing: 'normal' }}>
               Remote Only
             </span>
           </label>
@@ -249,9 +249,9 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
             }
             style={{
               background: 'transparent',
-              border: '1px solid #424245',
+              border: '1px solid var(--color-border-muted)',
               borderRadius: 6,
-              color: '#c0c0c4',
+              color: 'var(--color-text-secondary)',
               fontSize: 12,
               padding: '6px 12px',
               cursor: 'pointer',
@@ -367,7 +367,7 @@ function LocationsPicker({
         }}
       >
         {selected.length === 0 ? (
-          <span style={{ color: '#86868b', fontSize: 13 }}>
+          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 13 }}>
             Click to filter by city, state, or country…
           </span>
         ) : (
@@ -395,7 +395,7 @@ function LocationsPicker({
             ))}
           </>
         )}
-        <span style={{ marginLeft: 'auto', color: '#86868b', fontSize: 11 }}>
+        <span style={{ marginLeft: 'auto', color: 'var(--color-text-tertiary)', fontSize: 11 }}>
           {open ? '▴' : '▾'}
         </span>
       </div>
@@ -408,8 +408,8 @@ function LocationsPicker({
             top: 'calc(100% + 4px)',
             left: 0,
             right: 0,
-            background: '#1d1d1f',
-            border: '1px solid #424245',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border-muted)',
             borderRadius: 8,
             boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
             zIndex: 50,
@@ -433,7 +433,7 @@ function LocationsPicker({
           />
 
           {!data && (
-            <div style={{ fontSize: 12, color: '#86868b', padding: 8, textAlign: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: 8, textAlign: 'center' }}>
               Loading locations…
             </div>
           )}
@@ -445,21 +445,21 @@ function LocationsPicker({
                 items={filtered.countries}
                 selectedLower={selectedLower}
                 onToggle={toggle}
-                accent="#34a853"
+                accent="var(--color-success)"
               />
               <LocationGroup
                 title="States"
                 items={filtered.states}
                 selectedLower={selectedLower}
                 onToggle={toggle}
-                accent="#2997ff"
+                accent="var(--color-accent)"
               />
               <LocationGroup
                 title="Cities"
                 items={filtered.cities}
                 selectedLower={selectedLower}
                 onToggle={toggle}
-                accent="#b06a00"
+                accent="var(--color-warning)"
               />
             </div>
           )}
@@ -469,13 +469,13 @@ function LocationsPicker({
               style={{
                 marginTop: 10,
                 paddingTop: 10,
-                borderTop: '1px solid #424245',
+                borderTop: '1px solid var(--color-border-muted)',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 gap: 10,
                 fontSize: 11,
-                color: '#86868b',
+                color: 'var(--color-text-tertiary)',
                 flexWrap: 'wrap',
               }}
             >
@@ -496,10 +496,10 @@ function LocationsPicker({
                     fontWeight: 600,
                     color:
                       matchingCount === 0
-                        ? '#f87171'
+                        ? 'var(--color-danger)'
                         : matchingCount && matchingCount > 0
-                          ? '#34a853'
-                          : '#c0c0c4',
+                          ? 'var(--color-success)'
+                          : 'var(--color-text-secondary)',
                   }}
                 >
                   {isLoading
@@ -513,9 +513,9 @@ function LocationsPicker({
                     onClick={() => onChange([])}
                     style={{
                       background: 'transparent',
-                      border: '1px solid #424245',
+                      border: '1px solid var(--color-border-muted)',
                       borderRadius: 4,
-                      color: '#c0c0c4',
+                      color: 'var(--color-text-secondary)',
                       fontSize: 11,
                       padding: '3px 8px',
                       cursor: 'pointer',
@@ -527,10 +527,10 @@ function LocationsPicker({
                 <button
                   onClick={() => setOpen(false)}
                   style={{
-                    background: '#2997ff',
-                    border: '1px solid #2997ff',
+                    background: 'var(--color-accent)',
+                    border: '1px solid var(--color-accent)',
                     borderRadius: 4,
-                    color: '#fff',
+                    color: 'var(--color-bg-elevated)',
                     fontSize: 11,
                     fontWeight: 600,
                     padding: '3px 12px',
@@ -573,10 +573,10 @@ function LocationGroup({
           marginBottom: 6,
         }}
       >
-        {title} {items.length > 0 && <span style={{ color: '#515154', fontWeight: 400 }}>({items.length})</span>}
+        {title} {items.length > 0 && <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>({items.length})</span>}
       </div>
       {items.length === 0 ? (
-        <div style={{ fontSize: 11, color: '#515154', padding: '6px 0' }}>—</div>
+        <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: '6px 0' }}>—</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 280, overflow: 'auto' }}>
           {items.map((t) => {
@@ -589,7 +589,7 @@ function LocationGroup({
                   alignItems: 'center',
                   gap: 6,
                   fontSize: 12,
-                  color: isSelected ? '#f5f5f7' : '#c0c0c4',
+                  color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
                   padding: '3px 4px',
                   borderRadius: 4,
                   cursor: 'pointer',
@@ -605,7 +605,7 @@ function LocationGroup({
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {t.name}
                 </span>
-                <span style={{ fontSize: 10, color: '#515154', flexShrink: 0 }}>{t.count}</span>
+                <span style={{ fontSize: 10, color: 'var(--color-text-muted)', flexShrink: 0 }}>{t.count}</span>
               </label>
             )
           })}

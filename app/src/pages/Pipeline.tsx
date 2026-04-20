@@ -49,8 +49,8 @@ function DragHandle() {
     >
       {[0, 1, 2].map((i) => (
         <div key={i} style={{ display: 'flex', gap: 3 }}>
-          <div style={{ width: 2, height: 2, borderRadius: '50%', background: '#c0c0c4' }} />
-          <div style={{ width: 2, height: 2, borderRadius: '50%', background: '#c0c0c4' }} />
+          <div style={{ width: 2, height: 2, borderRadius: '50%', background: 'var(--color-text-secondary)' }} />
+          <div style={{ width: 2, height: 2, borderRadius: '50%', background: 'var(--color-text-secondary)' }} />
         </div>
       ))}
     </div>
@@ -101,7 +101,7 @@ function CoverLetterPanel({
             background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(139,92,246,0.15)',
             border: `1px solid ${copied ? 'rgba(34,197,94,0.3)' : 'rgba(139,92,246,0.3)'}`,
             borderRadius: 4,
-            color: copied ? '#34a853' : '#a78bfa',
+            color: copied ? 'var(--color-success)' : '#a78bfa',
             fontSize: 11,
             fontWeight: 500,
             padding: '3px 10px',
@@ -115,7 +115,7 @@ function CoverLetterPanel({
       <div
         style={{
           fontSize: 12,
-          color: '#d4d4d8',
+          color: 'var(--color-text-secondary)',
           lineHeight: 1.6,
           whiteSpace: 'pre-wrap',
           maxHeight: 280,
@@ -169,7 +169,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
   const location = entry.location || entry.job?.location || null
   const score = entry.llm_score ?? entry.keyword_score ?? entry.job?.llm_score ?? entry.job?.keyword_score ?? null
   const appliedDays = daysSince(entry.applied_at)
-  const stageColor = STAGE_CONFIG[entry.stage]?.color || '#515154'
+  const stageColor = STAGE_CONFIG[entry.stage]?.color || 'var(--color-text-muted)'
   const coverLetter = entry.cover_letter || null
   const notesPreview = entry.notes ? entry.notes.slice(0, 40) + (entry.notes.length > 40 ? '…' : '') : null
   const url = entry.url || entry.job?.url
@@ -214,8 +214,8 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
       onMouseLeave={() => setHovered(false)}
       onClick={() => !showArchiveConfirm && setExpanded((v) => !v)}
       style={{
-        background: isDragging ? '#2a2a2d' : '#1d1d1f',
-        border: `1px solid ${hovered && !isDragging ? stageColor + '44' : '#424245'}`,
+        background: isDragging ? 'var(--color-bg-tinted)' : 'var(--color-bg-elevated)',
+        border: `1px solid ${hovered && !isDragging ? stageColor + '44' : 'var(--color-border-muted)'}`,
         borderLeft: `3px solid ${stageColor}`,
         borderRadius: 8,
         padding: '12px 12px 12px 10px',
@@ -249,7 +249,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
           <div
             style={{
               fontSize: 13,
-              color: '#d4d4d8',
+              color: 'var(--color-text-secondary)',
               marginTop: 3,
               lineHeight: 1.4,
               display: '-webkit-box',
@@ -263,7 +263,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
 
           {/* Location */}
           {location && (
-            <div style={{ fontSize: 11, color: '#86868b', marginTop: 4, wordBreak: 'break-word', lineHeight: 1.3 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, wordBreak: 'break-word', lineHeight: 1.3 }}>
               {location}
             </div>
           )}
@@ -282,7 +282,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
             style={{
               background: 'none',
               border: 'none',
-              color: hovered ? '#86868b' : 'transparent',
+              color: hovered ? 'var(--color-text-tertiary)' : 'transparent',
               cursor: 'pointer',
               fontSize: 14,
               lineHeight: 1,
@@ -317,7 +317,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
 
       {/* Notes preview */}
       {notesPreview && !expanded && (
-        <div style={{ fontSize: 12, color: '#86868b', marginTop: 6, fontStyle: 'italic', lineHeight: 1.4 }}>
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 6, fontStyle: 'italic', lineHeight: 1.4 }}>
           {notesPreview}
         </div>
       )}
@@ -330,7 +330,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
           marginTop: 8,
           alignItems: 'center',
           fontSize: 11,
-          color: '#515154',
+          color: 'var(--color-text-muted)',
           flexWrap: 'wrap',
         }}
       >
@@ -341,7 +341,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
           <span>{appliedDays}d ago</span>
         )}
         {entry.next_step_date && (
-          <span style={{ color: '#b06a00' }}>
+          <span style={{ color: 'var(--color-warning)' }}>
             Next: {formatDate(entry.next_step_date)}
           </span>
         )}
@@ -372,7 +372,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
                 background: 'rgba(239,68,68,0.2)',
                 border: '1px solid rgba(239,68,68,0.4)',
                 borderRadius: 4,
-                color: '#f87171',
+                color: 'var(--color-danger)',
                 fontSize: 11,
                 fontWeight: 600,
                 padding: '4px 10px',
@@ -388,9 +388,9 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
               }}
               style={{
                 background: 'none',
-                border: '1px solid #424245',
+                border: '1px solid var(--color-border-muted)',
                 borderRadius: 4,
-                color: '#86868b',
+                color: 'var(--color-text-tertiary)',
                 fontSize: 11,
                 padding: '4px 10px',
                 cursor: 'pointer',
@@ -536,7 +536,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
                 {genLoading ? 'Generating…' : '✦ Generate Cover Letter'}
               </button>
               {genError && (
-                <span style={{ fontSize: 11, color: '#f87171', marginLeft: 8 }}>{genError}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-danger)', marginLeft: 8 }}>{genError}</span>
               )}
             </div>
           )}
@@ -546,10 +546,10 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
               onClick={handleSave}
               disabled={updateMut.isPending}
               style={{
-                background: '#2997ff',
+                background: 'var(--color-accent)',
                 border: 'none',
                 borderRadius: 5,
-                color: '#fff',
+                color: 'var(--color-bg-elevated)',
                 fontSize: 12,
                 fontWeight: 500,
                 padding: '6px 14px',
@@ -565,7 +565,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
                 href={url}
                 target="_blank"
                 rel="noreferrer"
-                style={{ fontSize: 12, color: '#2997ff', textDecoration: 'none' }}
+                style={{ fontSize: 12, color: 'var(--color-accent)', textDecoration: 'none' }}
                 onClick={(e) => e.stopPropagation()}
               >
                 View Posting ↗
@@ -573,7 +573,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
             )}
 
             {updateMut.isError && (
-              <span style={{ fontSize: 11, color: '#ef4444' }}>Save failed</span>
+              <span style={{ fontSize: 11, color: 'var(--color-danger)' }}>Save failed</span>
             )}
           </div>
         </div>
@@ -589,7 +589,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <label
         style={{
           fontSize: 10,
-          color: '#515154',
+          color: 'var(--color-text-muted)',
           display: 'block',
           marginBottom: 3,
           textTransform: 'uppercase',
@@ -604,10 +604,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const inputStyle: React.CSSProperties = {
-  background: '#000000',
-  border: '1px solid #424245',
+  background: 'var(--color-bg-base)',
+  border: '1px solid var(--color-border-muted)',
   borderRadius: 4,
-  color: '#f5f5f7',
+  color: 'var(--color-text-primary)',
   fontSize: 12,
   padding: '5px 8px',
   outline: 'none',
@@ -713,13 +713,13 @@ export function Pipeline() {
               margin: 0,
               fontSize: 22,
               fontWeight: 700,
-              color: '#f5f5f7',
+              color: 'var(--color-text-primary)',
               letterSpacing: '-0.02em',
             }}
           >
             Pipeline
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#86868b' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-text-tertiary)' }}>
             {total} total &middot; {activeCount} active
           </p>
         </div>
@@ -727,7 +727,7 @@ export function Pipeline() {
       </div>
 
       {isLoading && (
-        <div style={{ color: '#515154', textAlign: 'center', marginTop: 48 }}>
+        <div style={{ color: 'var(--color-text-muted)', textAlign: 'center', marginTop: 48 }}>
           Loading pipeline…
         </div>
       )}
@@ -735,7 +735,7 @@ export function Pipeline() {
       {isError && (
         <div
           style={{
-            color: '#f87171',
+            color: 'var(--color-danger)',
             padding: 16,
             background: 'rgba(239,68,68,0.1)',
             borderRadius: 8,
@@ -759,7 +759,7 @@ export function Pipeline() {
             const entries: PipelineEntry[] = byStage[stage] || []
             const isDragTarget = dragOverStage === stage
             const isArchiveCol = ARCHIVE_STAGES.includes(stage)
-            const stageColor = STAGE_CONFIG[stage]?.color || '#515154'
+            const stageColor = STAGE_CONFIG[stage]?.color || 'var(--color-text-muted)'
 
             return (
               <div
@@ -785,8 +785,8 @@ export function Pipeline() {
                 style={{
                   flexShrink: 0,
                   width: 280,
-                  background: isDragTarget ? 'rgba(59,130,246,0.04)' : '#000000',
-                  border: `1px solid ${isDragTarget ? '#2997ff' : '#1d1d1f'}`,
+                  background: isDragTarget ? 'rgba(59,130,246,0.04)' : 'var(--color-bg-base)',
+                  border: `1px solid ${isDragTarget ? 'var(--color-accent)' : 'var(--color-bg-elevated)'}`,
                   borderRadius: 8,
                   display: 'flex',
                   flexDirection: 'column',
@@ -798,7 +798,7 @@ export function Pipeline() {
                 <div
                   style={{
                     padding: '10px 12px',
-                    borderBottom: `1px solid ${isDragTarget ? 'rgba(59,130,246,0.2)' : '#1d1d1f'}`,
+                    borderBottom: `1px solid ${isDragTarget ? 'rgba(59,130,246,0.2)' : 'var(--color-bg-elevated)'}`,
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
@@ -840,8 +840,8 @@ export function Pipeline() {
 
                     <span
                       style={{
-                        background: '#2a2a2d',
-                        color: '#86868b',
+                        background: 'var(--color-bg-tinted)',
+                        color: 'var(--color-text-tertiary)',
                         borderRadius: 10,
                         padding: '1px 7px',
                         fontSize: 11,
@@ -858,7 +858,7 @@ export function Pipeline() {
                   <div
                     style={{
                       height: 2,
-                      background: 'linear-gradient(90deg, transparent, #2997ff, transparent)',
+                      background: 'linear-gradient(90deg, transparent, var(--color-accent), transparent)',
                       flexShrink: 0,
                     }}
                   />
@@ -879,9 +879,9 @@ export function Pipeline() {
                         padding: '20px 0',
                         textAlign: 'center',
                         fontSize: 12,
-                        color: isDragTarget ? '#2997ff' : '#424245',
+                        color: isDragTarget ? 'var(--color-accent)' : 'var(--color-border-muted)',
                         borderRadius: 6,
-                        border: `1px dashed ${isDragTarget ? '#2997ff50' : '#1d1d1f'}`,
+                        border: `1px dashed ${isDragTarget ? '#2997ff50' : 'var(--color-bg-elevated)'}`,
                         transition: 'all 0.15s',
                       }}
                     >
@@ -947,9 +947,9 @@ function ExportButtons({ disabled }: { disabled: boolean }) {
 
   const btn: React.CSSProperties = {
     background: 'transparent',
-    border: '1px solid #424245',
+    border: '1px solid var(--color-border-muted)',
     borderRadius: 6,
-    color: disabled ? '#424245' : '#c0c0c4',
+    color: disabled ? 'var(--color-border-muted)' : 'var(--color-text-secondary)',
     fontSize: 12,
     padding: '6px 12px',
     cursor: disabled || busy ? 'not-allowed' : 'pointer',

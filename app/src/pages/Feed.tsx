@@ -134,10 +134,10 @@ export function Feed() {
       {/* Header */}
       <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#f5f5f7', letterSpacing: '-0.02em' }}>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
             Job Feed
           </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#86868b' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-text-tertiary)' }}>
             Browse and filter discovered opportunities
           </p>
         </div>
@@ -149,9 +149,9 @@ export function Feed() {
             alignItems: 'center',
             gap: 6,
             background: 'transparent',
-            border: '1px solid #424245',
+            border: '1px solid var(--color-border-muted)',
             borderRadius: 6,
-            color: isRefreshing ? '#515154' : '#c0c0c4',
+            color: isRefreshing ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
             fontSize: 13,
             padding: '6px 12px',
             cursor: isRefreshing || isLoading ? 'not-allowed' : 'pointer',
@@ -159,13 +159,13 @@ export function Feed() {
           }}
           onMouseEnter={(e) => {
             if (!isRefreshing && !isLoading) {
-              ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#2997ff'
-              ;(e.currentTarget as HTMLButtonElement).style.color = '#2997ff'
+              ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-accent)'
+              ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--color-accent)'
             }
           }}
           onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.borderColor = '#424245'
-            ;(e.currentTarget as HTMLButtonElement).style.color = isRefreshing ? '#515154' : '#c0c0c4'
+            ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-border-muted)'
+            ;(e.currentTarget as HTMLButtonElement).style.color = isRefreshing ? 'var(--color-text-muted)' : 'var(--color-text-secondary)'
           }}
         >
           <span
@@ -199,24 +199,24 @@ export function Feed() {
             gap: 24,
             margin: '14px 0',
             padding: '10px 16px',
-            background: '#1d1d1f',
-            border: '1px solid #424245',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border-muted)',
             borderRadius: 6,
             alignItems: 'center',
             flexWrap: 'wrap',
           }}
         >
           <Stat label="Total Results" value={data.total} />
-          <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
-          <Stat label="New Today" value={newToday} color="#34a853" />
-          <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
-          <Stat label="Avg Score" value={avgScore} color={avgScore >= 70 ? '#34a853' : avgScore >= 50 ? '#2997ff' : '#c0c0c4'} />
-          <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
+          <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
+          <Stat label="New Today" value={newToday} color="var(--color-success)" />
+          <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
+          <Stat label="Avg Score" value={avgScore} color={avgScore >= 70 ? 'var(--color-success)' : avgScore >= 50 ? 'var(--color-accent)' : 'var(--color-text-secondary)'} />
+          <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
           <Stat label="Page" value={`${page} / ${totalPages}`} />
           {scrapeStatus?.last_run && (
             <>
-              <div style={{ width: 1, background: '#424245', alignSelf: 'stretch' }} />
-              <Stat label="Last Scraped" value={timeAgoFromNow(scrapeStatus.last_run)} color="#86868b" />
+              <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
+              <Stat label="Last Scraped" value={timeAgoFromNow(scrapeStatus.last_run)} color="var(--color-text-tertiary)" />
             </>
           )}
         </div>
@@ -224,7 +224,7 @@ export function Feed() {
 
       {/* Job list */}
       {isLoading && (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: '#515154' }}>
+        <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--color-text-muted)' }}>
           Loading jobs...
         </div>
       )}
@@ -236,7 +236,7 @@ export function Feed() {
             background: 'rgba(239, 68, 68, 0.1)',
             border: '1px solid rgba(239, 68, 68, 0.2)',
             borderRadius: 8,
-            color: '#f87171',
+            color: 'var(--color-danger)',
             fontSize: 14,
           }}
         >
@@ -303,9 +303,9 @@ export function Feed() {
                   height: 32,
                   borderRadius: 4,
                   border: '1px solid',
-                  borderColor: pageNum === page ? '#2997ff' : '#424245',
+                  borderColor: pageNum === page ? 'var(--color-accent)' : 'var(--color-border-muted)',
                   background: pageNum === page ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                  color: pageNum === page ? '#2997ff' : '#c0c0c4',
+                  color: pageNum === page ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                   fontSize: 13,
                   cursor: 'pointer',
                 }}
@@ -343,9 +343,9 @@ function EmptyFeed({
   // Filters narrowed everything away
   if (hasFilters && totalEverScraped === 0) {
     return (
-      <div style={{ textAlign: 'center', padding: '64px 0', color: '#515154' }}>
+      <div style={{ textAlign: 'center', padding: '64px 0', color: 'var(--color-text-muted)' }}>
         <div style={{ fontSize: 32, marginBottom: 12 }}>—</div>
-        <div style={{ fontSize: 15, color: '#424245' }}>No jobs match your filters</div>
+        <div style={{ fontSize: 15, color: 'var(--color-border-muted)' }}>No jobs match your filters</div>
       </div>
     )
   }
@@ -356,17 +356,17 @@ function EmptyFeed({
       style={{
         textAlign: 'center',
         padding: '48px 24px',
-        background: '#1d1d1f',
-        border: '1px solid #424245',
+        background: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border-muted)',
         borderRadius: 8,
-        color: '#c0c0c4',
+        color: 'var(--color-text-secondary)',
       }}
     >
       <div style={{ fontSize: 28, marginBottom: 16 }}>👋</div>
-      <div style={{ fontSize: 17, fontWeight: 600, color: '#f5f5f7', marginBottom: 8 }}>
+      <div style={{ fontSize: 17, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 8 }}>
         Welcome to Reverse ATS
       </div>
-      <div style={{ fontSize: 13, color: '#86868b', maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
+      <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', maxWidth: 520, margin: '0 auto 24px', lineHeight: 1.6 }}>
         No jobs scraped yet. To get the best results, set up your profile first
         so the LLM can score jobs against your background.
       </div>
@@ -376,19 +376,19 @@ function EmptyFeed({
           maxWidth: 480,
           margin: '0 auto 28px',
           fontSize: 13,
-          color: '#c0c0c4',
+          color: 'var(--color-text-secondary)',
           lineHeight: 1.9,
           paddingLeft: 24,
         }}
       >
         <li>
-          Go to <a href="/admin" style={{ color: '#2997ff' }}>Admin → Profile &amp; Resume</a> and paste your resume + target roles
+          Go to <a href="/admin" style={{ color: 'var(--color-accent)' }}>Admin → Profile &amp; Resume</a> and paste your resume + target roles
         </li>
         <li>
-          (Optional) Configure an LLM provider in <a href="/admin" style={{ color: '#2997ff' }}>Admin → LLM Settings</a> for AI-scored matches
+          (Optional) Configure an LLM provider in <a href="/admin" style={{ color: 'var(--color-accent)' }}>Admin → LLM Settings</a> for AI-scored matches
         </li>
         <li>
-          Add or pick companies to track in <a href="/admin" style={{ color: '#2997ff' }}>Admin → Company Manager</a>
+          Add or pick companies to track in <a href="/admin" style={{ color: 'var(--color-accent)' }}>Admin → Company Manager</a>
         </li>
         <li>Click the button below to run your first scrape</li>
       </ol>
@@ -396,7 +396,7 @@ function EmptyFeed({
         onClick={onTriggerScrape}
         disabled={isRefreshing}
         style={{
-          background: '#2997ff',
+          background: 'var(--color-accent)',
           color: 'white',
           border: 'none',
           borderRadius: 6,
@@ -409,7 +409,7 @@ function EmptyFeed({
       >
         {isRefreshing ? 'Scraping…' : 'Run first scrape'}
       </button>
-      <div style={{ fontSize: 11, color: '#515154', marginTop: 12 }}>
+      <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 12 }}>
         First scrape takes 1–2 minutes (about 1 second per company)
       </div>
     </div>
@@ -437,10 +437,10 @@ function Stat({
 }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: '#515154', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <div style={{ fontSize: 10, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
         {label}
       </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: color || '#f5f5f7', fontFamily: 'monospace', marginTop: 1 }}>
+      <div style={{ fontSize: 16, fontWeight: 700, color: color || 'var(--color-text-primary)', fontFamily: 'monospace', marginTop: 1 }}>
         {value}
       </div>
     </div>
@@ -463,9 +463,9 @@ function PagBtn({
       style={{
         padding: '6px 12px',
         borderRadius: 4,
-        border: '1px solid #424245',
+        border: '1px solid var(--color-border-muted)',
         background: 'transparent',
-        color: disabled ? '#424245' : '#c0c0c4',
+        color: disabled ? 'var(--color-border-muted)' : 'var(--color-text-secondary)',
         fontSize: 13,
         cursor: disabled ? 'not-allowed' : 'pointer',
       }}

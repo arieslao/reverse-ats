@@ -80,8 +80,8 @@ export function JobCard({ job }: JobCardProps) {
   return (
     <div
       style={{
-        background: '#1d1d1f',
-        border: '1px solid #424245',
+        background: 'var(--color-bg-elevated)',
+        border: '1px solid var(--color-border-muted)',
         borderRadius: 8,
         padding: '14px 16px',
         cursor: 'pointer',
@@ -89,10 +89,10 @@ export function JobCard({ job }: JobCardProps) {
         opacity: job.expired ? 0.5 : 1,
       }}
       onMouseEnter={(e) => {
-        ;(e.currentTarget as HTMLDivElement).style.borderColor = '#2997ff'
+        ;(e.currentTarget as HTMLDivElement).style.borderColor = 'var(--color-accent)'
       }}
       onMouseLeave={(e) => {
-        ;(e.currentTarget as HTMLDivElement).style.borderColor = '#424245'
+        ;(e.currentTarget as HTMLDivElement).style.borderColor = 'var(--color-border-muted)'
       }}
       onClick={() => setExpanded((v) => !v)}
     >
@@ -100,12 +100,12 @@ export function JobCard({ job }: JobCardProps) {
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, justifyContent: 'space-between' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 600, fontSize: 14, color: '#f5f5f7' }}>{job.company}</span>
+            <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-text-primary)' }}>{job.company}</span>
             {job.remote && (
               <span
                 style={{
                   background: 'rgba(34, 197, 94, 0.12)',
-                  color: '#34a853',
+                  color: 'var(--color-success)',
                   borderRadius: 4,
                   padding: '1px 6px',
                   fontSize: 11,
@@ -121,7 +121,7 @@ export function JobCard({ job }: JobCardProps) {
               <span
                 style={{
                   background: 'rgba(239, 68, 68, 0.1)',
-                  color: '#f87171',
+                  color: 'var(--color-danger)',
                   borderRadius: 4,
                   padding: '1px 6px',
                   fontSize: 11,
@@ -138,8 +138,8 @@ export function JobCard({ job }: JobCardProps) {
               <span
                 style={{
                   background: 'rgba(161, 161, 170, 0.08)',
-                  border: '1px solid #424245',
-                  color: '#86868b',
+                  border: '1px solid var(--color-border-muted)',
+                  color: 'var(--color-text-tertiary)',
                   borderRadius: 4,
                   padding: '1px 6px',
                   fontSize: 11,
@@ -150,14 +150,14 @@ export function JobCard({ job }: JobCardProps) {
             </div>
           )}
           {job.location && (
-            <div style={{ fontSize: 12, color: '#c0c0c4', marginTop: 2 }}>{job.location}</div>
+            <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginTop: 2 }}>{job.location}</div>
           )}
         </div>
 
         {/* Score + meta */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
           <ScoreBadge score={score} />
-          <span style={{ fontSize: 11, color: '#515154' }}>{timeAgo(job.first_seen_at)}</span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{timeAgo(job.first_seen_at)}</span>
         </div>
       </div>
 
@@ -166,9 +166,9 @@ export function JobCard({ job }: JobCardProps) {
         {job.category && (
           <span
             style={{
-              background: '#2a2a2d',
-              border: '1px solid #424245',
-              color: '#c0c0c4',
+              background: 'var(--color-bg-tinted)',
+              border: '1px solid var(--color-border-muted)',
+              color: 'var(--color-text-secondary)',
               borderRadius: 4,
               padding: '1px 8px',
               fontSize: 11,
@@ -180,9 +180,9 @@ export function JobCard({ job }: JobCardProps) {
         {job.ats_type && (
           <span
             style={{
-              background: '#2a2a2d',
-              border: '1px solid #424245',
-              color: '#86868b',
+              background: 'var(--color-bg-tinted)',
+              border: '1px solid var(--color-border-muted)',
+              color: 'var(--color-text-tertiary)',
               borderRadius: 4,
               padding: '1px 8px',
               fontSize: 11,
@@ -215,10 +215,10 @@ export function JobCard({ job }: JobCardProps) {
               style={{
                 marginTop: 12,
                 padding: 12,
-                background: '#000000',
+                background: 'var(--color-bg-base)',
                 borderRadius: 6,
                 fontSize: 13,
-                color: '#c0c0c4',
+                color: 'var(--color-text-secondary)',
                 lineHeight: 1.6,
                 whiteSpace: 'pre-wrap',
               }}
@@ -236,11 +236,11 @@ export function JobCard({ job }: JobCardProps) {
                 border: '1px solid rgba(59, 130, 246, 0.2)',
                 borderRadius: 6,
                 fontSize: 12,
-                color: '#93c5fd',
+                color: 'var(--color-accent)',
                 lineHeight: 1.5,
               }}
             >
-              <span style={{ fontWeight: 600, color: '#2997ff' }}>AI Reasoning: </span>
+              <span style={{ fontWeight: 600, color: 'var(--color-accent)' }}>AI Reasoning: </span>
               {job.llm_reasoning}
             </div>
           )}
@@ -251,8 +251,8 @@ export function JobCard({ job }: JobCardProps) {
               target="_blank"
               rel="noreferrer"
               style={{
-                background: '#2997ff',
-                color: '#fff',
+                background: 'var(--color-accent)',
+                color: 'var(--color-bg-elevated)',
                 borderRadius: 6,
                 padding: '6px 14px',
                 fontSize: 13,
@@ -271,7 +271,7 @@ export function JobCard({ job }: JobCardProps) {
                 style={{
                   background: 'rgba(34, 197, 94, 0.12)',
                   border: '1px solid rgba(34, 197, 94, 0.3)',
-                  color: '#34a853',
+                  color: 'var(--color-success)',
                   borderRadius: 6,
                   padding: '6px 14px',
                   fontSize: 13,
@@ -308,8 +308,8 @@ export function JobCard({ job }: JobCardProps) {
                 onClick={() => dismissMut.mutate()}
                 style={{
                   background: 'transparent',
-                  border: '1px solid #424245',
-                  color: '#86868b',
+                  border: '1px solid var(--color-border-muted)',
+                  color: 'var(--color-text-tertiary)',
                   borderRadius: 6,
                   padding: '6px 14px',
                   fontSize: 13,
@@ -321,7 +321,7 @@ export function JobCard({ job }: JobCardProps) {
               </button>
             )}
 
-            <span style={{ fontSize: 11, color: '#424245', marginLeft: 'auto' }}>
+            <span style={{ fontSize: 11, color: 'var(--color-border-muted)', marginLeft: 'auto' }}>
               kw: {job.keyword_score}
               {job.llm_score !== null && ` | llm: ${job.llm_score}`}
             </span>
@@ -336,7 +336,7 @@ export function JobCard({ job }: JobCardProps) {
               border: '1px solid rgba(239, 68, 68, 0.2)',
               borderRadius: 6,
               fontSize: 13,
-              color: '#f87171',
+              color: 'var(--color-danger)',
             }}>
               {coverLetterError}
             </div>
@@ -345,8 +345,8 @@ export function JobCard({ job }: JobCardProps) {
           {coverLetter && (
             <div style={{
               marginTop: 12,
-              background: '#000000',
-              border: '1px solid #424245',
+              background: 'var(--color-bg-base)',
+              border: '1px solid var(--color-border-muted)',
               borderRadius: 8,
               overflow: 'hidden',
             }}>
@@ -357,7 +357,7 @@ export function JobCard({ job }: JobCardProps) {
                 alignItems: 'center',
                 padding: '8px 12px',
                 background: 'rgba(168, 85, 247, 0.08)',
-                borderBottom: '1px solid #424245',
+                borderBottom: '1px solid var(--color-border-muted)',
               }}>
                 <span style={{ fontSize: 12, fontWeight: 600, color: '#a855f7' }}>
                   Cover Letter Draft
@@ -369,7 +369,7 @@ export function JobCard({ job }: JobCardProps) {
                       background: copied ? 'rgba(34, 197, 94, 0.15)' : 'rgba(168, 85, 247, 0.12)',
                       border: '1px solid',
                       borderColor: copied ? 'rgba(34, 197, 94, 0.3)' : 'rgba(168, 85, 247, 0.2)',
-                      color: copied ? '#34a853' : '#c084fc',
+                      color: copied ? 'var(--color-success)' : '#c084fc',
                       borderRadius: 4,
                       padding: '3px 10px',
                       fontSize: 11,
@@ -397,8 +397,8 @@ export function JobCard({ job }: JobCardProps) {
                     onClick={() => setCoverLetter(null)}
                     style={{
                       background: 'transparent',
-                      border: '1px solid #424245',
-                      color: '#86868b',
+                      border: '1px solid var(--color-border-muted)',
+                      color: 'var(--color-text-tertiary)',
                       borderRadius: 4,
                       padding: '3px 10px',
                       fontSize: 11,
@@ -413,7 +413,7 @@ export function JobCard({ job }: JobCardProps) {
               <div style={{
                 padding: 16,
                 fontSize: 13,
-                color: '#d4d4d8',
+                color: 'var(--color-text-secondary)',
                 lineHeight: 1.7,
                 whiteSpace: 'pre-wrap',
               }}>

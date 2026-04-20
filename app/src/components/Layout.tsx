@@ -52,14 +52,14 @@ export function Layout() {
   const { theme, toggle: toggleTheme } = useTheme()
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#000000' }}>
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
       {/* Sidebar */}
       <aside
         style={{
           width: 220,
           flexShrink: 0,
-          background: '#000000',
-          borderRight: '1px solid #1d1d1f',
+          background: 'var(--color-bg-base)',
+          borderRight: '1px solid var(--color-bg-elevated)',
           display: 'flex',
           flexDirection: 'column',
           height: '100vh',
@@ -69,7 +69,7 @@ export function Layout() {
         <div
           style={{
             padding: '20px 20px 16px',
-            borderBottom: '1px solid #1d1d1f',
+            borderBottom: '1px solid var(--color-bg-elevated)',
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -78,7 +78,7 @@ export function Layout() {
                 width: 28,
                 height: 28,
                 borderRadius: 6,
-                background: 'linear-gradient(135deg, #2997ff 0%, #1d4ed8 100%)',
+                background: 'linear-gradient(135deg, var(--color-accent) 0%, #1d4ed8 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -90,10 +90,10 @@ export function Layout() {
               </svg>
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: '#f5f5f7', letterSpacing: '-0.01em' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
                 Reverse ATS
               </div>
-              <div style={{ fontSize: 10, color: '#515154', letterSpacing: '0.05em' }}>JOB TRACKER</div>
+              <div style={{ fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>JOB TRACKER</div>
             </div>
           </div>
         </div>
@@ -115,7 +115,7 @@ export function Layout() {
                 textDecoration: 'none',
                 transition: 'background 0.15s, color 0.15s',
                 background: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
-                color: isActive ? '#2997ff' : '#c0c0c4',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               })}
             >
               {item.icon}
@@ -177,7 +177,7 @@ export function Layout() {
                 : 'rgba(59, 130, 246, 0.1)',
               border: '1px solid rgba(59, 130, 246, 0.25)',
               borderRadius: 6,
-              color: scrapeMut.isPending ? '#6b7280' : '#2997ff',
+              color: scrapeMut.isPending ? '#6b7280' : 'var(--color-accent)',
               fontSize: 12,
               fontWeight: 500,
               padding: '8px 12px',
@@ -198,12 +198,12 @@ export function Layout() {
           </button>
 
           {scrapeMut.isSuccess && (
-            <div style={{ fontSize: 11, color: '#34a853', textAlign: 'center', marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-success)', textAlign: 'center', marginTop: 6 }}>
               Scrape triggered
             </div>
           )}
           {scrapeMut.isError && (
-            <div style={{ fontSize: 11, color: '#ef4444', textAlign: 'center', marginTop: 6 }}>
+            <div style={{ fontSize: 11, color: 'var(--color-danger)', textAlign: 'center', marginTop: 6 }}>
               Failed to trigger
             </div>
           )}
@@ -215,7 +215,7 @@ export function Layout() {
         style={{
           flex: 1,
           overflow: 'auto',
-          background: '#000000',
+          background: 'var(--color-bg-base)',
         }}
       >
         <Outlet />
