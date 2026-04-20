@@ -31,18 +31,19 @@ const handler: ExportedHandler<Env> = {
 
     // CORS preflight — the marketing site (different origin) hits /health and
     // /jobs from the browser. Permissive on read-only endpoints, strict on /ingest.
+    const origin = request.headers.get("Origin");
     if (request.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders() });
+      return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
     if (request.method === "POST" && url.pathname === "/ingest") {
       return handleIngest(request, env, ctx);
     }
     if (request.method === "GET" && url.pathname === "/jobs") {
-      return withCors(await handleListJobs(request, env));
+      return withCors(await handleListJobs(request, env), origin);
     }
     if (request.method === "GET" && url.pathname === "/health") {
-      return withCors(await handleHealth(env));
+      return withCors(await handleHealth(env), origin);
     }
     return jsonResponse({ ok: false, error: "not found" }, 404);
   },
@@ -364,18 +365,41 @@ function nowIso(): string {
 // browser. /ingest stays uncors-d since it requires the bearer secret anyway
 // and is only ever called server-to-server from GitHub Actions.
 
-function corsHeaders(): Record<string, string> {
-  return {
-    "Access-Control-Allow-Origin": "*",
+const ALLOWED_ORIGIN_EXACT = new Set([
+  "https://reverse-ats.app",
+  "https://www.reverse-ats.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+]);
+
+function isAllowedOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (ALLOWED_ORIGIN_EXACT.has(origin)) return true;
+  // Pages preview deploys: https://<hash>.reverse-ats.pages.dev
+  try {
+    const host = new URL(origin).hostname;
+    return host === "reverse-ats.pages.dev" || host.endsWith(".reverse-ats.pages.dev");
+  } catch {
+    return false;
+  }
+}
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  const headers: Record<string, string> = {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
+    Vary: "Origin",
   };
+  if (isAllowedOrigin(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin as string;
+  }
+  return headers;
 }
 
-function withCors(response: Response): Response {
+function withCors(response: Response, origin: string | null): Response {
   const headers = new Headers(response.headers);
-  for (const [k, v] of Object.entries(corsHeaders())) headers.set(k, v);
+  for (const [k, v] of Object.entries(corsHeaders(origin))) headers.set(k, v);
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,

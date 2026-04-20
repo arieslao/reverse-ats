@@ -2,6 +2,8 @@
 
 **An AI-powered job search tool that works for you, not against you.**
 
+🌐 **Live site:** [reverse-ats.app](https://reverse-ats.app) · 💻 **Self-host:** see [Installation](#installation-guide-step-by-step) below
+
 Companies use Applicant Tracking Systems (ATS) to filter out candidates. Reverse ATS flips the script — it automatically finds job openings at 220+ companies, tells you which ones are the best fit for your skills, helps you track every application, and even writes personalized cover letters for you. All running privately on your own computer.
 
 ---
