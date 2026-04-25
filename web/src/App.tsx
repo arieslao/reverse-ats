@@ -1,27 +1,51 @@
-import { Navigation } from './components/Navigation'
-import { Hero } from './components/Hero'
-import { LiveCounter } from './components/LiveCounter'
-import { HowItWorks } from './components/HowItWorks'
-import { WhatYouGet } from './components/WhatYouGet'
-import { Pricing } from './components/Pricing'
-import { Transparency } from './components/Transparency'
-import { FAQ } from './components/FAQ'
-import { Footer } from './components/Footer'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+
+import RequireAuth from './components/auth/RequireAuth';
+import RequireTier from './components/auth/RequireTier';
+
+const Landing = lazy(() => import('./pages/marketing/Landing'));
+const AuthLayout = lazy(() => import('./layouts/AuthLayout'));
+const SignIn = lazy(() => import('./pages/auth/SignIn'));
+const SignUp = lazy(() => import('./pages/auth/SignUp'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+const MfaVerify = lazy(() => import('./pages/auth/MfaVerify'));
+const MfaSetup = lazy(() => import('./pages/auth/MfaSetup'));
+const AppIndex = lazy(() => import('./pages/app/Index'));
+const AdminIndex = lazy(() => import('./pages/admin/Index'));
+
+function Loading() {
+  return <div className="min-h-screen flex items-center justify-center text-sm opacity-60">Loading…</div>;
+}
 
 export function App() {
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navigation />
-      <main className="flex-1">
-        <Hero />
-        <LiveCounter />
-        <HowItWorks />
-        <WhatYouGet />
-        <Pricing />
-        <Transparency />
-        <FAQ />
-      </main>
-      <Footer />
-    </div>
-  )
+    <BrowserRouter>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+
+          <Route element={<AuthLayout />}>
+            <Route path="/sign-in" element={<SignIn />} />
+            <Route path="/sign-up" element={<SignUp />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/mfa-verify" element={<MfaVerify />} />
+            <Route path="/mfa-setup" element={<MfaSetup />} />
+          </Route>
+
+          <Route element={<RequireAuth />}>
+            <Route path="/app" element={<AppIndex />} />
+          </Route>
+
+          <Route element={<RequireTier tier="admin" />}>
+            <Route path="/admin" element={<AdminIndex />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
+  );
 }
