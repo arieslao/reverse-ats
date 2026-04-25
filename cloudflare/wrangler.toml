@@ -41,5 +41,11 @@ binding = "AI"
 [observability]
 enabled = true
 
+# Public Supabase project URL — already in the frontend bundle, not a secret.
+# JWT verification fetches `<SUPABASE_URL>/auth/v1/.well-known/jwks.json`.
+[vars]
+SUPABASE_URL = "REPLACE_WITH_YOUR_SUPABASE_PROJECT_URL"
+
 # Secrets (set via `wrangler secret put NAME`):
-#   INGEST_SECRET   — shared with GitHub Actions, gates POST /ingest
+#   INGEST_SECRET             — shared with GitHub Actions, gates POST /ingest
+#   SUPABASE_SERVICE_ROLE_KEY — Supabase admin key, used for /admin/* endpoints

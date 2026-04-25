@@ -12,7 +12,7 @@ export async function getUser(): Promise<AuthUser | null> {
   return await loadProfile(session.user.id, session.user.email ?? '');
 }
 
-async function loadProfile(userId: string, email: string): Promise<AuthUser> {
+export async function loadProfile(userId: string, email: string): Promise<AuthUser> {
   const { data, error } = await supabase
     .from('profiles')
     .select('id, email, tier')

@@ -19,6 +19,7 @@ import type {
 } from "./schema";
 import { preprocessJob, PREPROCESS_MODEL } from "./preprocess";
 import { embedStructuredJob, packVector, EMBEDDING_MODEL } from "./embed";
+import { handleAdmin } from "./admin";
 
 // How many jobs the scheduled handler preprocesses per 30-min cron tick.
 // 60/run × 48 runs/day = 2,880 jobs/day capacity — plenty of headroom for
@@ -45,6 +46,11 @@ const handler: ExportedHandler<Env> = {
     if (request.method === "GET" && url.pathname === "/health") {
       return withCors(await handleHealth(env), origin);
     }
+
+    // Admin (Supabase JWT-gated). handleAdmin returns null for non-admin paths.
+    const adminResponse = await handleAdmin(request, env);
+    if (adminResponse) return withCors(adminResponse, origin);
+
     return jsonResponse({ ok: false, error: "not found" }, 404);
   },
 
@@ -369,6 +375,7 @@ const ALLOWED_ORIGIN_EXACT = new Set([
   "https://reverse-ats.app",
   "https://www.reverse-ats.app",
   "http://localhost:5173",
+  "http://localhost:5174",
   "http://localhost:3000",
 ]);
 
@@ -386,8 +393,8 @@ function isAllowedOrigin(origin: string | null): boolean {
 
 function corsHeaders(origin: string | null): Record<string, string> {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };

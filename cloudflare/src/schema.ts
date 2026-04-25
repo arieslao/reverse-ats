@@ -5,6 +5,18 @@ export interface Env {
   DB: D1Database;
   AI: Ai;
   INGEST_SECRET: string;
+  // Supabase — public URL (also lives in the frontend bundle, set via [vars]).
+  SUPABASE_URL: string;
+  // Service-role key — set via `wrangler secret put SUPABASE_SERVICE_ROLE_KEY`.
+  // Used for admin operations (read all profiles, update tier, etc.).
+  SUPABASE_SERVICE_ROLE_KEY: string;
+}
+
+// Verified Supabase identity, derived from the JWT in Authorization header.
+export interface AuthedUser {
+  userId: string;
+  email: string;
+  tier: "free" | "sponsor" | "admin";
 }
 
 // Wire format the Python pipeline sends to POST /ingest.

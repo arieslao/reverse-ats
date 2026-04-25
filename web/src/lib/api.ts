@@ -1,9 +1,21 @@
 // Reads from the live Cloudflare Worker. Override with VITE_API_URL in
 // .env.local to point at a local Worker during development.
 
+import { supabase } from './supabase'
+
 const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ||
   'https://reverse-ats-ingest.aries-lao.workers.dev'
+
+/** Fetch with the current Supabase session JWT in the Authorization header. */
+async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession()
+  const headers = new Headers(init.headers)
+  if (session?.access_token) {
+    headers.set('Authorization', `Bearer ${session.access_token}`)
+  }
+  return fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' })
+}
 
 export interface Health {
   ok: true
@@ -44,4 +56,33 @@ export async function fetchRecentJobs(limit = 10): Promise<JobSummary[]> {
   } catch {
     return []
   }
+}
+
+// ─── Admin (requires admin tier) ──────────────────────────────────────────
+
+export type Tier = 'free' | 'sponsor' | 'admin'
+
+export interface AdminUser {
+  id: string
+  email: string
+  tier: Tier
+  created_at: string
+}
+
+export async function fetchAdminUsers(): Promise<AdminUser[]> {
+  const r = await authFetch('/admin/users')
+  if (!r.ok) throw new Error(`admin users fetch failed: ${r.status}`)
+  const data = await r.json()
+  return (data.users || []) as AdminUser[]
+}
+
+export async function updateUserTier(userId: string, tier: Tier): Promise<AdminUser> {
+  const r = await authFetch(`/admin/users/${userId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tier }),
+  })
+  if (!r.ok) throw new Error(`tier update failed: ${r.status}`)
+  const data = await r.json()
+  return data.user as AdminUser
 }
