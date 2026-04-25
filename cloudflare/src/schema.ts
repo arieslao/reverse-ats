@@ -5,6 +5,26 @@ export interface Env {
   DB: D1Database;
   AI: Ai;
   INGEST_SECRET: string;
+  RESEND_API_KEY: string;
+}
+
+// ─── Auth + admin types (matches migrations/0002_auth.sql) ──────────────────
+
+export type UserTier = "free" | "sponsor" | "admin";
+
+export interface User {
+  id: string;
+  email: string;
+  tier: UserTier;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface Session {
+  id: string;
+  user_id: string;
+  created_at: string;
+  expires_at: string;
 }
 
 // Wire format the Python pipeline sends to POST /ingest.

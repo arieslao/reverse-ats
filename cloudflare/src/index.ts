@@ -19,6 +19,17 @@ import type {
 } from "./schema";
 import { preprocessJob, PREPROCESS_MODEL } from "./preprocess";
 import { embedStructuredJob, packVector, EMBEDDING_MODEL } from "./embed";
+import {
+  handleAuthRequest,
+  handleAuthVerify,
+  handleAuthMe,
+  handleAuthLogout,
+} from "./auth";
+import {
+  handleAdminListUsers,
+  handleAdminPatchUser,
+  handleAdminDeleteUser,
+} from "./admin";
 
 // How many jobs the scheduled handler preprocesses per 30-min cron tick.
 // 60/run × 48 runs/day = 2,880 jobs/day capacity — plenty of headroom for
@@ -29,23 +40,59 @@ const handler: ExportedHandler<Env> = {
   async fetch(request, env, ctx): Promise<Response> {
     const url = new URL(request.url);
 
-    // CORS preflight — the marketing site (different origin) hits /health and
-    // /jobs from the browser. Permissive on read-only endpoints, strict on /ingest.
+    // CORS preflight — the marketing site (different origin) hits the worker
+    // for /health, /jobs, and /auth/* from the browser. Cookie-based auth
+    // requires credentials:'include', so the allowlist must echo the origin
+    // back exactly (never '*') and include Allow-Credentials.
     const origin = request.headers.get("Origin");
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
+    // /ingest is server-to-server (GitHub Actions → Worker, with bearer secret)
+    // so it doesn't need CORS at all.
     if (request.method === "POST" && url.pathname === "/ingest") {
       return handleIngest(request, env, ctx);
     }
+
+    // Public read-only.
     if (request.method === "GET" && url.pathname === "/jobs") {
       return withCors(await handleListJobs(request, env), origin);
     }
     if (request.method === "GET" && url.pathname === "/health") {
       return withCors(await handleHealth(env), origin);
     }
-    return jsonResponse({ ok: false, error: "not found" }, 404);
+
+    // Auth.
+    if (request.method === "POST" && url.pathname === "/auth/request") {
+      return withCors(await handleAuthRequest(request, env), origin);
+    }
+    if (request.method === "POST" && url.pathname === "/auth/verify") {
+      return withCors(await handleAuthVerify(request, env), origin);
+    }
+    if (request.method === "GET" && url.pathname === "/auth/me") {
+      return withCors(await handleAuthMe(request, env), origin);
+    }
+    if (request.method === "POST" && url.pathname === "/auth/logout") {
+      return withCors(await handleAuthLogout(request, env), origin);
+    }
+
+    // Admin (gated to tier='admin' inside the handlers).
+    if (request.method === "GET" && url.pathname === "/admin/users") {
+      return withCors(await handleAdminListUsers(request, env), origin);
+    }
+    const adminUserMatch = url.pathname.match(/^\/admin\/users\/([A-Za-z0-9-]+)$/);
+    if (adminUserMatch) {
+      const userId = adminUserMatch[1];
+      if (request.method === "PATCH") {
+        return withCors(await handleAdminPatchUser(request, env, userId), origin);
+      }
+      if (request.method === "DELETE") {
+        return withCors(await handleAdminDeleteUser(request, env, userId), origin);
+      }
+    }
+
+    return withCors(jsonResponse({ ok: false, error: "not found" }, 404), origin);
   },
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
@@ -386,13 +433,17 @@ function isAllowedOrigin(origin: string | null): boolean {
 
 function corsHeaders(origin: string | null): Record<string, string> {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
   };
   if (isAllowedOrigin(origin)) {
     headers["Access-Control-Allow-Origin"] = origin as string;
+    // Cookie-based auth: browser only sends/stores cookies cross-origin if the
+    // server explicitly opts in via this header AND the request used
+    // credentials:'include' on the fetch.
+    headers["Access-Control-Allow-Credentials"] = "true";
   }
   return headers;
 }
