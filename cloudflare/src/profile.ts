@@ -261,6 +261,25 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
     `## Candidate Resume\n\n${resume.slice(0, 6000)}\n\n` +
     `Recommend roles per the system instructions.`;
 
+  // Workers AI structured-output: pass a JSON schema and the runtime
+  // constrains the model so the output is always valid JSON of this shape.
+  const roleItem = {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      reasoning: { type: "string" },
+    },
+    required: ["title", "reasoning"],
+  };
+  const responseSchema = {
+    type: "object",
+    properties: {
+      current_fit: { type: "array", items: roleItem },
+      next_step: { type: "array", items: roleItem },
+    },
+    required: ["current_fit", "next_step"],
+  };
+
   let raw = "";
   try {
     const response = (await env.AI.run(SUGGEST_ROLES_MODEL, {
@@ -270,9 +289,7 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
       ],
       max_tokens: 2500,
       temperature: 0.2,
-      // Workers AI supports JSON mode for several Llama variants. If the
-      // model rejects this option it's silently ignored, so it's safe.
-      response_format: { type: "json_object" },
+      response_format: { type: "json_schema", json_schema: responseSchema },
     } as Parameters<typeof env.AI.run>[1])) as { response?: string };
     raw = (response.response || "").trim();
   } catch (err) {
@@ -288,7 +305,11 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
   if (!parsed || typeof parsed !== "object") {
     console.log(`[suggest-roles] parse failed. full raw:`, raw);
     return jsonResponse(
-      { ok: false, error: `Model returned unparseable response (${raw.length} chars). Try again.` },
+      {
+        ok: false,
+        error: `Model returned unparseable response (${raw.length} chars). Try again.`,
+        raw_preview: raw.slice(0, 800),
+      },
       502,
     );
   }
