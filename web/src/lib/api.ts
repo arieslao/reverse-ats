@@ -1,31 +1,38 @@
 // Reads from the live Cloudflare Worker. Override with VITE_API_URL in
 // .env.local to point at a local Worker during development.
 
-import { getAccessToken } from './supabase'
+import { getAccessToken, refreshAccessToken } from './supabase'
 
 const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ||
   'https://reverse-ats-ingest.aries-lao.workers.dev'
 
 /** Fetch with the cached Supabase JWT in the Authorization header.
- *  Reads the token synchronously from the in-memory cache (kept in sync by
- *  onAuthStateChange) — never calls supabase.auth.getSession(), which can
- *  deadlock against the auth processLock under contention. */
+ *  Reads the token from the in-memory cache (kept in sync by
+ *  onAuthStateChange). On 401, refreshes once and retries — so a long-open
+ *  session that crossed the JWT TTL self-heals instead of failing. */
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const method = init.method || 'GET'
   console.log(`[authFetch] start ${method} ${path}`)
-  const headers = new Headers(init.headers)
-  const token = getAccessToken()
-  console.log(`[authFetch] token present=${!!token}`)
-  if (token) headers.set('Authorization', `Bearer ${token}`)
-  try {
-    const res = await fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' })
-    console.log(`[authFetch] done ${method} ${path} → ${res.status}`)
-    return res
-  } catch (err) {
-    console.log(`[authFetch] error ${method} ${path}:`, err)
-    throw err
+  let res = await sendWithToken(method, path, init, getAccessToken())
+  if (res.status === 401) {
+    console.log(`[authFetch] 401 — refreshing token and retrying`)
+    const fresh = await refreshAccessToken()
+    if (fresh) res = await sendWithToken(method, path, init, fresh)
   }
+  console.log(`[authFetch] done ${method} ${path} → ${res.status}`)
+  return res
+}
+
+async function sendWithToken(
+  method: string,
+  path: string,
+  init: RequestInit,
+  token: string | null,
+): Promise<Response> {
+  const headers = new Headers(init.headers)
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  return fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' })
 }
 
 export interface Health {

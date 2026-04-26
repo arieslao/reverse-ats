@@ -52,3 +52,26 @@ supabase.auth.onAuthStateChange((_event, session) => {
 export function getAccessToken(): string | null {
   return cachedAccessToken;
 }
+
+// Force a session refresh and update the cache. Used by authFetch when the
+// API returns 401 — handles the case where autoRefreshToken silently failed
+// (most often: page open across the JWT TTL boundary, refresh stalled on the
+// auth lock). Refresh in flight is dedupe'd via inFlight to avoid kicking
+// off N concurrent refreshes if N parallel requests all hit 401.
+let inFlight: Promise<string | null> | null = null;
+export function refreshAccessToken(): Promise<string | null> {
+  if (inFlight) return inFlight;
+  inFlight = (async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error || !data.session) return null;
+      cachedAccessToken = data.session.access_token;
+      return cachedAccessToken;
+    } catch {
+      return null;
+    } finally {
+      inFlight = null;
+    }
+  })();
+  return inFlight;
+}
