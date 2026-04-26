@@ -214,11 +214,53 @@ export async function saveJob(jobId: string): Promise<void> {
   if (!r.ok) throw new Error(`save: ${r.status}`)
 }
 
-export async function generateCoverLetter(jobId: string): Promise<{ cover_letter: string }> {
+export interface UsageState {
+  used: number
+  remaining: number
+  limit: number
+}
+
+export interface CoverLetterResult {
+  cover_letter: string
+  tier?: Tier
+  usage?: UsageState
+}
+
+export async function generateCoverLetter(jobId: string): Promise<CoverLetterResult> {
   const r = await authFetch(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter`, { method: 'POST' })
-  const data = await r.json().catch(() => null) as { cover_letter?: string; error?: string } | null
-  if (!r.ok) throw new Error(data?.error || `cover-letter: ${r.status}`)
-  return { cover_letter: data?.cover_letter || '' }
+  const data = await r.json().catch(() => null) as {
+    cover_letter?: string
+    error?: string
+    tier?: Tier
+    usage?: UsageState
+  } | null
+  if (!r.ok) {
+    const err = new Error(data?.error || `cover-letter: ${r.status}`) as Error & {
+      status?: number
+      tier?: Tier
+      usage?: UsageState
+    }
+    err.status = r.status
+    err.tier = data?.tier
+    err.usage = data?.usage
+    throw err
+  }
+  return {
+    cover_letter: data?.cover_letter || '',
+    tier: data?.tier,
+    usage: data?.usage,
+  }
+}
+
+export interface UsageOverview {
+  tier: Tier
+  usage: Record<string, UsageState>
+}
+
+export async function fetchUsage(): Promise<UsageOverview> {
+  const r = await authFetch('/api/usage')
+  if (!r.ok) throw new Error(`usage: ${r.status}`)
+  return r.json()
 }
 
 export interface IndustryOption { id: string; label: string; count: number }

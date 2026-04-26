@@ -1,0 +1,81 @@
+// Per-user daily action limits, indexed by tier.
+//
+//   limits[action][tier] = max calls per UTC day
+//
+// Cover letter is the only AI-cost-bearing action that's tier-gated for now.
+// Adding a new action: extend LIMITS and call checkAndConsume() before the work.
+
+import type { AuthedUser, Env } from "./schema";
+
+export const LIMITS: Record<string, Record<AuthedUser["tier"], number>> = {
+  cover_letter: { free: 2, sponsor: 30, admin: 100 },
+};
+
+export function limitFor(action: keyof typeof LIMITS, tier: AuthedUser["tier"]): number {
+  return LIMITS[action]?.[tier] ?? 0;
+}
+
+function utcDay(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export interface UsageState {
+  ok: boolean;
+  used: number;
+  remaining: number;
+  limit: number;
+}
+
+/**
+ * Look up today's count for (user, action) without consuming. Returns the
+ * usage state for display in the UI.
+ */
+export async function readUsage(
+  env: Env,
+  userId: string,
+  action: keyof typeof LIMITS,
+  tier: AuthedUser["tier"],
+): Promise<UsageState> {
+  const limit = limitFor(action, tier);
+  const row = await env.DB.prepare(
+    `SELECT count FROM user_usage WHERE user_id = ? AND action = ? AND day = ?`,
+  )
+    .bind(userId, action, utcDay())
+    .first<{ count: number }>();
+  const used = row?.count ?? 0;
+  return { ok: used < limit, used, remaining: Math.max(0, limit - used), limit };
+}
+
+/**
+ * Atomically check + increment today's count. Returns ok=false (with current
+ * counts) if the limit is already reached, ok=true after consuming one.
+ */
+export async function checkAndConsume(
+  env: Env,
+  userId: string,
+  action: keyof typeof LIMITS,
+  tier: AuthedUser["tier"],
+): Promise<UsageState> {
+  const limit = limitFor(action, tier);
+  const day = utcDay();
+
+  // Read first to short-circuit when over.
+  const before = await env.DB.prepare(
+    `SELECT count FROM user_usage WHERE user_id = ? AND action = ? AND day = ?`,
+  )
+    .bind(userId, action, day)
+    .first<{ count: number }>();
+  const used = before?.count ?? 0;
+  if (used >= limit) {
+    return { ok: false, used, remaining: 0, limit };
+  }
+
+  await env.DB.prepare(
+    `INSERT INTO user_usage (user_id, action, day, count) VALUES (?, ?, ?, 1)
+     ON CONFLICT(user_id, action, day) DO UPDATE SET count = count + 1`,
+  )
+    .bind(userId, action, day)
+    .run();
+
+  return { ok: true, used: used + 1, remaining: limit - used - 1, limit };
+}

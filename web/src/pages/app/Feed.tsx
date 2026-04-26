@@ -11,6 +11,7 @@ import {
   type IndustryOption,
   type Job,
   type JobsQuery,
+  type UsageState,
 } from '../../lib/api';
 
 const PAGE_SIZE = 20;
@@ -24,7 +25,13 @@ export default function FeedPage() {
   const [error, setError] = useState<string | null>(null);
   const [industries, setIndustries] = useState<IndustryOption[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [coverLetter, setCoverLetter] = useState<{ jobId: string; text: string; loading: boolean } | null>(null);
+  const [coverLetter, setCoverLetter] = useState<{
+    jobId: string;
+    text: string;
+    loading: boolean;
+    usage?: UsageState;
+    capped?: boolean;
+  } | null>(null);
   const [scoring, setScoring] = useState(false);
   const [scoreNotice, setScoreNotice] = useState<string | null>(null);
 
@@ -83,9 +90,16 @@ export default function FeedPage() {
     setCoverLetter({ jobId, text: '', loading: true });
     try {
       const r = await generateCoverLetter(jobId);
-      setCoverLetter({ jobId, text: r.cover_letter, loading: false });
+      setCoverLetter({ jobId, text: r.cover_letter, loading: false, usage: r.usage });
     } catch (e) {
-      setCoverLetter({ jobId, text: e instanceof Error ? e.message : 'Failed', loading: false });
+      const err = e as Error & { status?: number; usage?: UsageState };
+      setCoverLetter({
+        jobId,
+        text: err.message || 'Failed',
+        loading: false,
+        usage: err.usage,
+        capped: err.status === 429,
+      });
     }
   };
 
@@ -334,7 +348,7 @@ function CoverLetterModal({
   onClose,
   jobTitle,
 }: {
-  state: { jobId: string; text: string; loading: boolean };
+  state: { jobId: string; text: string; loading: boolean; usage?: UsageState; capped?: boolean };
   onClose: () => void;
   jobTitle?: string;
 }) {
@@ -353,7 +367,12 @@ function CoverLetterModal({
             {jobTitle && <div className="text-xs text-[var(--color-text-secondary)]">{jobTitle}</div>}
           </div>
           <div className="flex items-center gap-2">
-            {!state.loading && state.text && (
+            {state.usage && (
+              <span className="text-xs text-[var(--color-text-tertiary)]">
+                {state.usage.remaining}/{state.usage.limit} left today
+              </span>
+            )}
+            {!state.loading && state.text && !state.capped && (
               <button onClick={copyToClipboard} className="text-xs px-3 h-8 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] cursor-pointer">
                 Copy
               </button>
@@ -366,6 +385,16 @@ function CoverLetterModal({
         <div className="p-4 overflow-y-auto flex-1">
           {state.loading ? (
             <p className="text-sm text-[var(--color-text-secondary)]">Generating… (~10–20s)</p>
+          ) : state.capped ? (
+            <div className="space-y-3">
+              <p className="text-sm">{state.text}</p>
+              <a
+                href="/#pricing"
+                className="inline-block text-xs px-3 h-8 leading-8 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] cursor-pointer"
+              >
+                Upgrade to Sponsor
+              </a>
+            </div>
           ) : (
             <pre className="text-sm whitespace-pre-wrap font-sans">{state.text}</pre>
           )}

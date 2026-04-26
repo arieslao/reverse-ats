@@ -14,24 +14,24 @@ export function Pricing() {
       className="px-5 sm:px-8 py-24 sm:py-32"
       style={{ background: 'var(--color-bg-section)' }}
     >
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <SectionHeader
           eyebrow="Pricing"
-          title="Free if you self-host. $10/mo if you don't want to."
-          subtitle="That's the whole price page. No tiers. No Pro upsell. No surprise charges."
+          title="Free to start. $10/mo if you want unlimited cover letters."
+          subtitle="Free hosted account gets the full app. Sponsor tier just bumps the AI cover-letter limit so we don't go bankrupt."
         />
 
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-5">
           <PricingCard
             name="Self-host"
             price="Free"
             priceSubtext="MIT licensed, forever"
-            description="Run it on your own laptop. Your data never leaves your machine. Best for privacy-conscious folks comfortable with a terminal."
+            description="Run it on your own laptop. Your data never leaves your machine. Best for the terminal-comfortable."
             features={[
               'Every feature, no limits',
-              'Use a free local AI (Ollama) or your own API key',
+              'Use free local AI (Ollama) or your own API key',
               'Your data, your computer, your rules',
-              'About a 10-minute setup, walked through step by step',
+              '~10 minute setup',
             ]}
             cta="View install guide"
             ctaHref="https://github.com/arieslao/reverse-ats#installation-guide-step-by-step"
@@ -39,17 +39,34 @@ export function Pricing() {
           />
 
           <PricingCard
-            name="Hosted"
+            name="Hosted Free"
+            price="$0"
+            priceSubtext="sign up, no card required"
+            description="The hosted app, with a small daily cap on AI cover letters. Everything else is unlimited."
+            features={[
+              'Unlimited job feed + filters',
+              'Unlimited saved jobs + pipeline',
+              'AI role suggestions from your resume',
+              'AI match scoring on every job',
+              '2 AI cover letters per day',
+            ]}
+            cta="Sign up free"
+            ctaHref="/sign-up"
+            primary={false}
+          />
+
+          <PricingCard
+            name="Hosted Sponsor"
             price="$10"
             priceSubtext="per month, cancel anytime"
-            description="We run it for you. Sign in with GitHub. Your data lives encrypted on Cloudflare's infrastructure, never sold. For folks who want it to just work."
+            description="Same hosted app, generous AI limits. Supports the project so we can keep the free tier free."
             features={[
-              'Every feature, same as self-host',
-              'No setup. No terminal. No Ollama install.',
-              'Sign in with GitHub. You\'re in.',
-              'Cancel anytime. Your data exports as JSON.',
+              'Everything in Hosted Free',
+              '30 AI cover letters per day',
+              'Priority support',
+              'Cancel anytime, data exports as JSON',
             ]}
-            cta="Reserve your spot — $10/mo"
+            cta="Become a sponsor — $10/mo"
             ctaHref="https://github.com/sponsors/arieslao"
             primary
             badge="Launching soon"

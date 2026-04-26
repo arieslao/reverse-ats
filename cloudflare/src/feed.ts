@@ -17,7 +17,8 @@
 //   POST /api/scoring/rescore            — score all saved+feed jobs vs. profile
 
 import type { Env } from "./schema";
-import { verifyRequest } from "./supabase-auth";
+import { fetchTier, verifyRequest } from "./supabase-auth";
+import { LIMITS, checkAndConsume, limitFor, readUsage } from "./usage";
 
 const PIPELINE_STAGES = new Set([
   "saved",
@@ -40,6 +41,7 @@ export async function handleFeedAndPipeline(request: Request, env: Env): Promise
     !path.startsWith("/api/feed/") &&
     !path.startsWith("/api/pipeline") &&
     path !== "/api/analytics" &&
+    path !== "/api/usage" &&
     !path.startsWith("/api/scoring/")
   ) {
     return null;
@@ -81,8 +83,24 @@ export async function handleFeedAndPipeline(request: Request, env: Env): Promise
   if (path === "/api/analytics" && request.method === "GET") return analytics(env, userId);
   if (path === "/api/scoring/stats" && request.method === "GET") return scoringStats(env, userId);
   if (path === "/api/scoring/rescore" && request.method === "POST") return rescore(env, userId, url);
+  if (path === "/api/usage" && request.method === "GET") return usageOverview(env, userId);
 
   return jsonResponse({ ok: false, error: "not found" }, 404);
+}
+
+// ─── /api/usage ─────────────────────────────────────────────────────────────
+// Tier limits + today's counts. UI uses this to show "X left today" and the
+// upgrade CTA when at cap.
+
+async function usageOverview(env: Env, userId: string): Promise<Response> {
+  const tier = await fetchTier(env, userId);
+  const actions = Object.keys(LIMITS);
+  const states: Record<string, { used: number; remaining: number; limit: number }> = {};
+  for (const a of actions) {
+    const s = await readUsage(env, userId, a as keyof typeof LIMITS, tier);
+    states[a] = { used: s.used, remaining: s.remaining, limit: s.limit };
+  }
+  return jsonResponse({ ok: true, tier, usage: states }, 200);
 }
 
 // ─── /api/jobs (list) ───────────────────────────────────────────────────────
@@ -638,6 +656,24 @@ async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
 const COVER_LETTER_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 async function coverLetter(env: Env, userId: string, jobId: string): Promise<Response> {
+  // Tier-gated daily limit before any work.
+  const tier = await fetchTier(env, userId);
+  const usage = await checkAndConsume(env, userId, "cover_letter", tier);
+  if (!usage.ok) {
+    return jsonResponse(
+      {
+        ok: false,
+        error:
+          tier === "free"
+            ? `You've used your ${usage.limit} free cover letters for today. Upgrade for ${limitFor("cover_letter", "sponsor")} per day.`
+            : `You've reached your ${usage.limit} cover letters for today. Resets at UTC midnight.`,
+        tier,
+        usage: { used: usage.used, remaining: 0, limit: usage.limit },
+      },
+      429,
+    );
+  }
+
   const profile = await env.DB.prepare(
     `SELECT resume_text FROM user_profiles WHERE user_id = ?`,
   )
@@ -645,6 +681,12 @@ async function coverLetter(env: Env, userId: string, jobId: string): Promise<Res
     .first<{ resume_text: string | null }>();
   const resume = (profile?.resume_text || "").trim();
   if (resume.length < 50) {
+    // Refund the used count if we couldn't actually generate.
+    await env.DB.prepare(
+      `UPDATE user_usage SET count = MAX(0, count - 1) WHERE user_id = ? AND action = ? AND day = ?`,
+    )
+      .bind(userId, "cover_letter", new Date().toISOString().slice(0, 10))
+      .run();
     return jsonResponse({ ok: false, error: "Save your resume first." }, 400);
   }
 
@@ -686,7 +728,16 @@ async function coverLetter(env: Env, userId: string, jobId: string): Promise<Res
     } as Parameters<typeof env.AI.run>[1])) as { response?: string };
     const text = (response.response || "").trim();
     if (!text) return jsonResponse({ ok: false, error: "empty model response" }, 502);
-    return jsonResponse({ ok: true, cover_letter: text, model: COVER_LETTER_MODEL }, 200);
+    return jsonResponse(
+      {
+        ok: true,
+        cover_letter: text,
+        model: COVER_LETTER_MODEL,
+        tier,
+        usage: { used: usage.used, remaining: usage.remaining, limit: usage.limit },
+      },
+      200,
+    );
   } catch (err) {
     return jsonResponse(
       { ok: false, error: `LLM call failed: ${err instanceof Error ? err.message : String(err)}` },

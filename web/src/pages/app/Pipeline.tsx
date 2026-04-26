@@ -8,6 +8,7 @@ import {
   updatePipelineEntry,
   type PipelineEntry,
   type PipelineStage,
+  type UsageState,
 } from '../../lib/api';
 
 const STAGES: { id: PipelineStage; label: string }[] = [
@@ -27,7 +28,14 @@ export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
-  const [coverLetter, setCoverLetter] = useState<{ jobId: string; jobTitle: string; text: string; loading: boolean } | null>(null);
+  const [coverLetter, setCoverLetter] = useState<{
+    jobId: string;
+    jobTitle: string;
+    text: string;
+    loading: boolean;
+    usage?: UsageState;
+    capped?: boolean;
+  } | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -73,9 +81,17 @@ export default function PipelinePage() {
     setCoverLetter({ jobId, jobTitle, text: '', loading: true });
     try {
       const r = await generateCoverLetter(jobId);
-      setCoverLetter({ jobId, jobTitle, text: r.cover_letter, loading: false });
+      setCoverLetter({ jobId, jobTitle, text: r.cover_letter, loading: false, usage: r.usage });
     } catch (e) {
-      setCoverLetter({ jobId, jobTitle, text: e instanceof Error ? e.message : 'Failed', loading: false });
+      const err = e as Error & { status?: number; usage?: UsageState };
+      setCoverLetter({
+        jobId,
+        jobTitle,
+        text: err.message || 'Failed',
+        loading: false,
+        usage: err.usage,
+        capped: err.status === 429,
+      });
     }
   };
 
@@ -210,7 +226,7 @@ function CoverLetterModal({
   state,
   onClose,
 }: {
-  state: { jobId: string; jobTitle: string; text: string; loading: boolean };
+  state: { jobId: string; jobTitle: string; text: string; loading: boolean; usage?: UsageState; capped?: boolean };
   onClose: () => void;
 }) {
   const copy = () => navigator.clipboard.writeText(state.text).catch(() => {});
@@ -223,7 +239,12 @@ function CoverLetterModal({
             <div className="text-xs text-[var(--color-text-secondary)]">{state.jobTitle}</div>
           </div>
           <div className="flex items-center gap-2">
-            {!state.loading && state.text && (
+            {state.usage && (
+              <span className="text-xs text-[var(--color-text-tertiary)]">
+                {state.usage.remaining}/{state.usage.limit} left today
+              </span>
+            )}
+            {!state.loading && state.text && !state.capped && (
               <button onClick={copy} className="text-xs px-3 h-8 rounded-md border border-[var(--color-border-muted)] cursor-pointer">Copy</button>
             )}
             <button onClick={onClose} className="text-xs px-3 h-8 rounded-md cursor-pointer">Close</button>
@@ -232,6 +253,16 @@ function CoverLetterModal({
         <div className="p-4 overflow-y-auto flex-1">
           {state.loading ? (
             <p className="text-sm text-[var(--color-text-secondary)]">Generating…</p>
+          ) : state.capped ? (
+            <div className="space-y-3">
+              <p className="text-sm">{state.text}</p>
+              <a
+                href="/#pricing"
+                className="inline-block text-xs px-3 h-8 leading-8 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] cursor-pointer"
+              >
+                Upgrade to Sponsor
+              </a>
+            </div>
           ) : (
             <pre className="text-sm whitespace-pre-wrap font-sans">{state.text}</pre>
           )}
