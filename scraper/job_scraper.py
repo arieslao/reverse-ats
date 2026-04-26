@@ -11,11 +11,10 @@ import json
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import requests
-from datetime import timezone
 
 # ---------------------------------------------------------------------------
 # Company Registry
@@ -25,7 +24,7 @@ COMPANIES = [
     # FAANG / Big Tech
     {"name": "Netflix",      "ats": "greenhouse", "slug": "netflix",      "category": "big_tech"},
     {"name": "NVIDIA",       "ats": "workday",    "slug": "nvidia",        "category": "big_tech",
-     "workday_url": "https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobs"},
+     "workday": {"tenant": "nvidia", "host": "wd5", "site": "NVIDIAExternalCareerSite"}},
     {"name": "Google",       "ats": "custom",     "slug": "google",        "category": "big_tech",
      "careers_url": "https://careers.google.com/jobs/results/?category=DATA_CENTER_OPERATIONS&category=DEVELOPER_RELATIONS&category=HARDWARE_ENGINEERING&category=INFORMATION_TECHNOLOGY&category=MANUFACTURING_SUPPLY_CHAIN&category=NETWORK_ENGINEERING&category=PRODUCT_MANAGEMENT&category=PROGRAM_MANAGEMENT&category=SOFTWARE_ENGINEERING&category=TECHNICAL_INFRASTRUCTURE_ENGINEERING&category=TECHNICAL_WRITING&category=USER_EXPERIENCE&employment_type=FULL_TIME"},
     {"name": "Apple",        "ats": "custom",     "slug": "apple",         "category": "big_tech",
@@ -105,6 +104,21 @@ COMPANIES = [
      "careers_url": "https://www.jumptrading.com/careers/"},
     {"name": "Hudson River",     "ats": "custom", "slug": "hrt",          "category": "quant",
      "careers_url": "https://www.hudsonrivertrading.com/careers/"},
+
+    # Workday tenants — Fortune-500-scale employers using the public CXS API.
+    # Tenant slugs / site names verified against each careers page bundle.
+    {"name": "CVS Health",   "ats": "workday", "slug": "cvshealth",   "category": "healthtech",
+     "workday": {"tenant": "cvshealth",  "host": "wd1",  "site": "CVS_Health_Careers"}},
+    {"name": "Humana",       "ats": "workday", "slug": "humana",      "category": "healthtech",
+     "workday": {"tenant": "humana",     "host": "wd5",  "site": "Humana_External_Career_Site"}},
+    {"name": "Walmart",      "ats": "workday", "slug": "walmart",     "category": "big_tech",
+     "workday": {"tenant": "walmart",    "host": "wd5",  "site": "WalmartExternal"}},
+    {"name": "Disney",       "ats": "workday", "slug": "disney",      "category": "big_tech",
+     "workday": {"tenant": "disney",     "host": "wd5",  "site": "disneycareer"}},
+    {"name": "Citi",         "ats": "workday", "slug": "citi",        "category": "fintech",
+     "workday": {"tenant": "citi",       "host": "wd5",  "site": "2"}},
+    {"name": "Salesforce",   "ats": "workday", "slug": "salesforce",  "category": "ai_tech",
+     "workday": {"tenant": "salesforce", "host": "wd12", "site": "External_Career_Site"}},
 ]
 
 # ---------------------------------------------------------------------------
@@ -373,51 +387,206 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
     return jobs
 
 
+# Workday CXS pagination. The endpoint caps `limit` at 20 — anything higher
+# returns 400 — so we paginate. 15 × 20 = 300 jobs/tenant: the title filter
+# prunes ~95% of those, and roles are returned newest-first so further pages
+# get rapidly diminishing returns. Half-second sleep between pages is courtesy.
+_WORKDAY_PAGE_SIZE = 20
+_WORKDAY_MAX_PAGES = 15
+_WORKDAY_PAGE_SLEEP = 0.5
+
+
+def _workday_cxs_url(company: dict) -> Optional[str]:
+    """Resolve a tenant's CXS jobs endpoint from registry config.
+
+    Preferred shape:
+        workday: { tenant: "nvidia", host: "wd5", site: "NVIDIAExternalCareerSite" }
+
+    Backwards-compatible shape (legacy):
+        workday_url: "https://nvidia.wd5.myworkdayjobs.com/.../<site>/jobs"
+        — we parse it to find tenant/host/site.
+    """
+    cfg = company.get("workday")
+    if isinstance(cfg, dict):
+        tenant = cfg.get("tenant")
+        host = cfg.get("host", "wd5")
+        site = cfg.get("site")
+        if tenant and site:
+            return f"https://{tenant}.{host}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs"
+
+    legacy = company.get("workday_url", "")
+    if legacy:
+        # e.g. https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/jobs
+        try:
+            host_part = legacy.split("//", 1)[1].split("/", 1)[0]  # nvidia.wd5.myworkdayjobs.com
+            tenant, host, *_ = host_part.split(".")
+            path = legacy.split("myworkdayjobs.com", 1)[1].rstrip("/")
+            segments = [s for s in path.split("/") if s and s != "jobs"]
+            site = next((s for s in reversed(segments) if not s.startswith("en-")), None)
+            if tenant and site:
+                return f"https://{tenant}.{host}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs"
+        except (IndexError, ValueError):
+            pass
+    return None
+
+
+def _parse_workday_posted_on(value: str) -> Optional[str]:
+    """Convert Workday's relative `postedOn` strings to a UTC ISO date.
+
+    Examples:
+        "Posted Today"          → today
+        "Posted Yesterday"      → yesterday
+        "Posted 7 Days Ago"     → today - 7d
+        "Posted 30+ Days Ago"   → today - 30d  (floor; the value is "at least N")
+
+    Resolution is intentionally one-day — Workday doesn't share the actual
+    timestamp on these tenants. Returning None when we can't parse keeps
+    `posted_at` honest rather than polluted with garbage.
+    """
+    if not value:
+        return None
+    s = value.strip().lower().removeprefix("posted ").strip()
+    today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    if s in ("today", "just posted"):
+        return today.isoformat().replace("+00:00", "Z")
+    if s == "yesterday":
+        return (today - timedelta(days=1)).isoformat().replace("+00:00", "Z")
+    # "7 Days Ago" / "30+ Days Ago" — extract the leading integer
+    digits = ""
+    for ch in s:
+        if ch.isdigit():
+            digits += ch
+        elif digits:
+            break
+    if digits:
+        try:
+            n = int(digits)
+            if 0 <= n <= 365:
+                return (today - timedelta(days=n)).isoformat().replace("+00:00", "Z")
+        except ValueError:
+            pass
+    return None
+
+
+def _fetch_workday_job_detail(api_root: str, external_path: str) -> Optional[dict]:
+    """Best-effort fetch of the full job posting body. Workday exposes
+    `/wday/cxs/{tenant}/{site}/job/{path}` for individual postings, returning
+    `jobPostingInfo.jobDescription` (HTML). Failure is non-fatal; the listing
+    row itself is enough for the feed."""
+    try:
+        # api_root is …/wday/cxs/{tenant}/{site}/jobs ; strip trailing /jobs.
+        detail_url = api_root.rsplit("/", 1)[0] + "/job" + external_path
+        return _get(detail_url)
+    except Exception:
+        return None
+
+
+_WORKDAY_HEADERS = {
+    "User-Agent": "AriesLabs-JobScraper/1.0",
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+}
+
+
+def _workday_paginate(
+    api_url: str,
+    search_text: str,
+    company_name: str,
+    legacy_url: str,
+    seen_paths: set[str],
+    max_pages: int = _WORKDAY_MAX_PAGES,
+) -> list[dict]:
+    """One pass through a Workday CXS endpoint with the given searchText.
+
+    Skips postings whose `externalPath` is already in `seen_paths` (the
+    caller's dedupe set). Returns IngestJob-shaped dicts and mutates
+    `seen_paths` in place so subsequent passes don't re-emit the same
+    role under a different query."""
+    site_root = api_url.split("/wday/cxs/")[0]
+    out: list[dict] = []
+    advertised_total = 0
+
+    for page in range(max_pages):
+        offset = page * _WORKDAY_PAGE_SIZE
+        try:
+            resp = requests.post(
+                api_url,
+                json={
+                    "appliedFacets": {},
+                    "limit": _WORKDAY_PAGE_SIZE,
+                    "offset": offset,
+                    "searchText": search_text,
+                },
+                headers=_WORKDAY_HEADERS,
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception:
+            break
+
+        postings = data.get("jobPostings") or []
+        if not postings:
+            break
+
+        for j in postings:
+            external_path = j.get("externalPath", "")
+            if external_path and external_path in seen_paths:
+                continue
+            seen_paths.add(external_path)
+            location = j.get("locationsText", "") or ""
+            posted_at = _parse_workday_posted_on(j.get("postedOn", ""))
+            # When we found this role via the remote-tagged search, trust
+            # remote=True even if the location string doesn't contain a
+            # keyword Workday's index thought was a remote match.
+            is_remote = _is_remote(location) or bool(search_text)
+            out.append({
+                "title": j.get("title", ""),
+                "location": _normalize_location(location),
+                "url": f"{site_root}{external_path}" if external_path else legacy_url,
+                "department": "",  # Workday doesn't expose this on the listing
+                "remote": is_remote,
+                "description_snippet": "",  # filled by Workers AI preprocess
+                "description_full": "",
+                "posted_at": posted_at,
+                "company": company_name,
+            })
+
+        if page == 0:
+            advertised_total = data.get("total") or 0
+        if advertised_total and len(out) >= advertised_total:
+            break
+        if len(postings) < _WORKDAY_PAGE_SIZE:
+            break
+        time.sleep(_WORKDAY_PAGE_SLEEP)
+
+    return out
+
+
 def fetch_workday(company: dict, company_name: str) -> list[dict]:
-    """
-    Workday doesn't have a clean public API. We attempt the standard
-    REST endpoint pattern but fall back gracefully.
-    """
-    base_url = company.get("workday_url", "")
-    if not base_url:
+    """Two-pass pull from a Workday tenant via the CXS POST endpoint.
+
+    Pass 1: `searchText="remote"` — captures WFH-friendly roles first so we
+            never miss a remote job to the per-tenant pagination cap, even
+            on huge tenants like CVS Health (15k+ listings).
+    Pass 2: `searchText=""`   — fills any remaining capacity with the
+            general newest-first listing so onsite/hybrid tech-metro roles
+            (NVIDIA Santa Clara, Salesforce SF) still come through.
+
+    Both passes share a `seen_paths` set so the same job never appears
+    twice. Each pass is capped at _WORKDAY_MAX_PAGES; in practice most
+    tenants have far fewer than 300 remote postings, so the second pass
+    runs at full budget on tenants where it matters most."""
+    api_url = _workday_cxs_url(company)
+    if not api_url:
         return []
 
-    # Workday REST search endpoint (undocumented but public)
-    api_url = base_url.rstrip("/") + "?format=json"
-    data = _get(api_url)
-    if not data:
-        return [{
-            "title": "Visit careers page directly",
-            "location": "See careers page",
-            "url": base_url,
-            "department": "",
-            "remote": False,
-            "description_snippet": f"Workday API not accessible. Visit: {base_url}",
-            "company": company_name,
-            "_custom": True,
-        }]
+    legacy_url = company.get("workday_url") or api_url.split("/wday/cxs/")[0]
+    seen_paths: set[str] = set()
 
-    job_postings = data.get("jobPostings", [])
-    jobs = []
-    for j in job_postings:
-        title = j.get("title", "")
-        location = j.get("locationsText", "") or j.get("primaryLocation", {}).get("descriptor", "")
-        # Workday returns `postedOn` as a relative string ("Posted Today",
-        # "Posted 7 Days Ago"). It also exposes a `startDate` on some
-        # tenants — prefer that when present and parseable; otherwise leave
-        # posted_at null rather than store unreliable relative text.
-        posted_at = _to_iso_z(j.get("startDate") or j.get("postedOn"))
-        jobs.append({
-            "title": title,
-            "location": _normalize_location(location),
-            "url": j.get("externalUrl", base_url),
-            "department": j.get("jobFamilyGroup", {}).get("descriptor", "") if isinstance(j.get("jobFamilyGroup"), dict) else "",
-            "remote": _is_remote(location),
-            "description_snippet": j.get("briefDescription", "")[:500],
-            "posted_at": posted_at,
-            "company": company_name,
-        })
-    return jobs
+    remote_jobs = _workday_paginate(api_url, "remote", company_name, legacy_url, seen_paths)
+    general_jobs = _workday_paginate(api_url, "", company_name, legacy_url, seen_paths)
+    return remote_jobs + general_jobs
 
 
 def fetch_custom(company: dict, company_name: str) -> list[dict]:
