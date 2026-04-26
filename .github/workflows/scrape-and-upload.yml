@@ -48,6 +48,12 @@ jobs:
           CF_INGEST_SECRET: ${{ secrets.CF_INGEST_SECRET }}
           # Use a temp DB inside the runner — disposable, just for one run.
           REVERSE_ATS_DB_PATH: /tmp/scrape-runner.db
+          # Workday's Akamai edge soft-blocks GitHub Actions IP ranges
+          # (200 OK with empty results). The Workday lane is scraped from
+          # GX10 instead via scripts/scrape_workday_gx10.py and pushed to
+          # the same /ingest endpoint. This flag tells pipeline.py to skip
+          # Workday tenants here so we don't waste minutes on silent zeroes.
+          SKIP_WORKDAY: "true"
         run: |
           cd backend
           python pipeline.py --skip-score --push-to-d1

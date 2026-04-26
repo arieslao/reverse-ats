@@ -21,6 +21,7 @@ Usage:
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -139,6 +140,20 @@ def run_pipeline(
             target_companies.append(entry)
     else:
         target_companies = [c for c in COMPANIES if not categories or c["category"] in categories]
+
+    # Skip Workday tenants when running in an environment that's soft-blocked
+    # by Akamai (GitHub Actions IP ranges return 200 OK with empty postings).
+    # The companion script `scripts/scrape_workday_gx10.py` handles the
+    # Workday lane from a residential IP and POSTs to the same /ingest.
+    if os.environ.get("SKIP_WORKDAY", "").lower() in ("1", "true", "yes"):
+        skipped = sum(1 for c in target_companies if c.get("ats") == "workday")
+        target_companies = [c for c in target_companies if c.get("ats") != "workday"]
+        if skipped:
+            logger.info(
+                "SKIP_WORKDAY=true — skipping %d Workday tenant(s); "
+                "they are scraped from GX10 (residential IP) instead",
+                skipped,
+            )
 
     _print_header(len(target_companies))
 
