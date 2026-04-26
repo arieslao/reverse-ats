@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, processLock } from '@supabase/supabase-js';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
@@ -7,7 +7,20 @@ if (!SUPABASE_URL) {
   console.warn('[supabase] VITE_SUPABASE_URL not set — auth will not work');
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// processLock = in-tab lock instead of the cross-tab Web Locks API.
+// Web Locks cause `NavigatorLockAcquireTimeoutError` when concurrent auth
+// operations race for the token (e.g. signInWithPassword + the SIGNED_IN
+// event handler firing loadProfile at the same moment). For a single-tab
+// SPA the cross-tab coordination is unnecessary and the in-tab lock is
+// the Supabase-recommended choice.
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    lock: processLock,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 export type Tier = 'free' | 'sponsor' | 'admin';
 
