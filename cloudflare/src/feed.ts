@@ -87,6 +87,10 @@ export async function handleFeedAndPipeline(request: Request, env: Env): Promise
     if (request.method === "PUT") return updatePipeline(request, env, userId, id);
     if (request.method === "DELETE") return deletePipeline(env, userId, id);
   }
+  const evtMatch = path.match(/^\/api\/pipeline\/(\d+)\/events$/);
+  if (evtMatch && request.method === "GET") {
+    return listPipelineEvents(env, userId, parseInt(evtMatch[1], 10));
+  }
 
   if (path === "/api/analytics" && request.method === "GET") return analytics(env, userId);
   if (path === "/api/scoring/stats" && request.method === "GET") return scoringStats(env, userId);
@@ -289,7 +293,7 @@ async function saveJobToPipeline(env: Env, userId: string, jobId: string): Promi
   }
 
   const now = new Date().toISOString();
-  await env.DB.prepare(
+  const inserted = await env.DB.prepare(
     `INSERT INTO user_pipeline (user_id, job_id, stage, created_at, updated_at)
      VALUES (?, ?, 'saved', ?, ?)
      ON CONFLICT(user_id, job_id) DO NOTHING`,
@@ -300,7 +304,12 @@ async function saveJobToPipeline(env: Env, userId: string, jobId: string): Promi
     `SELECT * FROM user_pipeline WHERE user_id = ? AND job_id = ?`,
   )
     .bind(userId, jobId)
-    .first();
+    .first<{ id: number }>();
+
+  // Log the initial 'saved' event only on first insert (changes > 0 means we actually inserted).
+  if (row && inserted.meta.changes > 0) {
+    await logPipelineEvent(env, userId, row.id, null, "saved", null, now);
+  }
   return jsonResponse({ ok: true, entry: row }, 200);
 }
 
@@ -424,6 +433,13 @@ async function createPipeline(request: Request, env: Env, userId: string): Promi
   const exists = await env.DB.prepare(`SELECT 1 FROM jobs WHERE id = ?`).bind(jobId).first();
   if (!exists) return jsonResponse({ ok: false, error: "job not found" }, 404);
 
+  // Capture the prior stage (if any) so we can log a transition event.
+  const prior = await env.DB.prepare(
+    `SELECT id, stage FROM user_pipeline WHERE user_id = ? AND job_id = ?`,
+  )
+    .bind(userId, jobId)
+    .first<{ id: number; stage: string }>();
+
   await env.DB.prepare(
     `INSERT INTO user_pipeline (user_id, job_id, stage, notes, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?)
@@ -437,7 +453,15 @@ async function createPipeline(request: Request, env: Env, userId: string): Promi
        JOIN jobs j ON j.id = p.job_id WHERE p.user_id = ? AND p.job_id = ?`,
   )
     .bind(userId, jobId)
-    .first();
+    .first<{ id: number }>();
+
+  if (row) {
+    if (!prior) {
+      await logPipelineEvent(env, userId, row.id, null, stage, body.notes || null, now);
+    } else if (prior.stage !== stage) {
+      await logPipelineEvent(env, userId, row.id, prior.stage, stage, body.notes || null, now);
+    }
+  }
   return jsonResponse({ ok: true, entry: row }, 200);
 }
 
@@ -451,11 +475,21 @@ async function updatePipeline(request: Request, env: Env, userId: string, id: nu
 
   const sets: string[] = [];
   const vals: (string | number | null)[] = [];
+  let stageTransition: { from: string; to: string; note: string | null } | null = null;
 
   if ("stage" in body) {
     const s = body.stage;
     if (typeof s !== "string" || !PIPELINE_STAGES.has(s)) {
       return jsonResponse({ ok: false, error: "invalid stage" }, 400);
+    }
+    // Look up current stage so we can decide whether to log an event.
+    const prior = await env.DB.prepare(
+      `SELECT stage FROM user_pipeline WHERE id = ? AND user_id = ?`,
+    )
+      .bind(id, userId)
+      .first<{ stage: string }>();
+    if (prior && prior.stage !== s) {
+      stageTransition = { from: prior.stage, to: s, note: typeof body.notes === "string" ? body.notes : null };
     }
     sets.push("stage = ?");
     vals.push(s);
@@ -511,6 +545,18 @@ async function updatePipeline(request: Request, env: Env, userId: string, id: nu
 
   if (result.meta.changes === 0) return jsonResponse({ ok: false, error: "not found" }, 404);
 
+  if (stageTransition) {
+    await logPipelineEvent(
+      env,
+      userId,
+      id,
+      stageTransition.from,
+      stageTransition.to,
+      stageTransition.note,
+      new Date().toISOString(),
+    );
+  }
+
   const row = await env.DB.prepare(
     `SELECT p.*, j.company, j.title, j.url, j.location FROM user_pipeline p
        JOIN jobs j ON j.id = p.job_id WHERE p.id = ? AND p.user_id = ?`,
@@ -518,6 +564,45 @@ async function updatePipeline(request: Request, env: Env, userId: string, id: nu
     .bind(id, userId)
     .first();
   return jsonResponse({ ok: true, entry: row }, 200);
+}
+
+// ─── /api/pipeline/:id/events ──────────────────────────────────────────────
+
+async function listPipelineEvents(env: Env, userId: string, pipelineId: number): Promise<Response> {
+  // Confirm the pipeline row belongs to this user before exposing events.
+  const owned = await env.DB.prepare(
+    `SELECT 1 FROM user_pipeline WHERE id = ? AND user_id = ?`,
+  )
+    .bind(pipelineId, userId)
+    .first();
+  if (!owned) return jsonResponse({ ok: false, error: "not found" }, 404);
+
+  const rows = await env.DB.prepare(
+    `SELECT id, pipeline_id, from_stage, to_stage, note, created_at
+       FROM pipeline_events
+      WHERE pipeline_id = ? AND user_id = ?
+      ORDER BY created_at ASC`,
+  )
+    .bind(pipelineId, userId)
+    .all();
+  return jsonResponse({ ok: true, events: rows.results || [] }, 200);
+}
+
+async function logPipelineEvent(
+  env: Env,
+  userId: string,
+  pipelineId: number,
+  fromStage: string | null,
+  toStage: string,
+  note: string | null,
+  createdAt: string,
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO pipeline_events (pipeline_id, user_id, from_stage, to_stage, note, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(pipelineId, userId, fromStage, toStage, note, createdAt)
+    .run();
 }
 
 async function deletePipeline(env: Env, userId: string, id: number): Promise<Response> {

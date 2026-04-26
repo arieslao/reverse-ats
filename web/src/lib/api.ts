@@ -335,6 +335,22 @@ export async function deletePipelineEntry(id: number): Promise<void> {
   if (!r.ok) throw new Error(`pipeline delete: ${r.status}`)
 }
 
+export interface PipelineEvent {
+  id: number
+  pipeline_id: number
+  from_stage: PipelineStage | null
+  to_stage: PipelineStage
+  note: string | null
+  created_at: string
+}
+
+export async function fetchPipelineEvents(id: number): Promise<PipelineEvent[]> {
+  const r = await authFetch(`/api/pipeline/${id}/events`)
+  if (!r.ok) throw new Error(`pipeline events: ${r.status}`)
+  const data = await r.json()
+  return (data.events || []) as PipelineEvent[]
+}
+
 // ─── Analytics + Scoring ──────────────────────────────────────────────────
 
 export interface AnalyticsResult {
