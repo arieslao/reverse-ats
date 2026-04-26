@@ -14,6 +14,9 @@ const MfaVerify = lazy(() => import('./pages/auth/MfaVerify'));
 const MfaSetup = lazy(() => import('./pages/auth/MfaSetup'));
 const AppIndex = lazy(() => import('./pages/app/Index'));
 const ProfilePage = lazy(() => import('./pages/app/Profile'));
+const FeedPage = lazy(() => import('./pages/app/Feed'));
+const PipelinePage = lazy(() => import('./pages/app/Pipeline'));
+const AnalyticsPage = lazy(() => import('./pages/app/Analytics'));
 const AdminIndex = lazy(() => import('./pages/admin/Index'));
 
 function Loading() {
@@ -39,6 +42,9 @@ export function App() {
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<AppIndex />} />
             <Route path="/app/profile" element={<ProfilePage />} />
+            <Route path="/app/feed" element={<FeedPage />} />
+            <Route path="/app/pipeline" element={<PipelinePage />} />
+            <Route path="/app/analytics" element={<AnalyticsPage />} />
           </Route>
 
           <Route element={<RequireTier tier="admin" />}>

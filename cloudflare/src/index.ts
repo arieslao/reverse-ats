@@ -21,6 +21,7 @@ import { preprocessJob, PREPROCESS_MODEL } from "./preprocess";
 import { embedStructuredJob, packVector, EMBEDDING_MODEL } from "./embed";
 import { handleAdmin } from "./admin";
 import { handleProfile } from "./profile";
+import { handleFeedAndPipeline } from "./feed";
 
 // How many jobs the scheduled handler preprocesses per 30-min cron tick.
 // 60/run × 48 runs/day = 2,880 jobs/day capacity — plenty of headroom for
@@ -51,6 +52,9 @@ const handler: ExportedHandler<Env> = {
     // Per-user app endpoints (Supabase JWT-gated). Returns null for non-/api paths.
     const profileResponse = await handleProfile(request, env);
     if (profileResponse) return withCors(profileResponse, origin);
+
+    const feedResponse = await handleFeedAndPipeline(request, env);
+    if (feedResponse) return withCors(feedResponse, origin);
 
     // Admin (Supabase JWT-gated). handleAdmin returns null for non-admin paths.
     const adminResponse = await handleAdmin(request, env);

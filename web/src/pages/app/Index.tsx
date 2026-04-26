@@ -34,21 +34,24 @@ export default function AppIndex() {
         </p>
 
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl">
-          <Link
-            to="/app/profile"
-            className="block p-5 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-accent)] transition-colors"
-          >
-            <div className="text-sm font-medium">Profile</div>
-            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
-              Resume, target roles, locations, salary, and skill preferences.
-            </div>
-          </Link>
-          <div className="block p-5 rounded-lg border border-dashed border-[var(--color-border-subtle)] opacity-60">
-            <div className="text-sm font-medium">Job feed</div>
-            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">Coming next release.</div>
-          </div>
+          <HubCard to="/app/feed" title="Job feed" hint="Browse and filter scraped jobs. Save, dismiss, or generate a cover letter." />
+          <HubCard to="/app/pipeline" title="Pipeline" hint="Saved jobs by stage — applied, phone screen, technical, offer." />
+          <HubCard to="/app/profile" title="Profile" hint="Resume, target roles, locations, salary, and skill preferences." />
+          <HubCard to="/app/analytics" title="Analytics" hint="Funnel + response rate + scoring coverage." />
         </div>
       </main>
     </div>
+  );
+}
+
+function HubCard({ to, title, hint }: { to: string; title: string; hint: string }) {
+  return (
+    <Link
+      to={to}
+      className="block p-5 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-accent)] transition-colors"
+    >
+      <div className="text-sm font-medium">{title}</div>
+      <div className="mt-1 text-xs text-[var(--color-text-secondary)]">{hint}</div>
+    </Link>
   );
 }
