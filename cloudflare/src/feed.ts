@@ -72,7 +72,7 @@ export async function handleFeedAndPipeline(request: Request, env: Env): Promise
     if (!action && request.method === "GET") return getJob(env, userId, jobId);
     if (action === "dismiss" && request.method === "POST") return dismissJob(env, userId, jobId);
     if (action === "save" && request.method === "POST") return saveJobToPipeline(env, userId, jobId);
-    if (action === "cover-letter" && request.method === "POST") return coverLetter(env, userId, jobId);
+    if (action === "cover-letter" && request.method === "POST") return coverLetter(env, userId, jobId, request);
   }
 
   if (path === "/api/feed/industries" && request.method === "GET") return feedIndustries(env);
@@ -826,7 +826,55 @@ async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
 
 const COVER_LETTER_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
-async function coverLetter(env: Env, userId: string, jobId: string): Promise<Response> {
+type CoverLetterStyle = "concise" | "standard" | "detailed";
+
+const COVER_LETTER_STYLES: Record<
+  CoverLetterStyle,
+  { systemPrompt: string; userInstruction: string; maxTokens: number }
+> = {
+  concise: {
+    systemPrompt:
+      "You write tight, high-signal cover letters. 2 short paragraphs, ~150 words total, no fluff, no clichés. " +
+      "Reference real experience from the resume and real requirements from the job. " +
+      "Return ONLY the letter body — no greeting line, no signature, no markdown.",
+    userInstruction: "Write a concise 2-paragraph cover letter (~150 words).",
+    maxTokens: 400,
+  },
+  standard: {
+    systemPrompt:
+      "You write concise, specific cover letters. 3 short paragraphs (~300 words), no fluff, no clichés. " +
+      "Reference real experience from the resume and real requirements from the job. " +
+      "Return ONLY the letter body — no greeting line, no signature, no markdown.",
+    userInstruction: "Write a 3-paragraph cover letter (~300 words).",
+    maxTokens: 800,
+  },
+  detailed: {
+    systemPrompt:
+      "You write thorough, specific cover letters. 4 paragraphs (~450 words) with concrete accomplishments and quantified impact. " +
+      "Reference real experience from the resume and real requirements from the job. " +
+      "Return ONLY the letter body — no greeting line, no signature, no markdown.",
+    userInstruction:
+      "Write a detailed 4-paragraph cover letter (~450 words) with concrete accomplishments and quantified impact.",
+    maxTokens: 1200,
+  },
+};
+
+function parseStyle(value: unknown): CoverLetterStyle {
+  return value === "concise" || value === "detailed" ? value : "standard";
+}
+
+async function coverLetter(env: Env, userId: string, jobId: string, request: Request): Promise<Response> {
+  let style: CoverLetterStyle = "standard";
+  if (request.method === "POST") {
+    try {
+      const body = (await request.clone().json().catch(() => null)) as { style?: unknown } | null;
+      if (body && body.style !== undefined) style = parseStyle(body.style);
+    } catch {
+      // body optional; default style stands
+    }
+  }
+  const styleConfig = COVER_LETTER_STYLES[style];
+
   // Tier-gated daily limit before any work.
   const tier = await fetchTier(env, userId);
   const usage = await checkAndConsume(env, userId, "cover_letter", tier);
@@ -879,22 +927,16 @@ async function coverLetter(env: Env, userId: string, jobId: string): Promise<Res
   try {
     const response = (await env.AI.run(COVER_LETTER_MODEL, {
       messages: [
-        {
-          role: "system",
-          content:
-            "You write concise, specific cover letters. 3 short paragraphs max, no fluff, no clichés. " +
-            "Reference real experience from the resume and real requirements from the job. " +
-            "Return ONLY the letter body — no greeting line, no signature, no markdown.",
-        },
+        { role: "system", content: styleConfig.systemPrompt },
         {
           role: "user",
           content:
             `Candidate resume:\n${resume.slice(0, 4000)}\n\n` +
             `Job:\n${job.title} at ${job.company}${job.location ? ` (${job.location})` : ""}\n\n${description}\n\n` +
-            `Write the cover letter.`,
+            styleConfig.userInstruction,
         },
       ],
-      max_tokens: 800,
+      max_tokens: styleConfig.maxTokens,
       temperature: 0.4,
     } as Parameters<typeof env.AI.run>[1])) as { response?: string };
     const text = (response.response || "").trim();
@@ -904,6 +946,7 @@ async function coverLetter(env: Env, userId: string, jobId: string): Promise<Res
         ok: true,
         cover_letter: text,
         model: COVER_LETTER_MODEL,
+        style,
         tier,
         usage: { used: usage.used, remaining: usage.remaining, limit: usage.limit },
       },

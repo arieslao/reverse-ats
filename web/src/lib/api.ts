@@ -227,16 +227,27 @@ export interface UsageState {
   limit: number
 }
 
+export type CoverLetterStyle = 'concise' | 'standard' | 'detailed'
+
 export interface CoverLetterResult {
   cover_letter: string
+  style?: CoverLetterStyle
   tier?: Tier
   usage?: UsageState
 }
 
-export async function generateCoverLetter(jobId: string): Promise<CoverLetterResult> {
-  const r = await authFetch(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter`, { method: 'POST' })
+export async function generateCoverLetter(
+  jobId: string,
+  style: CoverLetterStyle = 'standard',
+): Promise<CoverLetterResult> {
+  const r = await authFetch(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ style }),
+  })
   const data = await r.json().catch(() => null) as {
     cover_letter?: string
+    style?: CoverLetterStyle
     error?: string
     tier?: Tier
     usage?: UsageState
@@ -254,6 +265,7 @@ export async function generateCoverLetter(jobId: string): Promise<CoverLetterRes
   }
   return {
     cover_letter: data?.cover_letter || '',
+    style: data?.style,
     tier: data?.tier,
     usage: data?.usage,
   }

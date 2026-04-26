@@ -9,6 +9,7 @@ import {
   generateCoverLetter,
   rescoreJobs,
   saveJob,
+  type CoverLetterStyle,
   type IndustryOption,
   type Job,
   type JobsQuery,
@@ -16,6 +17,22 @@ import {
 } from '../../lib/api';
 
 const PAGE_SIZE = 20;
+const COVER_LETTER_STYLE_KEY = 'cover-letter-style';
+const COVER_LETTER_STYLES: { value: CoverLetterStyle; label: string; hint: string }[] = [
+  { value: 'concise', label: 'Concise', hint: '~150 words, 2 paragraphs' },
+  { value: 'standard', label: 'Standard', hint: '~300 words, 3 paragraphs' },
+  { value: 'detailed', label: 'Detailed', hint: '~450 words, 4 paragraphs' },
+];
+
+function loadInitialStyle(): CoverLetterStyle {
+  try {
+    const v = localStorage.getItem(COVER_LETTER_STYLE_KEY);
+    if (v === 'concise' || v === 'standard' || v === 'detailed') return v;
+  } catch {
+    // ignore
+  }
+  return 'standard';
+}
 
 export default function FeedPage() {
   const { user } = useAuthStore();
@@ -29,12 +46,23 @@ export default function FeedPage() {
   const [coverLetter, setCoverLetter] = useState<{
     jobId: string;
     text: string;
+    style: CoverLetterStyle;
     loading: boolean;
     usage?: UsageState;
     capped?: boolean;
   } | null>(null);
+  const [coverLetterStyle, setCoverLetterStyle] = useState<CoverLetterStyle>(loadInitialStyle);
   const [scoring, setScoring] = useState(false);
   const [scoreNotice, setScoreNotice] = useState<string | null>(null);
+
+  const updateStyle = (next: CoverLetterStyle) => {
+    setCoverLetterStyle(next);
+    try {
+      localStorage.setItem(COVER_LETTER_STYLE_KEY, next);
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     fetchFeedIndustries().then(setIndustries).catch(() => {});
@@ -89,16 +117,23 @@ export default function FeedPage() {
     }
   };
 
-  const onCoverLetter = async (jobId: string) => {
-    setCoverLetter({ jobId, text: '', loading: true });
+  const onCoverLetter = async (jobId: string, style: CoverLetterStyle = coverLetterStyle) => {
+    setCoverLetter({ jobId, text: '', style, loading: true });
     try {
-      const r = await generateCoverLetter(jobId);
-      setCoverLetter({ jobId, text: r.cover_letter, loading: false, usage: r.usage });
+      const r = await generateCoverLetter(jobId, style);
+      setCoverLetter({
+        jobId,
+        text: r.cover_letter,
+        style: r.style ?? style,
+        loading: false,
+        usage: r.usage,
+      });
     } catch (e) {
       const err = e as Error & { status?: number; usage?: UsageState };
       setCoverLetter({
         jobId,
         text: err.message || 'Failed',
+        style,
         loading: false,
         usage: err.usage,
         capped: err.status === 429,
@@ -151,6 +186,18 @@ export default function FeedPage() {
           </div>
           <div className="flex items-center gap-3">
             {scoreNotice && <span className="text-xs text-[var(--color-text-secondary)]">{scoreNotice}</span>}
+            <label className="flex items-center gap-1.5 text-xs text-[var(--color-text-secondary)]" title="Cover letter length used by the Cover letter button">
+              Cover letter:
+              <select
+                value={coverLetterStyle}
+                onChange={(e) => updateStyle(e.target.value as CoverLetterStyle)}
+                className="h-8 px-2 text-xs rounded-md bg-[var(--color-bg-elevated)] border border-[var(--color-border-muted)] focus:border-[var(--color-accent)] focus:outline-none cursor-pointer"
+              >
+                {COVER_LETTER_STYLES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label} · {s.hint}</option>
+                ))}
+              </select>
+            </label>
             <button
               onClick={onRescore}
               disabled={scoring}
@@ -276,6 +323,7 @@ export default function FeedPage() {
         <CoverLetterModal
           state={coverLetter}
           onClose={() => setCoverLetter(null)}
+          onRegenerate={(style) => onCoverLetter(coverLetter.jobId, style)}
           jobTitle={jobs.find((j) => j.id === coverLetter.jobId)?.title}
         />
       )}
@@ -353,10 +401,12 @@ function JobCard({
 function CoverLetterModal({
   state,
   onClose,
+  onRegenerate,
   jobTitle,
 }: {
-  state: { jobId: string; text: string; loading: boolean; usage?: UsageState; capped?: boolean };
+  state: { jobId: string; text: string; style: CoverLetterStyle; loading: boolean; usage?: UsageState; capped?: boolean };
   onClose: () => void;
+  onRegenerate: (style: CoverLetterStyle) => void;
   jobTitle?: string;
 }) {
   const copyToClipboard = () => {
@@ -389,6 +439,32 @@ function CoverLetterModal({
             </button>
           </div>
         </div>
+        {!state.capped && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border-subtle)] text-xs">
+            <span className="text-[var(--color-text-tertiary)]">Style:</span>
+            {COVER_LETTER_STYLES.map((s) => {
+              const active = state.style === s.value;
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => onRegenerate(s.value)}
+                  disabled={state.loading}
+                  title={s.hint}
+                  className={
+                    active
+                      ? 'px-2.5 h-7 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] cursor-pointer disabled:opacity-50'
+                      : 'px-2.5 h-7 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] cursor-pointer disabled:opacity-50'
+                  }
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+            <span className="text-[var(--color-text-tertiary)] ml-auto">
+              {COVER_LETTER_STYLES.find((s) => s.value === state.style)?.hint}
+            </span>
+          </div>
+        )}
         <div className="p-4 overflow-y-auto flex-1">
           {state.loading ? (
             <p className="text-sm text-[var(--color-text-secondary)]">Generating… (~10–20s)</p>
