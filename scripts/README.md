@@ -13,6 +13,9 @@ both pipelines can run concurrently without conflict.
 
 ### One-time setup on GX10
 
+GX10 is on Debian 12+ with PEP 668 (externally-managed-environment),
+so we use a repo-local venv rather than `--user` or system pip.
+
 ```bash
 # 1. Clone (or pull) the repo somewhere persistent
 ssh aries-gpu
@@ -20,8 +23,10 @@ cd /mnt/crucial-x10/projects
 git clone https://github.com/arieslao/reverse-ats.git    # or `git pull` if already there
 cd reverse-ats
 
-# 2. Install Python deps the script needs (from the existing requirements file)
-pip install --user -r backend/requirements.txt
+# 2. Create a repo-local venv and install requirements
+python3 -m venv .venv
+.venv/bin/pip install --upgrade pip
+.venv/bin/pip install -r backend/requirements.txt
 
 # 3. Make sure the log directory exists
 mkdir -p /mnt/crucial-x10/projects/reverse-ats/logs
@@ -29,7 +34,7 @@ mkdir -p /mnt/crucial-x10/projects/reverse-ats/logs
 # 4. Smoke-test the script with a manual run BEFORE adding cron
 CF_INGEST_URL=https://reverse-ats-ingest.aries-lao.workers.dev/ingest \
 CF_INGEST_SECRET=<the-secret> \
-python3 scripts/scrape_workday_gx10.py
+.venv/bin/python scripts/scrape_workday_gx10.py
 ```
 
 You should see one INFO line per Workday tenant ("NVIDIA: 555 jobs (46s)"
@@ -42,7 +47,7 @@ etc.) and a final `ingest complete: sent=N new=M updated=K errors=0`.
 crontab -l > /tmp/ct.txt
 cat >> /tmp/ct.txt <<'EOF'
 # Reverse ATS — Workday-only scrape from residential IP (Akamai blocks GH Actions)
-*/30 * * * * cd /mnt/crucial-x10/projects/reverse-ats && CF_INGEST_URL=https://reverse-ats-ingest.aries-lao.workers.dev/ingest CF_INGEST_SECRET=<the-secret> python3 scripts/scrape_workday_gx10.py >> /mnt/crucial-x10/projects/reverse-ats/logs/workday_scrape.log 2>&1
+*/30 * * * * cd /mnt/crucial-x10/projects/reverse-ats && CF_INGEST_URL=https://reverse-ats-ingest.aries-lao.workers.dev/ingest CF_INGEST_SECRET=<the-secret> .venv/bin/python scripts/scrape_workday_gx10.py >> /mnt/crucial-x10/projects/reverse-ats/logs/workday_scrape.log 2>&1
 EOF
 safe-crontab /tmp/ct.txt
 
