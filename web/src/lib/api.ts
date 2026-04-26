@@ -12,15 +12,11 @@ const API_URL =
  *  onAuthStateChange). On 401, refreshes once and retries — so a long-open
  *  session that crossed the JWT TTL self-heals instead of failing. */
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const method = init.method || 'GET'
-  console.log(`[authFetch] start ${method} ${path}`)
   let res = await sendWithToken(path, init, getAccessToken())
   if (res.status === 401) {
-    console.log(`[authFetch] 401 — refreshing token and retrying`)
     const fresh = await refreshAccessToken()
     if (fresh) res = await sendWithToken(path, init, fresh)
   }
-  console.log(`[authFetch] done ${method} ${path} → ${res.status}`)
   return res
 }
 

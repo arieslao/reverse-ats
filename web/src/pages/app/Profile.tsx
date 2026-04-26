@@ -44,11 +44,9 @@ export default function ProfilePage() {
   }, []);
 
   const save = async () => {
-    console.log('[Profile.save] click');
     setSaving(true);
     setError(null);
     try {
-      console.log('[Profile.save] calling updateProfile...');
       const next = await updateProfile({
         resume_text: form.resume_text || null,
         target_roles: form.target_roles,
@@ -63,14 +61,11 @@ export default function ProfilePage() {
         blacklisted_keywords: form.blacklisted_keywords,
         priority_categories: form.priority_categories,
       });
-      console.log('[Profile.save] updateProfile resolved');
       setForm({ ...next, resume_text: next.resume_text ?? '' });
       setSavedAt(Date.now());
     } catch (e) {
-      console.log('[Profile.save] caught error:', e);
       setError(e instanceof Error ? e.message : 'Save failed');
     } finally {
-      console.log('[Profile.save] finally — clearing saving state');
       setSaving(false);
     }
   };
