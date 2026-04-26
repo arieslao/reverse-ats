@@ -143,16 +143,21 @@ async function handleIngest(request: Request, env: Env, ctx: ExecutionContext): 
 async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
   const now = nowIso();
   const remote = job.remote ? 1 : 0;
+  const firstSeen = job.first_seen_at || now;
+  const fingerprint = await computeFingerprint(job.company, job.title, job.location ?? null);
 
-  const existing = await env.DB.prepare(`SELECT id FROM jobs WHERE id = ?`).bind(job.id).first();
+  const existing = await env.DB.prepare(`SELECT id, fingerprint FROM jobs WHERE id = ?`)
+    .bind(job.id)
+    .first<{ id: string; fingerprint: string | null }>();
 
   if (!existing) {
     await env.DB.prepare(
       `INSERT INTO jobs (
         id, company, title, url, location, department,
         description_full, description_snippet, category, ats_type,
-        remote, first_seen_at, last_seen_at, expired
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+        remote, first_seen_at, last_seen_at, expired,
+        posted_at, fingerprint
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
     )
       .bind(
         job.id,
@@ -166,15 +171,28 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
         job.category ?? null,
         job.ats_type ?? null,
         remote,
-        job.first_seen_at || now,
+        firstSeen,
         job.last_seen_at || now,
+        job.posted_at ?? null,
+        fingerprint,
       )
       .run();
+
+    // Append-only repost log keyed by fingerprint. New job_id with an
+    // existing fingerprint = a repost; the count drives the UI badge.
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO job_reposts (fingerprint, job_id, first_seen_at, posted_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind(fingerprint, job.id, firstSeen, job.posted_at ?? null)
+      .run();
+
     return "new";
   }
 
-  // Existing — refresh description (snippet may improve over scrapes), bump last_seen,
-  // and clear expired flag if the job has reappeared.
+  // Existing — refresh description (snippet may improve over scrapes), bump
+  // last_seen, fill in posted_at/fingerprint if the previous scrape didn't
+  // have them, and clear expired flag if the job has reappeared.
   await env.DB.prepare(
     `UPDATE jobs
        SET company             = ?,
@@ -188,7 +206,9 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
            ats_type            = COALESCE(?, ats_type),
            remote              = ?,
            last_seen_at        = ?,
-           expired             = 0
+           expired             = 0,
+           posted_at           = COALESCE(posted_at, ?),
+           fingerprint         = COALESCE(fingerprint, ?)
      WHERE id = ?`,
   )
     .bind(
@@ -203,10 +223,53 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
       job.ats_type ?? null,
       remote,
       job.last_seen_at || now,
+      job.posted_at ?? null,
+      fingerprint,
       job.id,
     )
     .run();
+
+  // Backfill the repost log for jobs that pre-date this column.
+  if (!existing.fingerprint) {
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO job_reposts (fingerprint, job_id, first_seen_at, posted_at)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind(
+        fingerprint,
+        job.id,
+        firstSeen,
+        job.posted_at ?? null,
+      )
+      .run();
+  }
+
   return "updated";
+}
+
+// Content-only signature stable across repostings: company + normalized title +
+// normalized location. Excludes URL on purpose — a repost almost always changes
+// the URL but keeps these three the same. SHA-256 over a single delimited
+// string keeps the value short, deterministic, and indexable.
+async function computeFingerprint(
+  company: string,
+  title: string,
+  location: string | null,
+): Promise<string> {
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .replace(/\s+/g, " ");
+  const raw = `${norm(company)}|${norm(title)}|${norm(location ?? "")}`;
+  const data = new TextEncoder().encode(raw);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 // ─── GET /jobs ──────────────────────────────────────────────────────────────

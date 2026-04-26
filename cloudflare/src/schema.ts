@@ -35,6 +35,10 @@ export interface IngestJob {
   remote?: boolean | number;
   first_seen_at?: string;
   last_seen_at?: string;
+  // ISO-8601 employer-side posted/updated date from the source ATS
+  // (Greenhouse `updated_at`, Lever `createdAt`, Ashby `publishedAt`, …).
+  // Optional — not every ATS surfaces it.
+  posted_at?: string | null;
 }
 
 export interface IngestRequest {

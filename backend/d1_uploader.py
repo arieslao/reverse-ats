@@ -153,4 +153,5 @@ def _normalize_for_wire(job: dict) -> dict:
         "remote": bool(job.get("remote")),
         "first_seen_at": job.get("first_seen_at"),
         "last_seen_at": job.get("last_seen_at"),
+        "posted_at": job.get("posted_at"),
     }

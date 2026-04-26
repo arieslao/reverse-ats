@@ -24,6 +24,34 @@ const COVER_LETTER_STYLES: { value: CoverLetterStyle; label: string; hint: strin
   { value: 'detailed', label: 'Detailed', hint: '~450 words, 4 paragraphs' },
 ];
 
+function formatRelative(iso: string): string {
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return '';
+  const diffMs = Date.now() - then;
+  if (diffMs < 0) return 'just now';
+  const minutes = Math.floor(diffMs / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
+function renderFreshness(job: Job): string {
+  const seen = formatRelative(job.first_seen_at);
+  if (!job.posted_at) return seen ? `Seen ${seen}` : '';
+  const posted = formatRelative(job.posted_at);
+  // Same string both ends usually means our scraper picked it up the same
+  // hour the employer posted it — collapse the duplicate so the line stays
+  // short. Otherwise show both so users can spot lag.
+  if (posted === seen) return `Posted ${posted}`;
+  return `Posted ${posted} · seen ${seen}`;
+}
+
 function loadInitialStyle(): CoverLetterStyle {
   try {
     const v = localStorage.getItem(COVER_LETTER_STYLE_KEY);
@@ -369,11 +397,27 @@ function JobCard({
                 remote
               </span>
             )}
+            {job.repost_count > 1 && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-md"
+                style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308' }}
+                title={
+                  job.repost_first_seen_at
+                    ? `First seen ${formatRelative(job.repost_first_seen_at)} — same role keeps reappearing under a fresh URL.`
+                    : 'Same role has been posted before under a different URL.'
+                }
+              >
+                Reposted ×{job.repost_count}
+              </span>
+            )}
           </div>
           <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
             {job.company}
             {job.location && <> · {job.location}</>}
             {job.category && <> · {job.category}</>}
+          </div>
+          <div className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">
+            {renderFreshness(job)}
           </div>
           {job.description_snippet && (
             <p className="mt-2 text-xs text-[var(--color-text-secondary)] line-clamp-3">{job.description_snippet}</p>
