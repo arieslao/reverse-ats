@@ -163,6 +163,12 @@ export interface Job {
   llm_reasoning: string | null
   first_seen_at: string
   last_seen_at: string
+  posted_at: string | null
+  /** Number of distinct job_ids sharing this listing's content fingerprint
+   *  (company + normalized title + location). 1 = first instance, >1 = repost. */
+  repost_count: number
+  /** ISO timestamp of when we first saw any job with this fingerprint. */
+  repost_first_seen_at: string | null
   expired: boolean
   dismissed: boolean
   pipeline_stage: PipelineStage | null

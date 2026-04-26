@@ -177,6 +177,46 @@ def _is_remote(location: str) -> bool:
     return any(kw in loc for kw in REMOTE_KEYWORDS)
 
 
+def _to_iso_z(value) -> Optional[str]:
+    """Coerce ATS posted-date fields into a normalized ISO-8601 UTC string.
+
+    Accepts:
+      - epoch milliseconds (Lever returns this for `createdAt`)
+      - ISO-8601 strings with or without trailing Z (Greenhouse `updated_at`,
+        Ashby `publishedAt`, etc.) — re-emitted with `Z` for consistency.
+    Returns None for anything we can't confidently parse so we don't
+    pollute the column with garbage that breaks freshness math downstream.
+    """
+    if value is None or value == "":
+        return None
+    try:
+        if isinstance(value, (int, float)):
+            ts = float(value)
+            if ts > 1e12:  # milliseconds
+                ts = ts / 1000.0
+            return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        if isinstance(value, str):
+            s = value.strip()
+            if not s:
+                return None
+            # Numeric string?
+            if s.isdigit():
+                return _to_iso_z(int(s))
+            # Already ISO-ish — let fromisoformat handle the common shapes,
+            # then re-emit with `Z`.
+            normalized = s.replace("Z", "+00:00")
+            try:
+                dt = datetime.fromisoformat(normalized)
+            except ValueError:
+                return None
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return None
+
+
 def _passes_title_filter(title: str, extra_keywords: list[str] = None) -> bool:
     t = title.lower()
     if any(ex in t for ex in EXCLUDE_KEYWORDS):
@@ -213,6 +253,10 @@ def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
         if depts:
             dept = depts[0].get("name", "")
         description = j.get("content", "") or ""
+        # Greenhouse exposes `updated_at` (ISO-8601). It's not strictly the
+        # original creation date, but it's the closest signal they give and
+        # tracks employer-side staleness well.
+        posted_at = _to_iso_z(j.get("updated_at") or j.get("first_published"))
         jobs.append({
             "title": title,
             "location": location,
@@ -225,6 +269,7 @@ def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
             # complete responsibilities list (truncating to 500 chars dropped
             # those for ~99% of jobs in Phase 0).
             "description_full": description,
+            "posted_at": posted_at,
             "company": company_name,
         })
     return jobs
@@ -243,6 +288,8 @@ def fetch_lever(slug: str, company_name: str) -> list[dict]:
         location = _normalize_location(cats.get("location", "") or cats.get("allLocations", ""))
         dept = cats.get("team", "") or cats.get("department", "")
         full_description = j.get("descriptionPlain", "") or j.get("description", "") or ""
+        # Lever returns `createdAt` as epoch milliseconds.
+        posted_at = _to_iso_z(j.get("createdAt"))
         jobs.append({
             "title": title,
             "location": location,
@@ -254,6 +301,7 @@ def fetch_lever(slug: str, company_name: str) -> list[dict]:
             # `description`) — preserve it for cloud preprocessing so we can
             # extract comp / YoE / required experience that lives further in.
             "description_full": full_description,
+            "posted_at": posted_at,
             "company": company_name,
         })
     return jobs
@@ -309,6 +357,9 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
         is_remote = j.get("isRemote", False)
         if is_remote:
             location = location or "Remote"
+        # Ashby uses `publishedAt` on the posting-api endpoint and
+        # `publishedDate` on the GraphQL one. Try both.
+        posted_at = _to_iso_z(j.get("publishedAt") or j.get("publishedDate") or j.get("updatedAt"))
         jobs.append({
             "title": j.get("title", ""),
             "location": _normalize_location(location),
@@ -316,6 +367,7 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
             "department": j.get("department", j.get("teamName", "")),
             "remote": is_remote or _is_remote(location),
             "description_snippet": "",
+            "posted_at": posted_at,
             "company": company_name,
         })
     return jobs
@@ -350,6 +402,11 @@ def fetch_workday(company: dict, company_name: str) -> list[dict]:
     for j in job_postings:
         title = j.get("title", "")
         location = j.get("locationsText", "") or j.get("primaryLocation", {}).get("descriptor", "")
+        # Workday returns `postedOn` as a relative string ("Posted Today",
+        # "Posted 7 Days Ago"). It also exposes a `startDate` on some
+        # tenants — prefer that when present and parseable; otherwise leave
+        # posted_at null rather than store unreliable relative text.
+        posted_at = _to_iso_z(j.get("startDate") or j.get("postedOn"))
         jobs.append({
             "title": title,
             "location": _normalize_location(location),
@@ -357,6 +414,7 @@ def fetch_workday(company: dict, company_name: str) -> list[dict]:
             "department": j.get("jobFamilyGroup", {}).get("descriptor", "") if isinstance(j.get("jobFamilyGroup"), dict) else "",
             "remote": _is_remote(location),
             "description_snippet": j.get("briefDescription", "")[:500],
+            "posted_at": posted_at,
             "company": company_name,
         })
     return jobs

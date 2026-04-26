@@ -203,9 +203,18 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
         j.id, j.company, j.title, j.url, j.location, j.department,
         j.description_snippet, j.description_full, j.category, j.ats_type,
         j.remote, j.first_seen_at, j.last_seen_at, j.expired,
+        j.posted_at, j.fingerprint,
+        r.repost_count, r.repost_first_seen_at,
         ${scoreSelect}
        FROM jobs j
        LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
+       LEFT JOIN (
+         SELECT fingerprint,
+                COUNT(*)         AS repost_count,
+                MIN(first_seen_at) AS repost_first_seen_at
+           FROM job_reposts
+          GROUP BY fingerprint
+       ) r ON r.fingerprint = j.fingerprint
       WHERE ${where.join(" AND ")}
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?`,
@@ -978,12 +987,16 @@ interface JobOutShape {
   llm_reasoning: string | null;
   first_seen_at: string;
   last_seen_at: string;
+  posted_at: string | null;
+  repost_count: number;
+  repost_first_seen_at: string | null;
   expired: boolean;
   dismissed: boolean;
   pipeline_stage: string | null;
 }
 
 function jobRowToOut(row: any): JobOutShape {
+  const repostCount = typeof row.repost_count === "number" ? row.repost_count : 0;
   return {
     id: row.id,
     company: row.company,
@@ -1000,6 +1013,9 @@ function jobRowToOut(row: any): JobOutShape {
     llm_reasoning: row.llm_reasoning ?? null,
     first_seen_at: row.first_seen_at,
     last_seen_at: row.last_seen_at,
+    posted_at: row.posted_at ?? null,
+    repost_count: repostCount,
+    repost_first_seen_at: row.repost_first_seen_at ?? null,
     expired: row.expired === 1 || row.expired === true,
     dismissed: row.dismissed === 1 || row.dismissed === true || false,
     pipeline_stage: row.pipeline_stage ?? null,
