@@ -1,20 +1,31 @@
 // Reads from the live Cloudflare Worker. Override with VITE_API_URL in
 // .env.local to point at a local Worker during development.
 
-import { supabase } from './supabase'
+import { getAccessToken } from './supabase'
 
 const API_URL =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ||
   'https://reverse-ats-ingest.aries-lao.workers.dev'
 
-/** Fetch with the current Supabase session JWT in the Authorization header. */
+/** Fetch with the cached Supabase JWT in the Authorization header.
+ *  Reads the token synchronously from the in-memory cache (kept in sync by
+ *  onAuthStateChange) — never calls supabase.auth.getSession(), which can
+ *  deadlock against the auth processLock under contention. */
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const { data: { session } } = await supabase.auth.getSession()
+  const method = init.method || 'GET'
+  console.log(`[authFetch] start ${method} ${path}`)
   const headers = new Headers(init.headers)
-  if (session?.access_token) {
-    headers.set('Authorization', `Bearer ${session.access_token}`)
+  const token = getAccessToken()
+  console.log(`[authFetch] token present=${!!token}`)
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  try {
+    const res = await fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' })
+    console.log(`[authFetch] done ${method} ${path} → ${res.status}`)
+    return res
+  } catch (err) {
+    console.log(`[authFetch] error ${method} ${path}:`, err)
+    throw err
   }
-  return fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' })
 }
 
 export interface Health {

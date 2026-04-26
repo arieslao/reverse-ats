@@ -41,3 +41,14 @@ export interface Profile {
   created_at: string;
   updated_at: string;
 }
+
+// Cached access token, kept in sync via onAuthStateChange. Synchronous read
+// avoids contending on the auth processLock — getSession() can deadlock when
+// a refresh races with another auth op and the lock isn't released.
+let cachedAccessToken: string | null = null;
+supabase.auth.onAuthStateChange((_event, session) => {
+  cachedAccessToken = session?.access_token ?? null;
+});
+export function getAccessToken(): string | null {
+  return cachedAccessToken;
+}
