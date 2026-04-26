@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth';
 import { logout, isAdmin } from '../../lib/auth';
+import { ThemeToggle } from '../../components/ThemeToggle';
 
 export default function AppIndex() {
   const { user, setUser } = useAuthStore();
@@ -23,6 +24,7 @@ export default function AppIndex() {
             <button onClick={handleSignOut} className="hover:text-[var(--color-text-primary)] cursor-pointer">
               Sign out
             </button>
+            <ThemeToggle />
           </div>
         </div>
       </header>

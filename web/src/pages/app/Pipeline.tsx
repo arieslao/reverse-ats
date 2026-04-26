@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth';
+import { ThemeToggle } from '../../components/ThemeToggle';
 import {
   deletePipelineEntry,
   fetchPipeline,
@@ -120,7 +121,10 @@ export default function PipelinePage() {
               <Link to="/app/profile" className="hover:text-[var(--color-text-primary)]">Profile</Link>
             </nav>
           </div>
-          <span className="text-xs text-[var(--color-text-secondary)]">{user?.email}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[var(--color-text-secondary)]">{user?.email}</span>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

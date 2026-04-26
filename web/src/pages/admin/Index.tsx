@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth';
+import { ThemeToggle } from '../../components/ThemeToggle';
 import { fetchAdminUsers, updateUserTier, type AdminUser, type Tier } from '../../lib/api';
 
 const TIERS: Tier[] = ['free', 'sponsor', 'admin'];
@@ -48,6 +49,7 @@ export default function AdminIndex() {
           <div className="flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
             <Link to="/app" className="hover:text-[var(--color-text-primary)]">Back to app</Link>
             <span>{user?.email}</span>
+            <ThemeToggle />
           </div>
         </div>
       </header>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth';
+import { ThemeToggle } from '../../components/ThemeToggle';
 import { fetchProfile, suggestRoles, updateProfile, type Profile, type RoleSuggestion } from '../../lib/api';
 
 const SENIORITY_OPTIONS = ['', 'intern', 'junior', 'mid', 'senior', 'staff', 'principal', 'director', 'vp', 'c-level'] as const;
@@ -78,6 +79,7 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
             <Link to="/app" className="hover:text-[var(--color-text-primary)]">Back to app</Link>
             <span>{user?.email}</span>
+            <ThemeToggle />
           </div>
         </div>
       </header>
