@@ -86,3 +86,39 @@ export async function updateUserTier(userId: string, tier: Tier): Promise<AdminU
   const data = await r.json()
   return data.user as AdminUser
 }
+
+// ─── Profile (per-user, requires sign-in) ─────────────────────────────────
+
+export interface Profile {
+  resume_text: string | null
+  target_roles: string[]
+  target_locations: string[]
+  remote_only: boolean
+  min_seniority: string | null
+  salary_min: number | null
+  salary_max: number | null
+  must_have_skills: string[]
+  nice_to_have_skills: string[]
+  blacklisted_companies: string[]
+  blacklisted_keywords: string[]
+  priority_categories: string[]
+  updated_at: string
+}
+
+export async function fetchProfile(): Promise<Profile> {
+  const r = await authFetch('/api/profile')
+  if (!r.ok) throw new Error(`profile fetch failed: ${r.status}`)
+  const data = await r.json()
+  return data.profile as Profile
+}
+
+export async function updateProfile(patch: Partial<Profile>): Promise<Profile> {
+  const r = await authFetch('/api/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!r.ok) throw new Error(`profile update failed: ${r.status}`)
+  const data = await r.json()
+  return data.profile as Profile
+}

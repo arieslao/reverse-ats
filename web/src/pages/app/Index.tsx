@@ -32,10 +32,22 @@ export default function AppIndex() {
         <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
           Signed in as <span className="font-medium">{user?.email}</span> · tier <span className="font-medium">{user?.tier}</span>
         </p>
-        <p className="mt-8 text-sm text-[var(--color-text-secondary)] max-w-prose">
-          The hosted Reverse ATS app is being ported here. Job feed, pipeline, AI scoring,
-          and your profile all land in this space across the next few releases.
-        </p>
+
+        <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl">
+          <Link
+            to="/app/profile"
+            className="block p-5 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] hover:border-[var(--color-accent)] transition-colors"
+          >
+            <div className="text-sm font-medium">Profile</div>
+            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">
+              Resume, target roles, locations, salary, and skill preferences.
+            </div>
+          </Link>
+          <div className="block p-5 rounded-lg border border-dashed border-[var(--color-border-subtle)] opacity-60">
+            <div className="text-sm font-medium">Job feed</div>
+            <div className="mt-1 text-xs text-[var(--color-text-secondary)]">Coming next release.</div>
+          </div>
+        </div>
       </main>
     </div>
   );

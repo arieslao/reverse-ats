@@ -13,6 +13,7 @@ const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
 const MfaVerify = lazy(() => import('./pages/auth/MfaVerify'));
 const MfaSetup = lazy(() => import('./pages/auth/MfaSetup'));
 const AppIndex = lazy(() => import('./pages/app/Index'));
+const ProfilePage = lazy(() => import('./pages/app/Profile'));
 const AdminIndex = lazy(() => import('./pages/admin/Index'));
 
 function Loading() {
@@ -37,6 +38,7 @@ export function App() {
 
           <Route element={<RequireAuth />}>
             <Route path="/app" element={<AppIndex />} />
+            <Route path="/app/profile" element={<ProfilePage />} />
           </Route>
 
           <Route element={<RequireTier tier="admin" />}>
