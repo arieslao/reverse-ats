@@ -14,22 +14,17 @@ const API_URL =
 async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const method = init.method || 'GET'
   console.log(`[authFetch] start ${method} ${path}`)
-  let res = await sendWithToken(method, path, init, getAccessToken())
+  let res = await sendWithToken(path, init, getAccessToken())
   if (res.status === 401) {
     console.log(`[authFetch] 401 — refreshing token and retrying`)
     const fresh = await refreshAccessToken()
-    if (fresh) res = await sendWithToken(method, path, init, fresh)
+    if (fresh) res = await sendWithToken(path, init, fresh)
   }
   console.log(`[authFetch] done ${method} ${path} → ${res.status}`)
   return res
 }
 
-async function sendWithToken(
-  method: string,
-  path: string,
-  init: RequestInit,
-  token: string | null,
-): Promise<Response> {
+async function sendWithToken(path: string, init: RequestInit, token: string | null): Promise<Response> {
   const headers = new Headers(init.headers)
   if (token) headers.set('Authorization', `Bearer ${token}`)
   return fetch(`${API_URL}${path}`, { ...init, headers, cache: 'no-store' })
