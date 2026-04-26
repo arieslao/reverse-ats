@@ -280,7 +280,7 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
     required: ["current_fit", "next_step"],
   };
 
-  let raw = "";
+  let parsed: unknown = null;
   try {
     const response = (await env.AI.run(SUGGEST_ROLES_MODEL, {
       messages: [
@@ -290,8 +290,17 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
       max_tokens: 2500,
       temperature: 0.2,
       response_format: { type: "json_schema", json_schema: responseSchema },
-    } as Parameters<typeof env.AI.run>[1])) as { response?: string };
-    raw = (response.response || "").trim();
+    } as Parameters<typeof env.AI.run>[1])) as { response?: unknown };
+
+    // With json_schema, Workers AI returns `response` as an already-parsed
+    // object. Older paths (or fallback) return a string we need to parse.
+    const r = response.response;
+    if (r && typeof r === "object") {
+      parsed = r;
+    } else if (typeof r === "string") {
+      parsed = parseJsonLoose(r);
+      console.log(`[suggest-roles] string response (${r.length} chars):`, r.slice(0, 300));
+    }
   } catch (err) {
     return jsonResponse(
       { ok: false, error: `LLM call failed: ${err instanceof Error ? err.message : String(err)}` },
@@ -299,17 +308,10 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
     );
   }
 
-  console.log(`[suggest-roles] raw response (${raw.length} chars):`, raw.slice(0, 500));
-
-  const parsed = parseJsonLoose(raw);
   if (!parsed || typeof parsed !== "object") {
-    console.log(`[suggest-roles] parse failed. full raw:`, raw);
+    console.log(`[suggest-roles] parse failed; got:`, parsed);
     return jsonResponse(
-      {
-        ok: false,
-        error: `Model returned unparseable response (${raw.length} chars). Try again.`,
-        raw_preview: raw.slice(0, 800),
-      },
+      { ok: false, error: "Model returned unparseable response. Try again." },
       502,
     );
   }
