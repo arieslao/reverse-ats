@@ -481,28 +481,32 @@ def _fetch_workday_job_detail(api_root: str, external_path: str) -> Optional[dic
         return None
 
 
-def fetch_workday(company: dict, company_name: str) -> list[dict]:
-    """Pull all (or up to _WORKDAY_PAGE_SIZE * _WORKDAY_MAX_PAGES) postings
-    for a Workday tenant via the CXS POST endpoint.
+_WORKDAY_HEADERS = {
+    "User-Agent": "AriesLabs-JobScraper/1.0",
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+}
 
-    Returns IngestJob-shaped dicts. Description bodies are fetched lazily for
-    the first page only — second-pass enrichment is too expensive at 220+
-    company scale and Workers AI preprocessing handles the rest from snippet."""
-    api_url = _workday_cxs_url(company)
-    if not api_url:
-        return []
 
-    # Slug used in the externalUrl we hand back to D1 — keeps links clickable.
-    legacy_url = company.get("workday_url") or api_url.split("/wday/cxs/")[0]
+def _workday_paginate(
+    api_url: str,
+    search_text: str,
+    company_name: str,
+    legacy_url: str,
+    seen_paths: set[str],
+    max_pages: int = _WORKDAY_MAX_PAGES,
+) -> list[dict]:
+    """One pass through a Workday CXS endpoint with the given searchText.
 
-    headers = {
-        "User-Agent": "AriesLabs-JobScraper/1.0",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
+    Skips postings whose `externalPath` is already in `seen_paths` (the
+    caller's dedupe set). Returns IngestJob-shaped dicts and mutates
+    `seen_paths` in place so subsequent passes don't re-emit the same
+    role under a different query."""
+    site_root = api_url.split("/wday/cxs/")[0]
+    out: list[dict] = []
+    advertised_total = 0
 
-    jobs: list[dict] = []
-    for page in range(_WORKDAY_MAX_PAGES):
+    for page in range(max_pages):
         offset = page * _WORKDAY_PAGE_SIZE
         try:
             resp = requests.post(
@@ -511,9 +515,9 @@ def fetch_workday(company: dict, company_name: str) -> list[dict]:
                     "appliedFacets": {},
                     "limit": _WORKDAY_PAGE_SIZE,
                     "offset": offset,
-                    "searchText": "",
+                    "searchText": search_text,
                 },
-                headers=headers,
+                headers=_WORKDAY_HEADERS,
                 timeout=REQUEST_TIMEOUT,
             )
             resp.raise_for_status()
@@ -525,40 +529,64 @@ def fetch_workday(company: dict, company_name: str) -> list[dict]:
         if not postings:
             break
 
-        # Build the public job URL by re-hosting externalPath under the tenant's
-        # career site host (Workday returns paths only).
-        site_root = api_url.split("/wday/cxs/")[0]
         for j in postings:
-            title = j.get("title", "")
-            location = j.get("locationsText", "") or ""
             external_path = j.get("externalPath", "")
+            if external_path and external_path in seen_paths:
+                continue
+            seen_paths.add(external_path)
+            location = j.get("locationsText", "") or ""
             posted_at = _parse_workday_posted_on(j.get("postedOn", ""))
-            jobs.append({
-                "title": title,
+            # When we found this role via the remote-tagged search, trust
+            # remote=True even if the location string doesn't contain a
+            # keyword Workday's index thought was a remote match.
+            is_remote = _is_remote(location) or bool(search_text)
+            out.append({
+                "title": j.get("title", ""),
                 "location": _normalize_location(location),
                 "url": f"{site_root}{external_path}" if external_path else legacy_url,
                 "department": "",  # Workday doesn't expose this on the listing
-                "remote": _is_remote(location),
+                "remote": is_remote,
                 "description_snippet": "",  # filled by Workers AI preprocess
                 "description_full": "",
                 "posted_at": posted_at,
                 "company": company_name,
             })
 
-        # Stop early if we've reached the advertised total. Workday only
-        # returns a real `total` on page 0; subsequent pages echo `total=0`,
-        # so we can't trust it past the first response. Capture once and
-        # stop when we've drained it.
         if page == 0:
             advertised_total = data.get("total") or 0
-        if advertised_total and len(jobs) >= advertised_total:
+        if advertised_total and len(out) >= advertised_total:
             break
-        # Short page = the API ran out of results before our cap.
         if len(postings) < _WORKDAY_PAGE_SIZE:
             break
         time.sleep(_WORKDAY_PAGE_SLEEP)
 
-    return jobs
+    return out
+
+
+def fetch_workday(company: dict, company_name: str) -> list[dict]:
+    """Two-pass pull from a Workday tenant via the CXS POST endpoint.
+
+    Pass 1: `searchText="remote"` — captures WFH-friendly roles first so we
+            never miss a remote job to the per-tenant pagination cap, even
+            on huge tenants like CVS Health (15k+ listings).
+    Pass 2: `searchText=""`   — fills any remaining capacity with the
+            general newest-first listing so onsite/hybrid tech-metro roles
+            (NVIDIA Santa Clara, Salesforce SF) still come through.
+
+    Both passes share a `seen_paths` set so the same job never appears
+    twice. Each pass is capped at _WORKDAY_MAX_PAGES; in practice most
+    tenants have far fewer than 300 remote postings, so the second pass
+    runs at full budget on tenants where it matters most."""
+    api_url = _workday_cxs_url(company)
+    if not api_url:
+        return []
+
+    legacy_url = company.get("workday_url") or api_url.split("/wday/cxs/")[0]
+    seen_paths: set[str] = set()
+
+    remote_jobs = _workday_paginate(api_url, "remote", company_name, legacy_url, seen_paths)
+    general_jobs = _workday_paginate(api_url, "", company_name, legacy_url, seen_paths)
+    return remote_jobs + general_jobs
 
 
 def fetch_custom(company: dict, company_name: str) -> list[dict]:
