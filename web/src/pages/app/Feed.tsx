@@ -80,7 +80,9 @@ export default function FeedPage() {
       setJobs((js) => js.filter((j) => j.id !== jobId));
       setTotal((t) => Math.max(0, t - 1));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
+      const err = e as Error & { status?: number };
+      // 429 → cap reached, surface friendly message + upgrade hint
+      setError(err.message || 'Save failed');
     } finally {
       setBusyId(null);
     }
@@ -108,7 +110,8 @@ export default function FeedPage() {
     setScoreNotice(null);
     try {
       const r = await rescoreJobs(false);
-      setScoreNotice(r.scored > 0 ? `Scored ${r.scored} job${r.scored === 1 ? '' : 's'}${r.has_more ? ' (more remaining — click again)' : ''}` : (r.message || 'Nothing to score'));
+      const remainingHint = r.usage ? ` · ${r.usage.remaining}/${r.usage.limit} rescores left today` : '';
+      setScoreNotice(r.scored > 0 ? `Scored ${r.scored} job${r.scored === 1 ? '' : 's'}${r.has_more ? ' — click again for the next batch' : ''}${remainingHint}` : (r.message || 'Nothing to score'));
       await load(filters);
     } catch (e) {
       setScoreNotice(e instanceof Error ? e.message : 'Rescore failed');

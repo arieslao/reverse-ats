@@ -18,7 +18,15 @@
 
 import type { Env } from "./schema";
 import { fetchTier, verifyRequest } from "./supabase-auth";
-import { LIMITS, checkAndConsume, limitFor, readUsage } from "./usage";
+import {
+  LIFETIME_LIMITS,
+  LIMITS,
+  checkAndConsume,
+  checkLifetime,
+  lifetimeLimitFor,
+  limitFor,
+  readUsage,
+} from "./usage";
 
 const PIPELINE_STAGES = new Set([
   "saved",
@@ -94,11 +102,26 @@ export async function handleFeedAndPipeline(request: Request, env: Env): Promise
 
 async function usageOverview(env: Env, userId: string): Promise<Response> {
   const tier = await fetchTier(env, userId);
-  const actions = Object.keys(LIMITS);
   const states: Record<string, { used: number; remaining: number; limit: number }> = {};
-  for (const a of actions) {
+  for (const a of Object.keys(LIMITS)) {
     const s = await readUsage(env, userId, a as keyof typeof LIMITS, tier);
     states[a] = { used: s.used, remaining: s.remaining, limit: s.limit };
+  }
+  // Lifetime caps — currently just saved_jobs.
+  for (const a of Object.keys(LIFETIME_LIMITS)) {
+    let count = 0;
+    if (a === "saved_jobs") {
+      const row = await env.DB.prepare(`SELECT COUNT(*) AS n FROM user_pipeline WHERE user_id = ?`)
+        .bind(userId)
+        .first<{ n: number }>();
+      count = row?.n ?? 0;
+    }
+    const limit = lifetimeLimitFor(a as keyof typeof LIFETIME_LIMITS, tier);
+    states[a] = {
+      used: count,
+      remaining: limit < 0 ? -1 : Math.max(0, limit - count),
+      limit,
+    };
   }
   return jsonResponse({ ok: true, tier, usage: states }, 200);
 }
@@ -233,6 +256,38 @@ async function dismissJob(env: Env, userId: string, jobId: string): Promise<Resp
 async function saveJobToPipeline(env: Env, userId: string, jobId: string): Promise<Response> {
   const exists = await env.DB.prepare(`SELECT 1 FROM jobs WHERE id = ?`).bind(jobId).first();
   if (!exists) return jsonResponse({ ok: false, error: "not found" }, 404);
+
+  // Lifetime cap on saved jobs (free tier only; sponsor/admin = unlimited).
+  // Skip the cap for re-saves (already in pipeline — idempotent insert).
+  const tier = await fetchTier(env, userId);
+  const already = await env.DB.prepare(
+    `SELECT 1 FROM user_pipeline WHERE user_id = ? AND job_id = ?`,
+  )
+    .bind(userId, jobId)
+    .first();
+  if (!already) {
+    const countRow = await env.DB.prepare(
+      `SELECT COUNT(*) AS n FROM user_pipeline WHERE user_id = ?`,
+    )
+      .bind(userId)
+      .first<{ n: number }>();
+    const usage = checkLifetime("saved_jobs", tier, countRow?.n ?? 0);
+    if (!usage.ok) {
+      return jsonResponse(
+        {
+          ok: false,
+          error:
+            tier === "free"
+              ? `Free accounts can save up to ${usage.limit} jobs. Remove some, or upgrade for unlimited saves.`
+              : `Lifetime save cap reached.`,
+          tier,
+          usage,
+        },
+        429,
+      );
+    }
+  }
+
   const now = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO user_pipeline (user_id, job_id, stage, created_at, updated_at)
@@ -538,6 +593,24 @@ const SCORE_BATCH_LIMIT = 25;
 async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
   const all = url.searchParams.get("all") === "true";
 
+  // Tier-gated daily limit (1 batch = 25 jobs scored). Free=1, Sponsor=4, Admin=20.
+  const tier = await fetchTier(env, userId);
+  const usage = await checkAndConsume(env, userId, "rescore", tier);
+  if (!usage.ok) {
+    return jsonResponse(
+      {
+        ok: false,
+        error:
+          tier === "free"
+            ? `You've used your ${usage.limit} rescore${usage.limit === 1 ? "" : "s"} for today. Upgrade for ${limitFor("rescore", "sponsor")} per day.`
+            : `Daily rescore limit reached. Resets at UTC midnight.`,
+        tier,
+        usage,
+      },
+      429,
+    );
+  }
+
   const profile = await env.DB.prepare(
     `SELECT resume_text, target_roles, must_have_skills FROM user_profiles WHERE user_id = ?`,
   )
@@ -545,6 +618,12 @@ async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
     .first<{ resume_text: string | null; target_roles: string; must_have_skills: string }>();
   const resume = (profile?.resume_text || "").trim();
   if (resume.length < 50) {
+    // Refund: didn't actually score.
+    await env.DB.prepare(
+      `UPDATE user_usage SET count = MAX(0, count - 1) WHERE user_id = ? AND action = ? AND day = ?`,
+    )
+      .bind(userId, "rescore", new Date().toISOString().slice(0, 10))
+      .run();
     return jsonResponse({ ok: false, error: "Save your resume first." }, 400);
   }
 
@@ -646,7 +725,14 @@ async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
   }
 
   return jsonResponse(
-    { ok: true, scored: okCount, batch: jobs.length, has_more: jobs.length === SCORE_BATCH_LIMIT },
+    {
+      ok: true,
+      scored: okCount,
+      batch: jobs.length,
+      has_more: jobs.length === SCORE_BATCH_LIMIT,
+      tier,
+      usage: { used: usage.used, remaining: usage.remaining, limit: usage.limit },
+    },
     200,
   );
 }

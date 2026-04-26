@@ -7,12 +7,43 @@
 
 import type { AuthedUser, Env } from "./schema";
 
+// Daily caps (reset at UTC midnight). -1 = unlimited.
 export const LIMITS: Record<string, Record<AuthedUser["tier"], number>> = {
   cover_letter: { free: 2, sponsor: 30, admin: 100 },
+  suggest_roles: { free: 1, sponsor: 5, admin: 20 },
+  rescore: { free: 1, sponsor: 4, admin: 20 },
+};
+
+// Lifetime caps (no reset). -1 = unlimited.
+export const LIFETIME_LIMITS: Record<string, Record<AuthedUser["tier"], number>> = {
+  saved_jobs: { free: 50, sponsor: -1, admin: -1 },
 };
 
 export function limitFor(action: keyof typeof LIMITS, tier: AuthedUser["tier"]): number {
   return LIMITS[action]?.[tier] ?? 0;
+}
+
+export function lifetimeLimitFor(action: keyof typeof LIFETIME_LIMITS, tier: AuthedUser["tier"]): number {
+  return LIFETIME_LIMITS[action]?.[tier] ?? -1;
+}
+
+/**
+ * Check a lifetime cap given the caller's already-known current count.
+ * Returns ok=false when the cap is reached. -1 limit = unlimited (always ok).
+ */
+export function checkLifetime(
+  action: keyof typeof LIFETIME_LIMITS,
+  tier: AuthedUser["tier"],
+  currentCount: number,
+): UsageState {
+  const limit = lifetimeLimitFor(action, tier);
+  if (limit < 0) return { ok: true, used: currentCount, remaining: -1, limit: -1 };
+  return {
+    ok: currentCount < limit,
+    used: currentCount,
+    remaining: Math.max(0, limit - currentCount),
+    limit,
+  };
 }
 
 function utcDay(): string {

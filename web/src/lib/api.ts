@@ -211,7 +211,14 @@ export async function dismissJob(jobId: string): Promise<void> {
 
 export async function saveJob(jobId: string): Promise<void> {
   const r = await authFetch(`/api/jobs/${encodeURIComponent(jobId)}/save`, { method: 'POST' })
-  if (!r.ok) throw new Error(`save: ${r.status}`)
+  if (!r.ok) {
+    const data = await r.json().catch(() => null) as { error?: string; tier?: Tier; usage?: UsageState } | null
+    const err = new Error(data?.error || `save: ${r.status}`) as Error & { status?: number; tier?: Tier; usage?: UsageState }
+    err.status = r.status
+    err.tier = data?.tier
+    err.usage = data?.usage
+    throw err
+  }
 }
 
 export interface UsageState {
@@ -352,22 +359,52 @@ export async function fetchScoringStats(): Promise<ScoringStats> {
   return r.json()
 }
 
-export async function rescoreJobs(all = false): Promise<{ scored: number; batch?: number; has_more?: boolean; message?: string }> {
+export async function rescoreJobs(all = false): Promise<{ scored: number; batch?: number; has_more?: boolean; message?: string; usage?: UsageState }> {
   const r = await authFetch(`/api/scoring/rescore${all ? '?all=true' : ''}`, { method: 'POST' })
-  const data = await r.json().catch(() => null) as { scored?: number; batch?: number; has_more?: boolean; error?: string; message?: string } | null
-  if (!r.ok) throw new Error(data?.error || `rescore: ${r.status}`)
-  return { scored: data?.scored || 0, batch: data?.batch, has_more: data?.has_more, message: data?.message }
+  const data = await r.json().catch(() => null) as {
+    scored?: number; batch?: number; has_more?: boolean; error?: string; message?: string
+    tier?: Tier; usage?: UsageState
+  } | null
+  if (!r.ok) {
+    const err = new Error(data?.error || `rescore: ${r.status}`) as Error & {
+      status?: number; tier?: Tier; usage?: UsageState
+    }
+    err.status = r.status
+    err.tier = data?.tier
+    err.usage = data?.usage
+    throw err
+  }
+  return {
+    scored: data?.scored || 0,
+    batch: data?.batch,
+    has_more: data?.has_more,
+    message: data?.message,
+    usage: data?.usage,
+  }
 }
 
 export async function suggestRoles(): Promise<SuggestRolesResult> {
   const r = await authFetch('/api/profile/suggest-roles', { method: 'POST' })
-  const data = await r.json().catch(() => null)
+  const data = await r.json().catch(() => null) as {
+    current_fit?: RoleSuggestion[]
+    next_step?: RoleSuggestion[]
+    error?: string
+    tier?: Tier
+    usage?: UsageState
+  } | null
   if (!r.ok) {
-    const msg = (data && (data as { error?: string }).error) || `suggest-roles failed: ${r.status}`
-    throw new Error(msg)
+    const err = new Error(data?.error || `suggest-roles failed: ${r.status}`) as Error & {
+      status?: number
+      tier?: Tier
+      usage?: UsageState
+    }
+    err.status = r.status
+    err.tier = data?.tier
+    err.usage = data?.usage
+    throw err
   }
   return {
-    current_fit: ((data as { current_fit?: RoleSuggestion[] }).current_fit) || [],
-    next_step: ((data as { next_step?: RoleSuggestion[] }).next_step) || [],
+    current_fit: data?.current_fit || [],
+    next_step: data?.next_step || [],
   }
 }

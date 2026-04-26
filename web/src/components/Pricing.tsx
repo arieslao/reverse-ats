@@ -17,8 +17,8 @@ export function Pricing() {
       <div className="max-w-6xl mx-auto">
         <SectionHeader
           eyebrow="Pricing"
-          title="Free to start. $10/mo if you want unlimited cover letters."
-          subtitle="Free hosted account gets the full app. Sponsor tier just bumps the AI cover-letter limit so we don't go bankrupt."
+          title="Free to start. $5/mo if you want generous AI limits."
+          subtitle="Hosted free works fully — just bounded so we can keep the lights on. Sponsor lifts the daily AI caps and unlimited saves."
         />
 
         <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -42,13 +42,14 @@ export function Pricing() {
             name="Hosted Free"
             price="$0"
             priceSubtext="sign up, no card required"
-            description="The hosted app, with a small daily cap on AI cover letters. Everything else is unlimited."
+            description="The hosted app with daily AI caps. Resume edits, browsing, and pipeline tracking are all unlimited."
             features={[
               'Unlimited job feed + filters',
-              'Unlimited saved jobs + pipeline',
-              'AI role suggestions from your resume',
-              'AI match scoring on every job',
+              'Unlimited resume edits',
+              'Save up to 50 jobs to your pipeline',
               '2 AI cover letters per day',
+              '1 batch rescore per day (25 jobs)',
+              '1 AI role suggestion per day',
             ]}
             cta="Sign up free"
             ctaHref="/sign-up"
@@ -57,20 +58,88 @@ export function Pricing() {
 
           <PricingCard
             name="Hosted Sponsor"
-            price="$10"
+            price="$5"
             priceSubtext="per month, cancel anytime"
-            description="Same hosted app, generous AI limits. Supports the project so we can keep the free tier free."
+            description="Roomy AI limits and unlimited saves. Supports the project so the free tier stays generous."
             features={[
-              'Everything in Hosted Free',
+              'Unlimited saved jobs',
               '30 AI cover letters per day',
-              'Priority support',
-              'Cancel anytime, data exports as JSON',
+              '4 batch rescores per day (100 jobs)',
+              '5 AI role suggestions per day',
+              'Priority support · cancel anytime',
+              'Data exports as JSON whenever',
             ]}
-            cta="Become a sponsor — $10/mo"
+            cta="Become a sponsor — $5/mo"
             ctaHref="https://github.com/sponsors/arieslao"
             primary
             badge="Launching soon"
           />
+        </div>
+
+        {/* Detailed limit comparison */}
+        <div
+          className="mt-12 rounded-3xl overflow-hidden"
+          style={{
+            background: 'var(--color-bg-card)',
+            border: '1px solid var(--color-border-subtle)',
+          }}
+        >
+          <div
+            className="px-8 py-5 border-b text-[11px] uppercase tracking-[0.16em]"
+            style={{
+              borderColor: 'var(--color-border-subtle)',
+              color: 'var(--color-text-tertiary)',
+              fontWeight: 500,
+            }}
+          >
+            What you get on each tier
+          </div>
+          <div className="overflow-x-auto">
+            <table
+              className="w-full"
+              style={{ borderCollapse: 'collapse', color: 'var(--color-text-secondary)' }}
+            >
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                  <th
+                    className="text-left px-8 py-4 text-[14px] font-medium"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    Action
+                  </th>
+                  <th
+                    className="text-left px-6 py-4 text-[14px] font-medium"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    Hosted Free
+                  </th>
+                  <th
+                    className="text-left px-6 py-4 text-[14px] font-medium"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    Hosted Sponsor ($5/mo)
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="text-[14px]">
+                {[
+                  ['Save jobs', '50 lifetime', 'Unlimited'],
+                  ['AI cover letters', '2 / day', '30 / day'],
+                  ['Rescore (batches of 25)', '1 / day', '4 / day'],
+                  ['AI role suggestions', '1 / day', '5 / day'],
+                  ['Resume edits', 'Unlimited', 'Unlimited'],
+                  ['Job feed + filters', 'Unlimited', 'Unlimited'],
+                  ['Pipeline + analytics', 'Unlimited', 'Unlimited'],
+                ].map(([action, free, sponsor]) => (
+                  <tr key={action} style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+                    <td className="px-8 py-3.5" style={{ color: 'var(--color-text-primary)' }}>{action}</td>
+                    <td className="px-6 py-3.5">{free}</td>
+                    <td className="px-6 py-3.5">{sponsor}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Price-anchor row */}

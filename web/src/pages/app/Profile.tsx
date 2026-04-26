@@ -279,6 +279,7 @@ function SuggestRolesPanel({
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [capped, setCapped] = useState(false);
   const [current, setCurrent] = useState<RoleSuggestion[]>([]);
   const [next, setNext] = useState<RoleSuggestion[]>([]);
   const [picked, setPicked] = useState<Record<string, boolean>>({});
@@ -287,6 +288,7 @@ function SuggestRolesPanel({
     setOpen(true);
     setLoading(true);
     setError(null);
+    setCapped(false);
     try {
       const result = await suggestRoles();
       const existingLower = new Set(existingTargets.map((t) => t.toLowerCase()));
@@ -298,7 +300,9 @@ function SuggestRolesPanel({
       setNext(result.next_step);
       setPicked(init);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Suggestion failed');
+      const err = e as Error & { status?: number };
+      setError(err.message || 'Suggestion failed');
+      if (err.status === 429) setCapped(true);
     } finally {
       setLoading(false);
     }
@@ -333,7 +337,19 @@ function SuggestRolesPanel({
 
       {open && (
         <div className="mt-4 flex flex-col gap-4">
-          {error && <div className="text-xs text-[var(--color-danger,#dc2626)]">{error}</div>}
+          {error && (
+            <div className="space-y-2">
+              <div className="text-xs text-[var(--color-danger,#dc2626)]">{error}</div>
+              {capped && (
+                <a
+                  href="/#pricing"
+                  className="inline-block text-xs px-3 h-8 leading-8 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] cursor-pointer"
+                >
+                  Upgrade to Sponsor
+                </a>
+              )}
+            </div>
+          )}
           {!loading && !error && current.length === 0 && next.length === 0 && (
             <div className="text-xs text-[var(--color-text-secondary)]">No suggestions returned. Try again.</div>
           )}

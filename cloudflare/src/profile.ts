@@ -9,7 +9,8 @@
 // verified token, never from the request body.
 
 import type { Env } from "./schema";
-import { verifyRequest } from "./supabase-auth";
+import { fetchTier, verifyRequest } from "./supabase-auth";
+import { checkAndConsume, limitFor } from "./usage";
 
 // ─── shape ──────────────────────────────────────────────────────────────────
 
@@ -242,12 +243,36 @@ interface RoleSuggestion {
 }
 
 async function suggestRolesHandler(env: Env, userId: string): Promise<Response> {
+  // Tier-gated daily cap. Free=1, Sponsor=5, Admin=20.
+  const tier = await fetchTier(env, userId);
+  const usage = await checkAndConsume(env, userId, "suggest_roles", tier);
+  if (!usage.ok) {
+    return jsonResponse(
+      {
+        ok: false,
+        error:
+          tier === "free"
+            ? `You've used your ${usage.limit} role suggestion${usage.limit === 1 ? "" : "s"} for today. Upgrade for ${limitFor("suggest_roles", "sponsor")} per day.`
+            : `Daily suggest-roles limit reached. Resets at UTC midnight.`,
+        tier,
+        usage,
+      },
+      429,
+    );
+  }
+
   const row = await env.DB.prepare(`SELECT resume_text FROM user_profiles WHERE user_id = ?`)
     .bind(userId)
     .first<{ resume_text: string | null }>();
 
   const resume = (row?.resume_text || "").trim();
   if (resume.length < 50) {
+    // Refund — we didn't actually call the model.
+    await env.DB.prepare(
+      `UPDATE user_usage SET count = MAX(0, count - 1) WHERE user_id = ? AND action = ? AND day = ?`,
+    )
+      .bind(userId, "suggest_roles", new Date().toISOString().slice(0, 10))
+      .run();
     return jsonResponse(
       {
         ok: false,
@@ -323,6 +348,8 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
       current_fit: cleanSuggestions(obj.current_fit, 10),
       next_step: cleanSuggestions(obj.next_step, 8),
       model: SUGGEST_ROLES_MODEL,
+      tier,
+      usage: { used: usage.used, remaining: usage.remaining, limit: usage.limit },
     },
     200,
   );
