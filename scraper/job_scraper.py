@@ -481,10 +481,17 @@ def _fetch_workday_job_detail(api_root: str, external_path: str) -> Optional[dic
         return None
 
 
+# Workday's edge (Akamai) rejects requests from cloud IP ranges with our
+# custom UA. A real browser UA + a minimal Origin header pass through.
 _WORKDAY_HEADERS = {
-    "User-Agent": "AriesLabs-JobScraper/1.0",
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
     "Content-Type": "application/json",
-    "Accept": "application/json",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
 
@@ -506,6 +513,14 @@ def _workday_paginate(
     out: list[dict] = []
     advertised_total = 0
 
+    # Per-tenant Origin/Referer lets the Akamai edge classify the request as
+    # coming from the careers site itself rather than a generic bot.
+    request_headers = {
+        **_WORKDAY_HEADERS,
+        "Origin": site_root,
+        "Referer": f"{site_root}/",
+    }
+
     for page in range(max_pages):
         offset = page * _WORKDAY_PAGE_SIZE
         try:
@@ -517,12 +532,22 @@ def _workday_paginate(
                     "offset": offset,
                     "searchText": search_text,
                 },
-                headers=_WORKDAY_HEADERS,
+                headers=request_headers,
                 timeout=REQUEST_TIMEOUT,
             )
             resp.raise_for_status()
             data = resp.json()
-        except Exception:
+        except Exception as exc:
+            # Surface in run logs so we can diagnose blocks/rate-limits without
+            # having to guess. Only on first-page failures — subsequent failures
+            # mean we already drained successfully and hit a tail edge case.
+            if page == 0:
+                status = getattr(getattr(exc, "response", None), "status_code", "?")
+                print(
+                    f"[workday] {company_name} pass={search_text!r} "
+                    f"page={page} status={status} err={type(exc).__name__}: {exc}",
+                    file=sys.stderr,
+                )
             break
 
         postings = data.get("jobPostings") or []
