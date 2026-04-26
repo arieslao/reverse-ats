@@ -268,9 +268,12 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
         { role: "system", content: SUGGEST_ROLES_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 2000,
+      max_tokens: 2500,
       temperature: 0.2,
-    })) as { response?: string };
+      // Workers AI supports JSON mode for several Llama variants. If the
+      // model rejects this option it's silently ignored, so it's safe.
+      response_format: { type: "json_object" },
+    } as Parameters<typeof env.AI.run>[1])) as { response?: string };
     raw = (response.response || "").trim();
   } catch (err) {
     return jsonResponse(
@@ -279,10 +282,13 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
     );
   }
 
+  console.log(`[suggest-roles] raw response (${raw.length} chars):`, raw.slice(0, 500));
+
   const parsed = parseJsonLoose(raw);
   if (!parsed || typeof parsed !== "object") {
+    console.log(`[suggest-roles] parse failed. full raw:`, raw);
     return jsonResponse(
-      { ok: false, error: "Could not parse LLM response. Try again." },
+      { ok: false, error: `Model returned unparseable response (${raw.length} chars). Try again.` },
       502,
     );
   }
