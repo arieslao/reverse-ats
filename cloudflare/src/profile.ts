@@ -63,14 +63,20 @@ const WRITABLE_ARRAY_FIELDS = [
 
 export async function handleProfile(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (url.pathname !== "/api/profile") return null;
+  if (!url.pathname.startsWith("/api/profile")) return null;
 
   const identity = await verifyRequest(request, env);
   if (!identity) return jsonResponse({ ok: false, error: "unauthorized" }, 401);
 
-  if (request.method === "GET") return getProfile(env, identity.userId);
-  if (request.method === "PUT") return putProfile(request, env, identity.userId);
-  return jsonResponse({ ok: false, error: "method not allowed" }, 405);
+  if (url.pathname === "/api/profile") {
+    if (request.method === "GET") return getProfile(env, identity.userId);
+    if (request.method === "PUT") return putProfile(request, env, identity.userId);
+    return jsonResponse({ ok: false, error: "method not allowed" }, 405);
+  }
+  if (url.pathname === "/api/profile/suggest-roles" && request.method === "POST") {
+    return suggestRolesHandler(env, identity.userId);
+  }
+  return null;
 }
 
 // ─── GET ────────────────────────────────────────────────────────────────────
@@ -185,6 +191,152 @@ async function putProfile(request: Request, env: Env, userId: string): Promise<R
   if (!row) return jsonResponse({ ok: false, error: "profile not found after update" }, 500);
 
   return jsonResponse({ ok: true, profile: rowToOut(row) }, 200);
+}
+
+// ─── POST /api/profile/suggest-roles ────────────────────────────────────────
+//
+// Asks Llama 3.1 8B (Workers AI) to recommend role titles based on the user's
+// stored resume_text. Returns two lists — current_fit (could land today) and
+// next_step (one-level-up career progression).
+
+const SUGGEST_ROLES_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+
+const SUGGEST_ROLES_SYSTEM_PROMPT = `You are an experienced career coach reviewing a candidate's resume.
+
+Your job is to recommend job titles for them to target. Output TWO lists:
+
+1. **current_fit** — 6 to 10 role titles the candidate could land TODAY based on
+   the experience already on their resume. These should match (or be one notch
+   below) their current/most-recent seniority. Include obvious peer roles and
+   adjacent specializations they're directly qualified for.
+
+2. **next_step** — 4 to 8 role titles that represent a NATURAL CAREER PROGRESSION
+   from where they are now. These are stretch roles — typically one level up in
+   seniority or scope, OR a logical pivot into an adjacent function their
+   experience qualifies them to grow into.
+
+For each role, include a one-sentence rationale grounded in specific evidence
+from their resume — name the actual companies, technologies, or
+responsibilities you saw.
+
+Return ONLY valid JSON with this exact structure:
+
+{
+  "current_fit": [
+    {"title": "<exact role title>", "reasoning": "<one sentence citing resume evidence>"}
+  ],
+  "next_step": [
+    {"title": "<exact role title>", "reasoning": "<one sentence citing resume evidence>"}
+  ]
+}
+
+Rules:
+- Use industry-standard job titles (e.g. "VP of Engineering", "Senior Director of Data Science").
+- Do NOT invent roles or repeat the same title across both lists.
+- Output JSON only — no prose, no markdown fences.
+`;
+
+interface RoleSuggestion {
+  title: string;
+  reasoning: string;
+}
+
+async function suggestRolesHandler(env: Env, userId: string): Promise<Response> {
+  const row = await env.DB.prepare(`SELECT resume_text FROM user_profiles WHERE user_id = ?`)
+    .bind(userId)
+    .first<{ resume_text: string | null }>();
+
+  const resume = (row?.resume_text || "").trim();
+  if (resume.length < 50) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: "Resume is too short. Paste your resume above and save first.",
+      },
+      400,
+    );
+  }
+
+  const userPrompt =
+    `## Candidate Resume\n\n${resume.slice(0, 6000)}\n\n` +
+    `Recommend roles per the system instructions.`;
+
+  let raw = "";
+  try {
+    const response = (await env.AI.run(SUGGEST_ROLES_MODEL, {
+      messages: [
+        { role: "system", content: SUGGEST_ROLES_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 2000,
+      temperature: 0.2,
+    })) as { response?: string };
+    raw = (response.response || "").trim();
+  } catch (err) {
+    return jsonResponse(
+      { ok: false, error: `LLM call failed: ${err instanceof Error ? err.message : String(err)}` },
+      502,
+    );
+  }
+
+  const parsed = parseJsonLoose(raw);
+  if (!parsed || typeof parsed !== "object") {
+    return jsonResponse(
+      { ok: false, error: "Could not parse LLM response. Try again." },
+      502,
+    );
+  }
+  const obj = parsed as { current_fit?: unknown; next_step?: unknown };
+
+  return jsonResponse(
+    {
+      ok: true,
+      current_fit: cleanSuggestions(obj.current_fit, 10),
+      next_step: cleanSuggestions(obj.next_step, 8),
+      model: SUGGEST_ROLES_MODEL,
+    },
+    200,
+  );
+}
+
+function cleanSuggestions(raw: unknown, max: number): RoleSuggestion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RoleSuggestion[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const r = item as { title?: unknown; reasoning?: unknown };
+    const title = typeof r.title === "string" ? r.title.trim() : "";
+    const reasoning = typeof r.reasoning === "string" ? r.reasoning.trim() : "";
+    if (!title || title.length > 80) continue;
+    const key = title.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title, reasoning: reasoning.slice(0, 240) });
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function parseJsonLoose(text: string): unknown {
+  if (!text) return null;
+  let cleaned = text.trim();
+  const fenceMatch = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+  if (fenceMatch) cleaned = fenceMatch[1].trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 // ─── helpers ────────────────────────────────────────────────────────────────

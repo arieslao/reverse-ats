@@ -122,3 +122,26 @@ export async function updateProfile(patch: Partial<Profile>): Promise<Profile> {
   const data = await r.json()
   return data.profile as Profile
 }
+
+export interface RoleSuggestion {
+  title: string
+  reasoning: string
+}
+
+export interface SuggestRolesResult {
+  current_fit: RoleSuggestion[]
+  next_step: RoleSuggestion[]
+}
+
+export async function suggestRoles(): Promise<SuggestRolesResult> {
+  const r = await authFetch('/api/profile/suggest-roles', { method: 'POST' })
+  const data = await r.json().catch(() => null)
+  if (!r.ok) {
+    const msg = (data && (data as { error?: string }).error) || `suggest-roles failed: ${r.status}`
+    throw new Error(msg)
+  }
+  return {
+    current_fit: ((data as { current_fit?: RoleSuggestion[] }).current_fit) || [],
+    next_step: ((data as { next_step?: RoleSuggestion[] }).next_step) || [],
+  }
+}

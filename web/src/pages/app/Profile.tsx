@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../stores/auth';
-import { fetchProfile, updateProfile, type Profile } from '../../lib/api';
+import { fetchProfile, suggestRoles, updateProfile, type Profile, type RoleSuggestion } from '../../lib/api';
 
 const SENIORITY_OPTIONS = ['', 'intern', 'junior', 'mid', 'senior', 'staff', 'principal', 'director', 'vp', 'c-level'] as const;
 const PRIORITY_CATEGORIES = ['tech', 'finance', 'healthcare', 'consulting', 'media', 'retail', 'education', 'government', 'other'] as const;
@@ -103,6 +103,21 @@ export default function ProfilePage() {
                 className="w-full px-3 py-2 text-xs font-mono rounded-md bg-[var(--color-bg-elevated)] border border-[var(--color-border-muted)] focus:border-[var(--color-accent)] focus:outline-none resize-y"
               />
             </Field>
+
+            <SuggestRolesPanel
+              existingTargets={form.target_roles}
+              onAdd={(picked) => {
+                const existing = new Set(form.target_roles.map((t) => t.toLowerCase()));
+                const merged = [...form.target_roles];
+                for (const t of picked) {
+                  if (!existing.has(t.toLowerCase())) {
+                    merged.push(t);
+                    existing.add(t.toLowerCase());
+                  }
+                }
+                setForm((f) => ({ ...f, target_roles: merged }));
+              }}
+            />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Field label="Target Roles">
@@ -244,6 +259,173 @@ export default function ProfilePage() {
           </div>
         )}
       </main>
+    </div>
+  );
+}
+
+// ─── Suggest Roles ──────────────────────────────────────────────────────────
+//
+// Calls POST /api/profile/suggest-roles → Workers AI returns two lists.
+// User picks which to merge into target_roles. Resume text must already be
+// saved (the worker reads it from D1, not the form state).
+
+function SuggestRolesPanel({
+  existingTargets,
+  onAdd,
+}: {
+  existingTargets: string[];
+  onAdd: (titles: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [current, setCurrent] = useState<RoleSuggestion[]>([]);
+  const [next, setNext] = useState<RoleSuggestion[]>([]);
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+
+  const run = async () => {
+    setOpen(true);
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await suggestRoles();
+      const existingLower = new Set(existingTargets.map((t) => t.toLowerCase()));
+      const init: Record<string, boolean> = {};
+      for (const r of [...result.current_fit, ...result.next_step]) {
+        init[r.title] = !existingLower.has(r.title.toLowerCase());
+      }
+      setCurrent(result.current_fit);
+      setNext(result.next_step);
+      setPicked(init);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Suggestion failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addPicked = () => {
+    const titles = Object.entries(picked)
+      .filter(([, v]) => v)
+      .map(([k]) => k);
+    onAdd(titles);
+    setOpen(false);
+  };
+
+  return (
+    <div className="rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)] p-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <div className="text-sm font-medium">Suggest roles from resume</div>
+          <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">
+            Save your resume above first — then let the model recommend titles you can target now and as a stretch.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={run}
+          disabled={loading}
+          className="text-xs px-3 h-8 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
+        >
+          {loading ? 'Thinking…' : open ? 'Run again' : 'Suggest roles'}
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-4 flex flex-col gap-4">
+          {error && <div className="text-xs text-[var(--color-danger,#dc2626)]">{error}</div>}
+          {!loading && !error && current.length === 0 && next.length === 0 && (
+            <div className="text-xs text-[var(--color-text-secondary)]">No suggestions returned. Try again.</div>
+          )}
+
+          {(current.length > 0 || next.length > 0) && (
+            <>
+              <SuggestionGroup
+                heading="Could land today"
+                items={current}
+                picked={picked}
+                onToggle={(title) => setPicked((p) => ({ ...p, [title]: !p[title] }))}
+                existingTargets={existingTargets}
+              />
+              <SuggestionGroup
+                heading="Stretch / progression"
+                items={next}
+                picked={picked}
+                onToggle={(title) => setPicked((p) => ({ ...p, [title]: !p[title] }))}
+                existingTargets={existingTargets}
+              />
+
+              <div className="flex items-center gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={addPicked}
+                  className="text-xs px-3 h-8 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] transition-colors cursor-pointer"
+                >
+                  Add selected to Target Roles
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] cursor-pointer"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SuggestionGroup({
+  heading,
+  items,
+  picked,
+  onToggle,
+  existingTargets,
+}: {
+  heading: string;
+  items: RoleSuggestion[];
+  picked: Record<string, boolean>;
+  onToggle: (title: string) => void;
+  existingTargets: string[];
+}) {
+  if (items.length === 0) return null;
+  const existingLower = new Set(existingTargets.map((t) => t.toLowerCase()));
+  return (
+    <div>
+      <div className="text-xs font-medium uppercase tracking-wider text-[var(--color-text-tertiary)] mb-2">
+        {heading}
+      </div>
+      <ul className="flex flex-col gap-2">
+        {items.map((r) => {
+          const already = existingLower.has(r.title.toLowerCase());
+          return (
+            <li key={r.title} className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={!!picked[r.title]}
+                onChange={() => onToggle(r.title)}
+                disabled={already}
+                className="mt-1 accent-[var(--color-accent)]"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium">
+                  {r.title}
+                  {already && (
+                    <span className="ml-2 text-xs font-normal text-[var(--color-text-tertiary)]">already added</span>
+                  )}
+                </div>
+                {r.reasoning && (
+                  <div className="mt-0.5 text-xs text-[var(--color-text-secondary)]">{r.reasoning}</div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
