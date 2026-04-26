@@ -28,16 +28,22 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user, loading: false });
   },
 
-  // Subscribe to Supabase auth events. INITIAL_SESSION fires once on boot
-  // with the existing session (or null), so we don't need a separate
-  // getUser/getSession call at startup — that would race with sign-in flows
-  // and trigger NavigatorLockAcquireTimeout errors.
+  // Subscribe to Supabase auth events. Any supabase.* call (including
+  // PostgREST `from(...)`) inside this callback deadlocks the auth
+  // processLock — `signInWithPassword` holds the lock and awaits listeners,
+  // and `from('profiles')` re-acquires the same non-reentrant lock to read
+  // the access token. Defer all supabase work via `setTimeout(..., 0)` so it
+  // runs after the lock releases.
   initialize: () => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
         if (session?.user) {
-          const user = await loadProfile(session.user.id, session.user.email ?? '');
-          set({ user, loading: false, initialized: true });
+          const userId = session.user.id;
+          const email = session.user.email ?? '';
+          setTimeout(async () => {
+            const user = await loadProfile(userId, email);
+            set({ user, loading: false, initialized: true });
+          }, 0);
         } else {
           set({ user: null, loading: false, initialized: true });
         }
