@@ -3,8 +3,18 @@ import { createClient, processLock } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
-if (!SUPABASE_URL) {
-  console.warn('[supabase] VITE_SUPABASE_URL not set — auth will not work');
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const missing = [
+    !SUPABASE_URL && 'VITE_SUPABASE_URL',
+    !SUPABASE_ANON_KEY && 'VITE_SUPABASE_ANON_KEY',
+  ].filter(Boolean).join(' and ');
+  throw new Error(
+    `[supabase] ${missing} is missing from the build. ` +
+      `These must be set as Variables (not Secrets) in Cloudflare Pages → ` +
+      `reverse-ats → Settings → Variables and Secrets, for BOTH Production and Preview, ` +
+      `then the deployment must be re-run (env vars are inlined at build time, not runtime). ` +
+      `For local dev, set them in web/.env.local.`,
+  );
 }
 
 // processLock = in-tab lock instead of the cross-tab Web Locks API.
