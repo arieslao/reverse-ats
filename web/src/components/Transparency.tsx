@@ -2,62 +2,67 @@ import { SectionHeader } from './HowItWorks'
 
 const ROLLOUT = [
   {
-    phase: 'Today',
+    phase: 'Live today',
     label: 'Live',
     status: 'done',
-    title: 'You can run the full app yourself, free',
-    body: 'The whole project is open source. If you\'re comfortable with a terminal, follow the setup guide and you have the entire tool — running on your laptop, with your data staying on your machine.',
+    title: 'Self-host free, or sponsor-tier hosted',
+    body: 'The whole project is open source — if you can use a terminal, the setup guide gets the full tool running on your laptop with your data local. The hosted version is also live for sponsors at $5/mo: sign in, browse the scored feed, save jobs, work the pipeline, draft cover letters in three different lengths.',
   },
   {
-    phase: 'This week',
+    phase: 'Live today',
+    label: 'Live',
+    status: 'done',
+    title: '220+ employers, 3,500+ live jobs',
+    body: 'Greenhouse, Lever, Ashby, and Workday tenants (NVIDIA, CVS, Disney, Citi, Salesforce, plus Fortune 500 healthcare and retail) refreshed every 30 minutes across two redundant scrape lanes. Every posting shows when the employer posted it vs. when we saw it; reposted listings get a badge so ghost roles stand out.',
+  },
+  {
+    phase: 'In progress',
     label: 'In progress',
     status: 'progress',
-    title: 'Improving how the AI reads jobs',
-    body: 'We\'re tuning the way the AI extracts skills, seniority, and salary ranges from raw job posts. Better understanding here means better matches when the hosted version opens.',
+    title: 'Privacy policy + 30-day deletion guarantee',
+    body: 'Drafting a real privacy policy and terms before we open enrollment beyond sponsors. Account-export already works; the verifiable 30-day deletion pipeline is in flight. These need to be airtight first.',
   },
   {
-    phase: 'Next few weeks',
+    phase: 'Coming soon',
     label: 'Next',
     status: 'next',
-    title: 'More employers, better matching',
-    body: 'Expanding from 220 employers to over 1,000 — across more industries. Adding smart deduplication so the same job posted on three different boards shows up as one entry, not three.',
+    title: 'Public open enrollment + 50 more Fortune 500 employers',
+    body: 'Once the privacy and deletion items above are live, signups open to everyone. In parallel, the next batch of Workday tenants is staged: UnitedHealth, JPMorgan, Wells Fargo, Adobe, Target — bringing the registry from 174 companies to ~225.',
   },
   {
-    phase: '1–2 weeks out',
-    label: 'Coming',
+    phase: 'Planned',
+    label: 'Later',
     status: 'later',
-    title: 'Sign-in and reading the job feed',
-    body: 'Sponsors will be able to sign in with GitHub and browse the live job feed — read-only at first, no resume uploads yet. Lets us prove the sign-in flow is solid before any sensitive data is involved.',
-  },
-  {
-    phase: '~6–8 weeks out',
-    label: 'Hosted opens',
-    status: 'later',
-    title: 'Full hosted version goes live',
-    body: 'Paste your resume, get your scored feed, drag jobs through your pipeline, generate cover letters, the whole thing. By this point all the safety pieces below are firmly in place.',
+    title: 'PDF resume upload + email job alerts',
+    body: 'Currently your resume is paste-as-text. PDF upload + parse next. Then opt-in email alerts so you don\'t have to refresh the feed — when a high-scoring match for your profile lands, we tell you.',
   },
 ]
 
 const SAFETY_REASONS = [
   {
-    title: 'A privacy promise we can stand behind',
-    why: 'You\'ll be giving us your resume — that\'s sensitive personal information. We need a real privacy policy and terms of service stating exactly what we do with it (almost nothing, for what it\'s worth) before we accept a single byte.',
-  },
-  {
-    title: 'Sign-in we\'d trust ourselves',
-    why: 'We use GitHub sign-in to avoid password leaks entirely. But we still want to test session management and access checks carefully before storing your application history.',
+    title: 'Sign-in we trust ourselves',
+    status: 'done',
+    why: 'Email + password + TOTP multi-factor + password reset, all routed through Supabase Auth. Sessions, JWT verification, password handling — none of it our code, all audited and battle-tested.',
   },
   {
     title: 'Daily backups of your data',
-    why: 'Software changes as it grows. We won\'t store your saved jobs and notes until we have automatic daily backups and a tested way to restore them. Your work is too important to risk.',
-  },
-  {
-    title: 'A clean way to leave',
-    why: 'When you cancel, you should be able to download everything as a single file and have us delete the rest within 30 days. The download already works. The deletion needs to be airtight.',
+    status: 'done',
+    why: 'Cloudflare D1 automatically snapshots the database every day with point-in-time recovery. We didn\'t build our own backup pipeline — the platform handles it.',
   },
   {
     title: 'Spending caps that protect everyone',
-    why: 'We\'re running on free cloud tiers to keep this affordable. Hard limits on per-account usage protect against abuse spiking our bills and forcing the service to shut down. Boring but important.',
+    status: 'done',
+    why: 'AI cover letters are tier-gated: 2/day free, 30/day sponsor. Same hard caps coming to AI scoring + embeddings so a single runaway account can\'t burn through the free-tier limits and force a shutdown.',
+  },
+  {
+    title: 'A privacy promise we can stand behind',
+    status: 'progress',
+    why: 'Drafting a real privacy policy and terms before we open public signup. The short version: your resume stays in your account, gets used only to match jobs and draft cover letters, never gets sold or shared with third parties.',
+  },
+  {
+    title: 'A clean way to leave',
+    status: 'progress',
+    why: 'When you cancel, you should be able to download everything as a single file (already works) and have us delete the rest within 30 days (pipeline in flight). Needs to be verifiable end-to-end before public enrollment.',
   },
 ]
 
@@ -67,8 +72,8 @@ export function Transparency() {
       <div className="max-w-6xl mx-auto">
         <SectionHeader
           eyebrow="Where we are"
-          title="Shipping in phases — on purpose."
-          subtitle="A note on why the hosted version isn't live yet, and why holding back is actually the kindest thing we can do."
+          title="What's live, what's coming."
+          subtitle="An honest changelog. Hosted is live for sponsors today. Public open enrollment waits until the trust foundations are airtight."
         />
 
         <div className="mt-16 sm:mt-20 grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -141,13 +146,13 @@ export function Transparency() {
             </ol>
           </div>
 
-          {/* Why we're holding back */}
+          {/* Trust foundations */}
           <div>
             <h3
               className="text-[12px] uppercase tracking-[0.18em] font-medium mb-6"
               style={{ color: 'var(--color-accent)' }}
             >
-              Why we're holding back
+              Trust foundations
             </h3>
             <div
               className="rounded-2xl p-6 mb-3"
@@ -160,11 +165,11 @@ export function Transparency() {
                 className="text-[15px] leading-[1.55]"
                 style={{ color: 'var(--color-text-primary)' }}
               >
-                We could ship the hosted version today and start charging for it.
-                We're choosing not to, until the items below are in place — because
-                shipping a half-baked product that holds your resume and
-                application history is how trust gets broken. These come{' '}
-                <em style={{ fontStyle: 'italic' }}>first</em>, then features.
+                Three of the five foundations below are already live. The
+                remaining two gate <em style={{ fontStyle: 'italic' }}>public
+                open enrollment</em> — sponsors trust us today; everyone else
+                gets in when the privacy policy and 30-day deletion are
+                airtight, not before.
               </p>
             </div>
 
@@ -184,7 +189,12 @@ export function Transparency() {
                       height="18"
                       viewBox="0 0 18 18"
                       fill="none"
-                      style={{ color: 'var(--color-success)' }}
+                      style={{
+                        color:
+                          reason.status === 'done'
+                            ? 'var(--color-success)'
+                            : 'var(--color-warning)',
+                      }}
                       className="flex-shrink-0"
                     >
                       <path
@@ -193,16 +203,25 @@ export function Transparency() {
                         strokeWidth="1.5"
                         strokeLinejoin="round"
                       />
-                      <path
-                        d="M6 9l2 2 4-4.5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                      {reason.status === 'done' ? (
+                        <path
+                          d="M6 9l2 2 4-4.5"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      ) : (
+                        <path
+                          d="M9 5.5v4M9 12v.01"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                        />
+                      )}
                     </svg>
                     <span
-                      className="text-[15px]"
+                      className="text-[15px] flex-1"
                       style={{
                         fontFamily: 'var(--font-display)',
                         fontWeight: 600,
@@ -211,6 +230,22 @@ export function Transparency() {
                       }}
                     >
                       {reason.title}
+                    </span>
+                    <span
+                      className="flex-shrink-0 text-[10px] uppercase tracking-[0.12em] px-2 py-0.5 rounded-full"
+                      style={{
+                        color:
+                          reason.status === 'done'
+                            ? 'var(--color-success)'
+                            : 'var(--color-warning)',
+                        background:
+                          reason.status === 'done'
+                            ? 'var(--color-success-soft)'
+                            : 'var(--color-warning-soft)',
+                        fontWeight: 500,
+                      }}
+                    >
+                      {reason.status === 'done' ? 'Live' : 'In progress'}
                     </span>
                   </div>
                   <p
