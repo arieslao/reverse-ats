@@ -44,24 +44,24 @@ export default function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-[var(--color-bg-base)] text-[var(--color-text-primary)]">
       <header className="border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link to="/app" className="text-sm font-medium tracking-tight">Reverse ATS</Link>
-            <nav className="flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-1">
+            <Link to="/app" className="text-sm font-medium tracking-tight shrink-0">Reverse ATS</Link>
+            <nav className="flex items-center gap-3 sm:gap-4 text-xs text-[var(--color-text-secondary)] overflow-x-auto whitespace-nowrap">
               <Link to="/app/feed" className="hover:text-[var(--color-text-primary)]">Feed</Link>
               <Link to="/app/pipeline" className="hover:text-[var(--color-text-primary)]">Pipeline</Link>
               <Link to="/app/analytics" className="text-[var(--color-text-primary)]">Analytics</Link>
               <Link to="/app/profile" className="hover:text-[var(--color-text-primary)]">Profile</Link>
             </nav>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-[var(--color-text-secondary)]">{user?.email}</span>
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <span className="hidden md:inline text-xs text-[var(--color-text-secondary)] truncate max-w-[180px]">{user?.email}</span>
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight">Analytics</h1>
           <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">Your job-search funnel at a glance.</p>

@@ -29,7 +29,7 @@ export function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="px-5 sm:px-8 py-24 sm:py-32"
+      className="px-5 sm:px-8 py-16 sm:py-32"
       style={{ background: 'var(--color-bg-section)' }}
     >
       <div className="max-w-6xl mx-auto">

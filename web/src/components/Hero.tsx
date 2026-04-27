@@ -5,7 +5,7 @@ export function Hero() {
   return (
     <section
       id="top"
-      className="relative px-5 sm:px-8 pt-20 pb-24 sm:pt-32 sm:pb-32 overflow-hidden"
+      className="relative px-5 sm:px-8 pt-14 pb-16 sm:pt-32 sm:pb-32 overflow-hidden"
     >
       <div className="max-w-5xl mx-auto text-center">
         {/* Eyebrow — minimal, premium */}
@@ -102,14 +102,14 @@ export function Hero() {
         </div>
 
         {/* Built-for row — universal audience tags */}
-        <div className="mt-20 sm:mt-24">
+        <div className="mt-12 sm:mt-24">
           <div
             className="text-[11px] uppercase tracking-[0.18em] mb-5"
             style={{ color: 'var(--color-text-tertiary)', fontWeight: 500 }}
           >
             Built for everyone job-hunting
           </div>
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2.5 max-w-3xl mx-auto">
+          <div className="flex flex-wrap items-center justify-center gap-x-4 sm:gap-x-8 gap-y-2.5 max-w-3xl mx-auto">
             {[
               'Engineers',
               'Designers',

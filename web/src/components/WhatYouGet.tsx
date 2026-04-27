@@ -39,7 +39,7 @@ const STATUS_CONFIG: Record<FeatureStatus, { label: string; color: string; bg: s
 
 export function WhatYouGet() {
   return (
-    <section className="px-5 sm:px-8 py-24 sm:py-32">
+    <section className="px-5 sm:px-8 py-16 sm:py-32">
       <div className="max-w-3xl mx-auto">
         <SectionHeader
           eyebrow="Everything included"
