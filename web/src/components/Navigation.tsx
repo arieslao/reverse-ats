@@ -2,7 +2,10 @@ import { Link } from 'react-router-dom'
 import { ThemeToggle } from './ThemeToggle'
 
 // Slim Apple-style top nav. Backdrop-blurred. Bold wordmark.
-// Mobile: collapses to wordmark + theme toggle + Sponsor button.
+// Mobile: wordmark + theme toggle + Sign in + Sponsor.
+// Sign up + GitHub icon stay hidden until sm: — Sign in is the more
+// frequent action for returning users, and the /sign-in page already
+// links out to /sign-up so we don't lose the path.
 
 const NAV_LINKS = [
   { href: '#how-it-works', label: 'How it works' },
@@ -87,7 +90,7 @@ export function Navigation() {
           </a>
           <Link
             to="/sign-in"
-            className="hidden sm:inline-flex items-center text-[13px] px-3 h-9 rounded-full transition-colors"
+            className="inline-flex items-center text-[13px] px-2.5 sm:px-3 h-9 rounded-full transition-colors whitespace-nowrap"
             style={{ color: 'var(--color-text-secondary)' }}
             onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-primary)')}
             onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-text-secondary)')}
