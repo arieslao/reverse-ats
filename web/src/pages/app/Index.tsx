@@ -14,14 +14,14 @@ export default function AppIndex() {
   return (
     <div className="min-h-screen bg-[var(--color-bg-base)] text-[var(--color-text-primary)]">
       <header className="border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link to="/" className="text-sm font-medium tracking-tight">Reverse ATS</Link>
-          <div className="flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
-            <span>{user?.email}</span>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <Link to="/" className="text-sm font-medium tracking-tight shrink-0">Reverse ATS</Link>
+          <div className="flex items-center gap-3 sm:gap-4 text-xs text-[var(--color-text-secondary)] min-w-0">
+            <span className="hidden md:inline truncate max-w-[180px]">{user?.email}</span>
             {isAdmin(user) && (
-              <Link to="/admin" className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)]">Admin</Link>
+              <Link to="/admin" className="text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] whitespace-nowrap">Admin</Link>
             )}
-            <button onClick={handleSignOut} className="hover:text-[var(--color-text-primary)] cursor-pointer">
+            <button onClick={handleSignOut} className="hover:text-[var(--color-text-primary)] cursor-pointer whitespace-nowrap">
               Sign out
             </button>
             <ThemeToggle />
@@ -29,7 +29,7 @@ export default function AppIndex() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-16">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
         <h1 className="text-3xl font-semibold tracking-tight">You're signed in</h1>
         <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
           Signed in as <span className="font-medium">{user?.email}</span> · tier <span className="font-medium">{user?.tier}</span>

@@ -11,7 +11,7 @@ export function Pricing() {
   return (
     <section
       id="pricing"
-      className="px-5 sm:px-8 py-24 sm:py-32"
+      className="px-5 sm:px-8 py-16 sm:py-32"
       style={{ background: 'var(--color-bg-section)' }}
     >
       <div className="max-w-6xl mx-auto">
@@ -94,52 +94,101 @@ export function Pricing() {
           >
             What you get on each tier
           </div>
-          <div className="overflow-x-auto">
-            <table
-              className="w-full"
-              style={{ borderCollapse: 'collapse', color: 'var(--color-text-secondary)' }}
-            >
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
-                  <th
-                    className="text-left px-8 py-4 text-[14px] font-medium"
-                    style={{ color: 'var(--color-text-primary)' }}
+          {(() => {
+            const rows: [string, string, string][] = [
+              ['Save jobs', '50 lifetime', 'Unlimited'],
+              ['AI cover letters', '2 / day', '30 / day'],
+              ['Rescore (batches of 25)', '1 / day', '4 / day'],
+              ['AI role suggestions', '1 / day', '5 / day'],
+              ['Resume edits', 'Unlimited', 'Unlimited'],
+              ['Job feed + filters', 'Unlimited', 'Unlimited'],
+              ['Pipeline + analytics', 'Unlimited', 'Unlimited'],
+            ];
+            return (
+              <>
+                {/* Tablet+ — three-column table. Hidden on mobile in favor
+                    of a stacked layout that doesn't force horizontal scroll. */}
+                <div className="hidden sm:block">
+                  <table
+                    className="w-full"
+                    style={{ borderCollapse: 'collapse', color: 'var(--color-text-secondary)' }}
                   >
-                    Action
-                  </th>
-                  <th
-                    className="text-left px-6 py-4 text-[14px] font-medium"
-                    style={{ color: 'var(--color-text-primary)' }}
-                  >
-                    Hosted Free
-                  </th>
-                  <th
-                    className="text-left px-6 py-4 text-[14px] font-medium"
-                    style={{ color: 'var(--color-text-primary)' }}
-                  >
-                    Hosted Sponsor ($5/mo)
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-[14px]">
-                {[
-                  ['Save jobs', '50 lifetime', 'Unlimited'],
-                  ['AI cover letters', '2 / day', '30 / day'],
-                  ['Rescore (batches of 25)', '1 / day', '4 / day'],
-                  ['AI role suggestions', '1 / day', '5 / day'],
-                  ['Resume edits', 'Unlimited', 'Unlimited'],
-                  ['Job feed + filters', 'Unlimited', 'Unlimited'],
-                  ['Pipeline + analytics', 'Unlimited', 'Unlimited'],
-                ].map(([action, free, sponsor]) => (
-                  <tr key={action} style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
-                    <td className="px-8 py-3.5" style={{ color: 'var(--color-text-primary)' }}>{action}</td>
-                    <td className="px-6 py-3.5">{free}</td>
-                    <td className="px-6 py-3.5">{sponsor}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--color-border-subtle)' }}>
+                        <th
+                          className="text-left px-8 py-4 text-[14px] font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          Action
+                        </th>
+                        <th
+                          className="text-left px-6 py-4 text-[14px] font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          Hosted Free
+                        </th>
+                        <th
+                          className="text-left px-6 py-4 text-[14px] font-medium"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          Hosted Sponsor ($5/mo)
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-[14px]">
+                      {rows.map(([action, free, sponsor]) => (
+                        <tr key={action} style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+                          <td className="px-8 py-3.5" style={{ color: 'var(--color-text-primary)' }}>{action}</td>
+                          <td className="px-6 py-3.5">{free}</td>
+                          <td className="px-6 py-3.5">{sponsor}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile — Free/Sponsor side-by-side per row, no scrolling. */}
+                <ul className="sm:hidden">
+                  {rows.map(([action, free, sponsor], idx) => (
+                    <li
+                      key={action}
+                      className="px-5 py-4"
+                      style={{
+                        borderTop: idx === 0 ? 'none' : '1px solid var(--color-border-subtle)',
+                      }}
+                    >
+                      <div
+                        className="text-[14px] font-medium mb-2"
+                        style={{ color: 'var(--color-text-primary)' }}
+                      >
+                        {action}
+                      </div>
+                      <div className="flex justify-between gap-4 text-[13px]" style={{ color: 'var(--color-text-secondary)' }}>
+                        <div>
+                          <div
+                            className="text-[10px] uppercase tracking-[0.12em] mb-0.5"
+                            style={{ color: 'var(--color-text-tertiary)' }}
+                          >
+                            Free
+                          </div>
+                          {free}
+                        </div>
+                        <div className="text-right">
+                          <div
+                            className="text-[10px] uppercase tracking-[0.12em] mb-0.5"
+                            style={{ color: 'var(--color-text-tertiary)' }}
+                          >
+                            Sponsor
+                          </div>
+                          {sponsor}
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            );
+          })()}
         </div>
 
         {/* Price-anchor row */}

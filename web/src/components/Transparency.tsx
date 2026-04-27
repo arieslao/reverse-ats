@@ -63,7 +63,7 @@ const SAFETY_REASONS = [
 
 export function Transparency() {
   return (
-    <section id="transparency" className="px-5 sm:px-8 py-24 sm:py-32">
+    <section id="transparency" className="px-5 sm:px-8 py-16 sm:py-32">
       <div className="max-w-6xl mx-auto">
         <SectionHeader
           eyebrow="Where we are"

@@ -44,17 +44,17 @@ export default function AdminIndex() {
   return (
     <div className="min-h-screen bg-[var(--color-bg-base)] text-[var(--color-text-primary)]">
       <header className="border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-elevated)]">
-        <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link to="/" className="text-sm font-medium tracking-tight">Reverse ATS · Admin</Link>
-          <div className="flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
-            <Link to="/app" className="hover:text-[var(--color-text-primary)]">Back to app</Link>
-            <span>{user?.email}</span>
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
+          <Link to="/" className="text-sm font-medium tracking-tight shrink-0 truncate">Reverse ATS · Admin</Link>
+          <div className="flex items-center gap-3 sm:gap-4 text-xs text-[var(--color-text-secondary)] min-w-0">
+            <Link to="/app" className="hover:text-[var(--color-text-primary)] whitespace-nowrap">Back to app</Link>
+            <span className="hidden md:inline truncate max-w-[180px]">{user?.email}</span>
             <ThemeToggle />
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Users</h1>
