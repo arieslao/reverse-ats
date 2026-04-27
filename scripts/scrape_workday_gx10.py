@@ -45,6 +45,7 @@ sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 from job_scraper import COMPANIES, scrape_company  # noqa: E402
 from d1_uploader import push_jobs                   # noqa: E402
+from db import job_id_hash                          # noqa: E402
 
 
 def _setup_logging() -> logging.Logger:
@@ -84,8 +85,11 @@ def main() -> int:
             continue
 
         # Match the field shape pipeline.py would have set; the Worker reads
-        # category and ats_type into the jobs row.
+        # id, category, and ats_type into the jobs row. Compute id with the
+        # same hash function the local pipeline uses so a Workday job seen
+        # by both lanes (e.g. a transient CI run) lands in one D1 row.
         for j in jobs:
+            j["id"] = job_id_hash(j.get("company", ""), j.get("title", ""), j.get("url", ""))
             j["category"] = company["category"]
             j["ats_type"] = "workday"
 
