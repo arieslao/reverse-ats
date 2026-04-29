@@ -34,11 +34,11 @@ Self-hosting is **always free** and always will be — that's the core promise o
 | Option | Price | What you get |
 |---|---|---|
 | **Self-host** | **Free**, MIT-licensed | The whole repo. Run it on your laptop. Always your data, always private. |
-| **Hosted** *(coming soon)* | **$10/mo** via [GitHub Sponsors](https://github.com/sponsors/arieslao) | We host it for you. Every feature included — AI scoring, cover letters in 5 styles, daily digest, interview prep, chatbot, the whole roadmap. No Pro tier. No upsells. |
+| **Hosted** *(coming soon)* | **$5/mo** via [GitHub Sponsors](https://github.com/sponsors/arieslao) | We host it for you. Every feature included — AI scoring, cover letters in 5 styles, daily digest, interview prep, chatbot, the whole roadmap. No Pro tier. No upsells. |
 
-**Why one flat price:** job seekers are often unemployed and price-sensitive. Tiered pricing means deciding "should I pay more?" while you're already stressed. $10 flat says: *here's everything, here's the fair price, cancel anytime, your data exports as JSON.*
+**Why one flat price:** job seekers are often unemployed and price-sensitive. Tiered pricing means deciding "should I pay more?" while you're already stressed. $5 flat says: *here's everything, here's the fair price, cancel anytime, your data exports as JSON.*
 
-GitHub Sponsors lets fans contribute custom amounts above $10 if they want to support the project beyond their own use — same hosted access, the extra funds the buildout.
+GitHub Sponsors lets fans contribute custom amounts above $5 if they want to support the project beyond their own use — same hosted access, the extra funds the buildout.
 
 The hosted tier is being built openly — see [backlog.md](backlog.md) and [cloudflare/](cloudflare/) for the cloud architecture in progress. Sponsoring today helps fund it. **Cancel anytime, your data is yours.**
 

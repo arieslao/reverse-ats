@@ -73,7 +73,7 @@ export function Hero() {
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-hover)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--color-accent)')}
           >
-            Reserve hosted access — $10/mo
+            Reserve hosted access — $5/mo
           </a>
           <a
             href="https://github.com/arieslao/reverse-ats#installation-guide-step-by-step"

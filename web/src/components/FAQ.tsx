@@ -7,8 +7,8 @@ const FAQS = [
     a: 'Yes. The whole project is open source under the MIT license. Walk through the setup guide, and you have the full app on your laptop. The only optional cost is if you choose to use a paid AI service like OpenAI (about 2¢ per job scored). The free options work great too.',
   },
   {
-    q: 'Why $10 a month for the hosted version? What\'s the catch?',
-    a: 'No catch. Running this on cloud infrastructure costs us about a nickel per active user per month, even with everything turned on. $10 covers infrastructure, our time to maintain the project, and lets us keep building. There is no Pro tier we\'re hiding behind another paywall — what you see in the feature list is what you get.',
+    q: 'Why $5 a month for the hosted version? What\'s the catch?',
+    a: 'No catch. Running this on cloud infrastructure costs us about a nickel per active user per month, even with everything turned on. $5 covers infrastructure, our time to maintain the project, and lets us keep building. There is no Pro tier we\'re hiding behind another paywall — what you see in the feature list is what you get.',
   },
   {
     q: 'Will my resume be sold or shared with recruiters?',

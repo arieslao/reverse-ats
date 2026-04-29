@@ -5,7 +5,7 @@ URL (e.g. `reverseats.app` or `reverseats.pages.dev`). Deployed to
 Cloudflare Pages.
 
 This is the **first user-facing thing** for the project — it explains
-the value prop, lets people sponsor at $10/mo, and is honest about what's
+the value prop, lets people sponsor at $5/mo, and is honest about what's
 built today vs. what's coming.
 
 ## Local dev
@@ -52,7 +52,7 @@ The single-page site has these sections in order:
 2. **LiveCounter** — real-time stats from `/health` (job count, AI summaries)
 3. **HowItWorks** — 3 plain-language steps
 4. **WhatYouGet** — full feature list, color-coded by Live / Coming / Planned
-5. **Pricing** — 2 cards (Free Self-host vs $10 Hosted) + price-anchor row
+5. **Pricing** — 2 cards (Free Self-host vs $5 Hosted) + price-anchor row
 6. **Transparency** — phased rollout + the safety reasons we're holding back
 7. **FAQ** — 9 honest answers covering privacy, comparison, "is this safe?"
 8. **Footer** — repo links, contact

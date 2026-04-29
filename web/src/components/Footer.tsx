@@ -2,7 +2,7 @@
 
 const PROJECT_LINKS = [
   { label: 'GitHub repo', href: 'https://github.com/arieslao/reverse-ats' },
-  { label: 'Sponsor — $10/mo', href: 'https://github.com/sponsors/arieslao' },
+  { label: 'Sponsor — $5/mo', href: 'https://github.com/sponsors/arieslao' },
   { label: 'Roadmap', href: 'https://github.com/arieslao/reverse-ats/blob/main/backlog.md' },
   { label: 'Report an issue', href: 'https://github.com/arieslao/reverse-ats/issues' },
 ]
