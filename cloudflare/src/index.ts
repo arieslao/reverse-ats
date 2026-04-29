@@ -153,11 +153,13 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
   if (!existing) {
     await env.DB.prepare(
       `INSERT INTO jobs (
-        id, company, title, url, location, department,
+        id, company, title, url, location, department, team,
         description_full, description_snippet, category, ats_type,
         remote, first_seen_at, last_seen_at, expired,
-        posted_at, fingerprint
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+        posted_at, fingerprint,
+        employment_type, workplace_type,
+        salary_min, salary_max, salary_currency, comp_summary
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         job.id,
@@ -166,6 +168,7 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
         job.url,
         job.location ?? null,
         job.department ?? null,
+        job.team ?? null,
         job.description_full ?? null,
         job.description_snippet ?? null,
         job.category ?? null,
@@ -175,6 +178,12 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
         job.last_seen_at || now,
         job.posted_at ?? null,
         fingerprint,
+        job.employment_type ?? null,
+        job.workplace_type ?? null,
+        job.salary_min ?? null,
+        job.salary_max ?? null,
+        job.salary_currency ?? null,
+        job.comp_summary ?? null,
       )
       .run();
 
@@ -193,6 +202,9 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
   // Existing — refresh description (snippet may improve over scrapes), bump
   // last_seen, fill in posted_at/fingerprint if the previous scrape didn't
   // have them, and clear expired flag if the job has reappeared.
+  // COALESCE on the new comp/workplace fields so a future scrape that loses
+  // a previously-disclosed value (e.g. employer redacted, regex didn't fire,
+  // includeCompensation flag temporarily dropped) doesn't blank the column.
   await env.DB.prepare(
     `UPDATE jobs
        SET company             = ?,
@@ -200,6 +212,7 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
            url                 = ?,
            location            = COALESCE(?, location),
            department          = COALESCE(?, department),
+           team                = COALESCE(?, team),
            description_full    = COALESCE(?, description_full),
            description_snippet = COALESCE(?, description_snippet),
            category            = COALESCE(?, category),
@@ -208,7 +221,13 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
            last_seen_at        = ?,
            expired             = 0,
            posted_at           = COALESCE(posted_at, ?),
-           fingerprint         = COALESCE(fingerprint, ?)
+           fingerprint         = COALESCE(fingerprint, ?),
+           employment_type     = COALESCE(?, employment_type),
+           workplace_type      = COALESCE(?, workplace_type),
+           salary_min          = COALESCE(?, salary_min),
+           salary_max          = COALESCE(?, salary_max),
+           salary_currency     = COALESCE(?, salary_currency),
+           comp_summary        = COALESCE(?, comp_summary)
      WHERE id = ?`,
   )
     .bind(
@@ -217,6 +236,7 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
       job.url,
       job.location ?? null,
       job.department ?? null,
+      job.team ?? null,
       job.description_full ?? null,
       job.description_snippet ?? null,
       job.category ?? null,
@@ -225,6 +245,12 @@ async function upsertJob(env: Env, job: IngestJob): Promise<"new" | "updated"> {
       job.last_seen_at || now,
       job.posted_at ?? null,
       fingerprint,
+      job.employment_type ?? null,
+      job.workplace_type ?? null,
+      job.salary_min ?? null,
+      job.salary_max ?? null,
+      job.salary_currency ?? null,
+      job.comp_summary ?? null,
       job.id,
     )
     .run();

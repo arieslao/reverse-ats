@@ -28,6 +28,7 @@ export interface IngestJob {
   url: string;
   location?: string | null;
   department?: string | null;
+  team?: string | null;
   description_full?: string | null;
   description_snippet?: string | null;
   category?: string | null;
@@ -39,6 +40,20 @@ export interface IngestJob {
   // (Greenhouse `updated_at`, Lever `createdAt`, Ashby `publishedAt`, …).
   // Optional — not every ATS surfaces it.
   posted_at?: string | null;
+  // Ashby `employmentType` / Lever-mapped `commitment`:
+  // FullTime|PartTime|Intern|Contract|Temporary.
+  employment_type?: string | null;
+  // Ashby `workplaceType` / Lever-mapped `workplaceType`:
+  // OnSite|Remote|Hybrid. Finer than the legacy `remote` boolean.
+  workplace_type?: string | null;
+  // Annual salary range in `salary_currency` (USD by default).
+  // NULL when employer hasn't disclosed comp.
+  salary_min?: number | null;
+  salary_max?: number | null;
+  salary_currency?: string | null;
+  // Human-readable comp string from the employer's posting (Ashby's
+  // `compensationTierSummary`). Rendered verbatim when present.
+  comp_summary?: string | null;
 }
 
 export interface IngestRequest {

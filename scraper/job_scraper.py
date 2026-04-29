@@ -9,6 +9,7 @@ Requirements: pip install requests
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timedelta, timezone
@@ -373,6 +374,149 @@ def _relevance_score(title: str, description: str = "") -> int:
 
 
 # ---------------------------------------------------------------------------
+# Compensation extraction (Greenhouse / Lever)
+# ---------------------------------------------------------------------------
+
+# Match "$60,000 - $120,000", "$60K – $120K", "$1.2M to $1.5M", optionally
+# followed by "/year" or "annually". K/M/B suffixes get expanded; bare commas
+# in values like 60,000 get stripped before parsing. The pattern is anchored
+# on the dollar sign and a separator so we don't snag standalone numbers
+# (e.g. "raised $50M Series B" doesn't satisfy the requirement of two amounts).
+_SALARY_RANGE_RE = re.compile(
+    r"\$\s*"                                 # leading $
+    r"(?P<lo>\d{1,3}(?:[,\.]\d{3})*(?:\.\d+)?\s*[KkMmBb]?)"
+    r"\s*(?:[\-–—]|to)\s*"                   # separator
+    r"\$?\s*"                                # optional second $
+    r"(?P<hi>\d{1,3}(?:[,\.]\d{3})*(?:\.\d+)?\s*[KkMmBb]?)"
+    r"\s*(?:USD)?"
+    r"\s*(?:per\s+year|/\s*(?:year|yr)|annual(?:ly)?)?",
+    re.IGNORECASE,
+)
+
+
+def _parse_money_token(tok: str) -> Optional[int]:
+    """Parse '$60,000' / '$60K' / '$1.2M' / '$200' → integer dollars."""
+    if not tok:
+        return None
+    s = tok.strip().replace(",", "").upper()
+    mult = 1
+    if s.endswith("K"):
+        mult = 1_000
+        s = s[:-1].strip()
+    elif s.endswith("M"):
+        mult = 1_000_000
+        s = s[:-1].strip()
+    elif s.endswith("B"):
+        mult = 1_000_000_000
+        s = s[:-1].strip()
+    try:
+        return int(round(float(s) * mult))
+    except (ValueError, TypeError):
+        return None
+
+
+# Phrases that strongly anchor a range to BASE COMPENSATION rather than
+# total comp / signing bonus / fundraising amounts. Lever postings often
+# include "sign-on bonus" + "Series B raised $X" right next to the salary,
+# so we score nearby phrasing to avoid grabbing the wrong number.
+_SALARY_CONTEXT_KEYWORDS = (
+    "salary", "base salary", "annual salary", "base pay", "compensation",
+    "pay range", "salary range", "base compensation",
+)
+
+
+def _extract_salary_from_text(text: str) -> dict:
+    """Best-effort extraction of an annual base salary range from free text.
+
+    Used by Greenhouse (HTML body) and Lever (`additionalPlain`) where comp
+    isn't a structured field. Returns an empty dict when no confident match
+    is found — callers should treat absence as "employer didn't disclose"
+    rather than zero. Currency is assumed USD when only `$` is present;
+    rejects ranges that resolve to obviously-wrong numbers (e.g. revenue
+    multipliers, equity grants without a salary anchor).
+    """
+    if not text:
+        return {}
+
+    # Drop HTML-ish junk so the regex sees clean content. We don't care about
+    # full HTML correctness — just enough that "<p>$60,000-$120,000</p>" isn't
+    # broken across noise.
+    cleaned = re.sub(r"<[^>]+>", " ", text)
+    cleaned = re.sub(r"&[a-z]+;|&#\d+;", " ", cleaned, flags=re.IGNORECASE)
+
+    best: Optional[dict] = None
+    for m in _SALARY_RANGE_RE.finditer(cleaned):
+        lo = _parse_money_token(m.group("lo"))
+        hi = _parse_money_token(m.group("hi"))
+        if lo is None or hi is None:
+            continue
+        if hi < lo:
+            lo, hi = hi, lo
+        # Sanity gates: real annual base salaries today land in [$30k, $2M].
+        # Outside that window we're almost certainly looking at fundraising,
+        # revenue, or equity-grant numbers in the same description.
+        if lo < 30_000 or hi > 2_000_000:
+            continue
+        # Reject ranges that span > 5x — those are almost always two unrelated
+        # figures glued together by the regex (e.g. "$50K – $5M" from a job
+        # post that mentions both salary and a fundraising round).
+        if hi > lo * 5:
+            continue
+
+        # Score the context window around the match. A nearby "salary" /
+        # "base pay" anchor wins; otherwise we still take the first range
+        # we see but flag it as low-confidence.
+        window_start = max(0, m.start() - 180)
+        window = cleaned[window_start:m.end() + 60].lower()
+        anchored = any(kw in window for kw in _SALARY_CONTEXT_KEYWORDS)
+
+        candidate = {
+            "salary_min": lo,
+            "salary_max": hi,
+            "salary_currency": "USD",
+            "_anchored": anchored,
+        }
+
+        if anchored:
+            # An anchored hit beats anything else; take the FIRST one and bail.
+            best = candidate
+            break
+        if best is None:
+            best = candidate
+
+    if not best:
+        return {}
+    best.pop("_anchored", None)
+    return best
+
+
+# Map Lever's lowercased workplaceType to the title-cased convention Ashby
+# uses, so the column has consistent values across ATSes.
+_LEVER_WORKPLACE_MAP = {
+    "remote": "Remote",
+    "hybrid": "Hybrid",
+    "onsite": "OnSite",
+    "on-site": "OnSite",
+    "in-office": "OnSite",
+}
+
+# Map Lever's `categories.commitment` to Ashby's employmentType vocabulary.
+_LEVER_COMMITMENT_MAP = {
+    "full-time": "FullTime",
+    "fulltime": "FullTime",
+    "part-time": "PartTime",
+    "parttime": "PartTime",
+    "internship": "Intern",
+    "intern": "Intern",
+    "contract": "Contract",
+    "contractor": "Contract",
+    "fixed-term": "Contract",
+    "temporary": "Temporary",
+    "temp": "Temporary",
+}
+
+
+# ---------------------------------------------------------------------------
 # ATS Fetchers
 # ---------------------------------------------------------------------------
 
@@ -398,6 +542,10 @@ def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
         # original creation date, but it's the closest signal they give and
         # tracks employer-side staleness well.
         posted_at = _to_iso_z(j.get("updated_at") or j.get("first_published"))
+        # Greenhouse's public board API doesn't return structured comp; pay
+        # transparency law disclosures live inline in the description body.
+        # Hit rate is low (~1% on Stripe) but free.
+        salary = _extract_salary_from_text(description)
         jobs.append({
             "title": title,
             "location": location,
@@ -411,6 +559,9 @@ def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
             # those for ~99% of jobs in Phase 0).
             "description_full": description,
             "posted_at": posted_at,
+            "salary_min": salary.get("salary_min"),
+            "salary_max": salary.get("salary_max"),
+            "salary_currency": salary.get("salary_currency"),
             "company": company_name,
         })
     return jobs
@@ -431,26 +582,100 @@ def fetch_lever(slug: str, company_name: str) -> list[dict]:
         full_description = j.get("descriptionPlain", "") or j.get("description", "") or ""
         # Lever returns `createdAt` as epoch milliseconds.
         posted_at = _to_iso_z(j.get("createdAt"))
+
+        # Lever returns workplaceType as lowercased; commitment as the
+        # employer-typed string ("Full-time", "Internship", "Fixed-Term",
+        # …). Normalize both to Ashby's vocabulary so the column is
+        # consistent across ATSes; unknown values pass through unchanged
+        # rather than getting silently dropped.
+        wt = (j.get("workplaceType") or "").lower().strip()
+        workplace_type = _LEVER_WORKPLACE_MAP.get(wt)
+        commitment = (cats.get("commitment") or "").lower().strip()
+        employment_type = _LEVER_COMMITMENT_MAP.get(commitment)
+
+        # Lever stores comp + benefits in `additionalPlain` (formatted plain
+        # text, very predictable phrasing). Hit rate ~70% on US-disclosing
+        # employers like Palantir; 0% on EU-only boards.
+        comp_text = j.get("additionalPlain") or full_description
+        salary = _extract_salary_from_text(comp_text)
+
         jobs.append({
             "title": title,
             "location": location,
             "url": j.get("applyUrl", j.get("hostedUrl", "")),
             "department": dept,
-            "remote": _is_remote(location),
+            "remote": _is_remote(location) or workplace_type == "Remote",
+            "workplace_type": workplace_type,
+            "employment_type": employment_type,
             "description_snippet": full_description[:500],
             # Lever returns the full posting in `descriptionPlain` (or HTML in
             # `description`) — preserve it for cloud preprocessing so we can
             # extract comp / YoE / required experience that lives further in.
             "description_full": full_description,
             "posted_at": posted_at,
+            "salary_min": salary.get("salary_min"),
+            "salary_max": salary.get("salary_max"),
+            "salary_currency": salary.get("salary_currency"),
             "company": company_name,
         })
     return jobs
 
 
+def _ashby_extract_salary(compensation: dict) -> dict:
+    """Pull a single Salary range + currency out of an Ashby compensation block.
+
+    Ashby exposes geographic compensation tiers (e.g. "NY/SF" vs "Nationwide")
+    plus a `summaryComponents` array that collapses them into one range per
+    component type. Reading the Salary entry from `summaryComponents` gives us
+    the union min/max without re-implementing the merge.
+
+    `compensationTierSummary` is the human-readable string Ashby builds for
+    its own posting page (e.g. "$211.4K – $290.6K • Offers Equity"); we keep
+    it verbatim so the UI can render whatever the employer chose to publish.
+    """
+    out: dict = {
+        "salary_min": None,
+        "salary_max": None,
+        "salary_currency": None,
+        "comp_summary": None,
+    }
+    if not isinstance(compensation, dict):
+        return out
+
+    summary = compensation.get("compensationTierSummary")
+    if isinstance(summary, str) and summary.strip():
+        out["comp_summary"] = summary.strip()
+
+    for comp in compensation.get("summaryComponents") or []:
+        if not isinstance(comp, dict):
+            continue
+        if comp.get("compensationType") != "Salary":
+            continue
+        # `1 YEAR` is overwhelmingly the only interval used for Salary in the
+        # public API; we don't normalize hourly/monthly bands today. If we see
+        # something other than YEAR, skip rather than store a misleading number.
+        if comp.get("interval") not in (None, "1 YEAR"):
+            continue
+        min_v = comp.get("minValue")
+        max_v = comp.get("maxValue")
+        if isinstance(min_v, (int, float)):
+            out["salary_min"] = int(min_v)
+        if isinstance(max_v, (int, float)):
+            out["salary_max"] = int(max_v)
+        cur = comp.get("currencyCode")
+        if isinstance(cur, str) and cur.strip():
+            out["salary_currency"] = cur.strip()
+        break  # one Salary entry expected per posting
+
+    return out
+
+
 def fetch_ashby(slug: str, company_name: str) -> list[dict]:
+    # `includeCompensation=true` is required to get compensationTiers /
+    # summaryComponents — without it the `compensation` field is omitted
+    # entirely. Free for the caller; employers control disclosure per posting.
     url = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
-    data = _get(url)
+    data = _get(url, params={"includeCompensation": "true"})
     if not data:
         # Fallback: try GraphQL endpoint
         gql_url = "https://jobs.ashbyhq.com/api/non-user-graphql"
@@ -494,6 +719,12 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
     postings = data.get("jobs", data.get("jobPostings", []))
     jobs = []
     for j in postings:
+        # Skip postings the employer has chosen to hide from their public board.
+        # Ashby returns `isListed=false` for unpublished/hidden roles even
+        # when the API key isn't required — respect that signal.
+        if j.get("isListed") is False:
+            continue
+
         location = j.get("location", j.get("locationName", ""))
         is_remote = j.get("isRemote", False)
         if is_remote:
@@ -501,14 +732,39 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
         # Ashby uses `publishedAt` on the posting-api endpoint and
         # `publishedDate` on the GraphQL one. Try both.
         posted_at = _to_iso_z(j.get("publishedAt") or j.get("publishedDate") or j.get("updatedAt"))
+
+        # `descriptionPlain` is what fed the AI scorer was missing for Ashby
+        # boards — without it `description_snippet` was empty and the LLM
+        # was scoring on title + location alone. Greenhouse / Lever already
+        # send plain text in this slot, so do the same here for parity.
+        description_plain = j.get("descriptionPlain") or ""
+        # Ashby posts `workplaceType` (OnSite / Remote / Hybrid) which is
+        # finer than the `isRemote` boolean — keep both so existing remote
+        # filtering still works while UI/scoring can opt into the trichotomy.
+        workplace_type = j.get("workplaceType")
+        # `team` is distinct from `department` — e.g. department="R&D",
+        # team="Engineering". Fall back through whichever the employer fills.
+        department = j.get("department") or j.get("teamName") or ""
+        team = j.get("team") or ""
+
+        salary = _ashby_extract_salary(j.get("compensation") or {})
+
         jobs.append({
             "title": j.get("title", ""),
             "location": _normalize_location(location),
             "url": j.get("applyLink", j.get("jobUrl", f"https://jobs.ashbyhq.com/{slug}")),
-            "department": j.get("department", j.get("teamName", "")),
+            "department": department,
+            "team": team,
             "remote": is_remote or _is_remote(location),
-            "description_snippet": "",
+            "workplace_type": workplace_type,
+            "employment_type": j.get("employmentType"),
+            "description_snippet": description_plain[:500],
+            "description_full": description_plain,
             "posted_at": posted_at,
+            "salary_min": salary["salary_min"],
+            "salary_max": salary["salary_max"],
+            "salary_currency": salary["salary_currency"],
+            "comp_summary": salary["comp_summary"],
             "company": company_name,
         })
     return jobs

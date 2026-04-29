@@ -151,12 +151,19 @@ CREATE TABLE IF NOT EXISTS jobs (
     title               TEXT NOT NULL,
     location            TEXT,
     department          TEXT,
+    team                TEXT,
     url                 TEXT NOT NULL,
     description_snippet TEXT,
     description_full    TEXT,
     category            TEXT,
     ats_type            TEXT,
     remote              INTEGER NOT NULL DEFAULT 0,
+    employment_type     TEXT,
+    workplace_type      TEXT,
+    salary_min          INTEGER,
+    salary_max          INTEGER,
+    salary_currency     TEXT,
+    comp_summary        TEXT,
     keyword_score       INTEGER NOT NULL DEFAULT 0,
     llm_score           INTEGER,
     llm_reasoning       TEXT,
@@ -341,6 +348,24 @@ def init_db(db_path: str = None) -> None:
         # a constraint, so we rebuild the table when we detect the old shape.
         _migrate_drop_pipeline_cascade(conn)
 
+        # M5: richer Ashby fields (added 2026-04-29). Populated for Ashby
+        # boards via the public posting-api with `?includeCompensation=true`;
+        # other ATS leave them NULL until their fetchers are extended.
+        for col in (
+            "team TEXT",
+            "employment_type TEXT",
+            "workplace_type TEXT",
+            "salary_min INTEGER",
+            "salary_max INTEGER",
+            "salary_currency TEXT",
+            "comp_summary TEXT",
+        ):
+            try:
+                conn.execute(f"ALTER TABLE jobs ADD COLUMN {col}")
+                conn.commit()
+            except sqlite3.OperationalError:
+                pass
+
         seed_companies_from_scraper(conn)
     finally:
         conn.close()
@@ -500,14 +525,18 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
         conn.execute(
             """
             INSERT INTO jobs (
-                id, company, title, location, department, url,
+                id, company, title, location, department, team, url,
                 description_snippet, description_full, category, ats_type,
-                remote, keyword_score, llm_score, llm_reasoning,
+                remote, employment_type, workplace_type,
+                salary_min, salary_max, salary_currency, comp_summary,
+                keyword_score, llm_score, llm_reasoning,
                 first_seen_at, last_seen_at, expired, dismissed, created_at
             ) VALUES (
-                :id, :company, :title, :location, :department, :url,
+                :id, :company, :title, :location, :department, :team, :url,
                 :description_snippet, :description_full, :category, :ats_type,
-                :remote, :keyword_score, :llm_score, :llm_reasoning,
+                :remote, :employment_type, :workplace_type,
+                :salary_min, :salary_max, :salary_currency, :comp_summary,
+                :keyword_score, :llm_score, :llm_reasoning,
                 :first_seen_at, :last_seen_at, 0, 0, :created_at
             )
             """,
@@ -517,12 +546,19 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
                 "title": title,
                 "location": job_data.get("location"),
                 "department": job_data.get("department"),
+                "team": job_data.get("team"),
                 "url": url,
                 "description_snippet": _clean_description(job_data.get("description_snippet")),
                 "description_full": _clean_description(job_data.get("description_full")),
                 "category": job_data.get("category"),
                 "ats_type": job_data.get("ats_type"),
                 "remote": 1 if job_data.get("remote") else 0,
+                "employment_type": job_data.get("employment_type"),
+                "workplace_type": job_data.get("workplace_type"),
+                "salary_min": job_data.get("salary_min"),
+                "salary_max": job_data.get("salary_max"),
+                "salary_currency": job_data.get("salary_currency"),
+                "comp_summary": job_data.get("comp_summary"),
                 "keyword_score": job_data.get("keyword_score", 0),
                 "llm_score": job_data.get("llm_score"),
                 "llm_reasoning": job_data.get("llm_reasoning"),
@@ -532,17 +568,27 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
             },
         )
     else:
-        # Refresh mutable fields; never overwrite first_seen_at or dismissed
+        # Refresh mutable fields; never overwrite first_seen_at or dismissed.
+        # New Ashby comp/employment fields use COALESCE so that a future scrape
+        # that drops back to a non-comp source (or the GraphQL fallback) won't
+        # blank values we already captured.
         conn.execute(
             """
             UPDATE jobs SET
                 location            = COALESCE(:location, location),
                 department          = COALESCE(:department, department),
+                team                = COALESCE(:team, team),
                 description_snippet = COALESCE(:description_snippet, description_snippet),
                 description_full    = COALESCE(:description_full, description_full),
                 category            = COALESCE(:category, category),
                 ats_type            = COALESCE(:ats_type, ats_type),
                 remote              = :remote,
+                employment_type     = COALESCE(:employment_type, employment_type),
+                workplace_type      = COALESCE(:workplace_type, workplace_type),
+                salary_min          = COALESCE(:salary_min, salary_min),
+                salary_max          = COALESCE(:salary_max, salary_max),
+                salary_currency     = COALESCE(:salary_currency, salary_currency),
+                comp_summary        = COALESCE(:comp_summary, comp_summary),
                 keyword_score       = :keyword_score,
                 llm_score           = COALESCE(:llm_score, llm_score),
                 llm_reasoning       = COALESCE(:llm_reasoning, llm_reasoning),
@@ -554,11 +600,18 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
                 "id": job_id,
                 "location": job_data.get("location"),
                 "department": job_data.get("department"),
+                "team": job_data.get("team"),
                 "description_snippet": _clean_description(job_data.get("description_snippet")),
                 "description_full": _clean_description(job_data.get("description_full")),
                 "category": job_data.get("category"),
                 "ats_type": job_data.get("ats_type"),
                 "remote": 1 if job_data.get("remote") else 0,
+                "employment_type": job_data.get("employment_type"),
+                "workplace_type": job_data.get("workplace_type"),
+                "salary_min": job_data.get("salary_min"),
+                "salary_max": job_data.get("salary_max"),
+                "salary_currency": job_data.get("salary_currency"),
+                "comp_summary": job_data.get("comp_summary"),
                 "keyword_score": job_data.get("keyword_score", 0),
                 "llm_score": job_data.get("llm_score"),
                 "llm_reasoning": job_data.get("llm_reasoning"),

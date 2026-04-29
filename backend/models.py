@@ -38,12 +38,27 @@ class JobOut(BaseModel):
     title: str
     location: Optional[str] = None
     department: Optional[str] = None
+    team: Optional[str] = None
     url: str
     description_snippet: Optional[str] = None
     description_full: Optional[str] = None
     category: Optional[str] = None
     ats_type: Optional[str] = None
     remote: bool = False
+    # Ashby's `workplaceType`: "OnSite" | "Remote" | "Hybrid". Finer than the
+    # legacy boolean `remote`. NULL for ATS that don't expose it.
+    workplace_type: Optional[str] = None
+    # Ashby's `employmentType`: "FullTime" | "PartTime" | "Intern" | "Contract" | "Temporary".
+    employment_type: Optional[str] = None
+    # Salary range (annual). Sourced from Ashby `summaryComponents.Salary`,
+    # which already collapses geographic compensation tiers into a single
+    # min/max range. NULL when the employer hasn't disclosed comp.
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    salary_currency: Optional[str] = None
+    # Human-readable summary the employer publishes (Ashby's
+    # `compensationTierSummary`, e.g. "$211.4K – $290.6K • Offers Equity").
+    comp_summary: Optional[str] = None
     keyword_score: int = 0
     llm_score: Optional[int] = None
     llm_reasoning: Optional[str] = None

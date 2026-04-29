@@ -200,10 +200,12 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
 
   const rows = await env.DB.prepare(
     `SELECT
-        j.id, j.company, j.title, j.url, j.location, j.department,
+        j.id, j.company, j.title, j.url, j.location, j.department, j.team,
         j.description_snippet, j.description_full, j.category, j.ats_type,
         j.remote, j.first_seen_at, j.last_seen_at, j.expired,
         j.posted_at, j.fingerprint,
+        j.employment_type, j.workplace_type,
+        j.salary_min, j.salary_max, j.salary_currency, j.comp_summary,
         r.repost_count, r.repost_first_seen_at,
         ${scoreSelect}
        FROM jobs j
@@ -977,12 +979,19 @@ interface JobOutShape {
   title: string;
   location: string | null;
   department: string | null;
+  team: string | null;
   url: string;
   description_snippet: string | null;
   description_full: string | null;
   category: string | null;
   ats_type: string | null;
   remote: boolean;
+  employment_type: string | null;
+  workplace_type: string | null;
+  salary_min: number | null;
+  salary_max: number | null;
+  salary_currency: string | null;
+  comp_summary: string | null;
   llm_score: number | null;
   llm_reasoning: string | null;
   first_seen_at: string;
@@ -1003,12 +1012,19 @@ function jobRowToOut(row: any): JobOutShape {
     title: row.title,
     location: row.location ?? null,
     department: row.department ?? null,
+    team: row.team ?? null,
     url: row.url,
     description_snippet: row.description_snippet ?? null,
     description_full: row.description_full ?? null,
     category: row.category ?? null,
     ats_type: row.ats_type ?? null,
     remote: row.remote === 1 || row.remote === true,
+    employment_type: row.employment_type ?? null,
+    workplace_type: row.workplace_type ?? null,
+    salary_min: typeof row.salary_min === "number" ? row.salary_min : null,
+    salary_max: typeof row.salary_max === "number" ? row.salary_max : null,
+    salary_currency: row.salary_currency ?? null,
+    comp_summary: row.comp_summary ?? null,
     llm_score: row.llm_score ?? null,
     llm_reasoning: row.llm_reasoning ?? null,
     first_seen_at: row.first_seen_at,

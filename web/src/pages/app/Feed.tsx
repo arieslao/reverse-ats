@@ -52,6 +52,28 @@ function renderFreshness(job: Job): string {
   return `Posted ${posted} · seen ${seen}`;
 }
 
+/** Format an annual amount: 211400 → "$211K", 1_500_000 → "$1.5M". */
+function formatAmount(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${n}`;
+}
+
+/** Display string for a job's compensation, or null when nothing's disclosed.
+ *  Prefers the employer's own `comp_summary` (Ashby's polished string with
+ *  equity / commission notes); falls back to formatting our parsed range. */
+function formatSalary(job: Job): string | null {
+  if (job.comp_summary && job.comp_summary.trim()) return job.comp_summary.trim();
+  if (job.salary_min == null && job.salary_max == null) return null;
+  const lo = job.salary_min;
+  const hi = job.salary_max;
+  if (lo != null && hi != null) {
+    const cur = job.salary_currency && job.salary_currency !== 'USD' ? ` ${job.salary_currency}` : '';
+    return `${formatAmount(lo)} – ${formatAmount(hi)}${cur}`;
+  }
+  return formatAmount((lo ?? hi) as number);
+}
+
 function loadInitialStyle(): CoverLetterStyle {
   try {
     const v = localStorage.getItem(COVER_LETTER_STYLE_KEY);
@@ -392,9 +414,40 @@ function JobCard({
                 {score}
               </span>
             )}
-            {job.remote && (
-              <span className="text-xs px-1.5 py-0.5 rounded-md bg-[var(--color-bg-tinted,rgba(120,120,120,0.12))] text-[var(--color-text-tertiary)]">
-                remote
+            {(job.workplace_type || job.remote) && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-md uppercase tracking-wide font-semibold"
+                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}
+              >
+                {job.workplace_type || 'Remote'}
+              </span>
+            )}
+            {(() => {
+              const sal = formatSalary(job);
+              return sal ? (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded-md font-semibold"
+                  style={{
+                    background: 'rgba(34,197,94,0.15)',
+                    color: '#22c55e',
+                    border: '1px solid rgba(34,197,94,0.28)',
+                  }}
+                  title={
+                    job.salary_min != null && job.salary_max != null
+                      ? `${job.salary_min.toLocaleString()} – ${job.salary_max.toLocaleString()} ${job.salary_currency || 'USD'} / year`
+                      : undefined
+                  }
+                >
+                  {sal}
+                </span>
+              ) : null;
+            })()}
+            {job.employment_type && job.employment_type !== 'FullTime' && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded-md"
+                style={{ background: 'rgba(168,85,247,0.15)', color: '#c084fc' }}
+              >
+                {job.employment_type}
               </span>
             )}
             {job.repost_count > 1 && (

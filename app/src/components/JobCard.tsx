@@ -27,6 +27,29 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(days / 7)}w ago`
 }
 
+/** Format a single annual amount: $211400 → "$211K", $1_500_000 → "$1.5M". */
+function formatAmount(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`
+  return `$${n}`
+}
+
+/** Display string for a job's compensation, or null when nothing's disclosed.
+ *  Prefers the employer's own `comp_summary` (Ashby publishes a polished
+ *  string with equity / commission notes); falls back to formatting our
+ *  parsed min/max range otherwise. */
+function formatSalary(job: Job): string | null {
+  if (job.comp_summary && job.comp_summary.trim()) return job.comp_summary.trim()
+  if (job.salary_min == null && job.salary_max == null) return null
+  const lo = job.salary_min
+  const hi = job.salary_max
+  if (lo != null && hi != null) {
+    const suffix = job.salary_currency && job.salary_currency !== 'USD' ? ` ${job.salary_currency}` : ''
+    return `${formatAmount(lo)} – ${formatAmount(hi)}${suffix}`
+  }
+  return formatAmount((lo ?? hi) as number)
+}
+
 export function JobCard({ job }: JobCardProps) {
   const [expanded, setExpanded] = useState(false)
   const queryClient = useQueryClient()
@@ -101,7 +124,10 @@ export function JobCard({ job }: JobCardProps) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-text-primary)' }}>{job.company}</span>
-            {job.remote && (
+            {/* Workplace badge — prefers Ashby/Lever workplace_type (Remote /
+                Hybrid / OnSite) for finer granularity; falls back to the
+                legacy boolean for ATSes that don't expose the field. */}
+            {(job.workplace_type || job.remote) && (
               <span
                 style={{
                   background: 'rgba(34, 197, 94, 0.12)',
@@ -114,7 +140,7 @@ export function JobCard({ job }: JobCardProps) {
                   letterSpacing: '0.04em',
                 }}
               >
-                Remote
+                {job.workplace_type || 'Remote'}
               </span>
             )}
             {job.expired && (
@@ -163,6 +189,43 @@ export function JobCard({ job }: JobCardProps) {
 
       {/* Tags row */}
       <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+        {(() => {
+          const sal = formatSalary(job)
+          return sal ? (
+            <span
+              title={
+                job.salary_min != null && job.salary_max != null
+                  ? `${job.salary_min.toLocaleString()} – ${job.salary_max.toLocaleString()} ${job.salary_currency || 'USD'} / year`
+                  : undefined
+              }
+              style={{
+                background: 'rgba(34, 197, 94, 0.12)',
+                border: '1px solid rgba(34, 197, 94, 0.28)',
+                color: 'var(--color-success)',
+                borderRadius: 4,
+                padding: '1px 8px',
+                fontSize: 11,
+                fontWeight: 600,
+              }}
+            >
+              {sal}
+            </span>
+          ) : null
+        })()}
+        {job.employment_type && job.employment_type !== 'FullTime' && (
+          <span
+            style={{
+              background: 'rgba(168, 85, 247, 0.12)',
+              border: '1px solid rgba(168, 85, 247, 0.28)',
+              color: '#c084fc',
+              borderRadius: 4,
+              padding: '1px 8px',
+              fontSize: 11,
+            }}
+          >
+            {job.employment_type}
+          </span>
+        )}
         {job.category && (
           <span
             style={{

@@ -15,12 +15,25 @@ export interface Job {
   title: string
   location: string | null
   department: string | null
+  team: string | null
   url: string
   description_snippet: string | null
   description_full: string | null
   category: string | null
   ats_type: string | null
   remote: boolean
+  /** Ashby/Lever workplaceType: OnSite | Remote | Hybrid. Finer than `remote`. */
+  workplace_type: string | null
+  /** Ashby employmentType / Lever-mapped commitment:
+   *  FullTime | PartTime | Intern | Contract | Temporary. */
+  employment_type: string | null
+  /** Annual salary range in `salary_currency` (USD by default). */
+  salary_min: number | null
+  salary_max: number | null
+  salary_currency: string | null
+  /** Human-readable comp string from the employer's posting (Ashby's
+   *  `compensationTierSummary`, e.g. "$211.4K – $290.6K • Offers Equity"). */
+  comp_summary: string | null
   keyword_score: number
   llm_score: number | null
   llm_reasoning: string | null

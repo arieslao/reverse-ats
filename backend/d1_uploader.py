@@ -146,6 +146,7 @@ def _normalize_for_wire(job: dict) -> dict:
         "url": job["url"],
         "location": job.get("location"),
         "department": job.get("department"),
+        "team": job.get("team"),
         "description_full": job.get("description_full"),
         "description_snippet": job.get("description_snippet"),
         "category": job.get("category"),
@@ -154,4 +155,13 @@ def _normalize_for_wire(job: dict) -> dict:
         "first_seen_at": job.get("first_seen_at"),
         "last_seen_at": job.get("last_seen_at"),
         "posted_at": job.get("posted_at"),
+        # Compensation + workplace classification (added 2026-04-29).
+        # Populated by fetch_ashby (structured), fetch_lever (structured +
+        # regex), fetch_greenhouse (regex). NULL when not disclosed.
+        "employment_type": job.get("employment_type"),
+        "workplace_type": job.get("workplace_type"),
+        "salary_min": job.get("salary_min"),
+        "salary_max": job.get("salary_max"),
+        "salary_currency": job.get("salary_currency"),
+        "comp_summary": job.get("comp_summary"),
     }
