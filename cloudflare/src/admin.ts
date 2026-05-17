@@ -28,6 +28,10 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response 
     if (request.method === "PATCH") return updateUser(request, env, userId);
   }
 
+  if (request.method === "GET" && url.pathname === "/admin/scrape-health") {
+    return scrapeHealth(env, url);
+  }
+
   return jsonResponse({ ok: false, error: "not found" }, 404);
 }
 
@@ -81,6 +85,127 @@ async function updateUser(request: Request, env: Env, userId: string): Promise<R
   const rows = (await res.json()) as unknown[];
   if (rows.length === 0) return jsonResponse({ ok: false, error: "user not found" }, 404);
   return jsonResponse({ ok: true, user: rows[0] }, 200);
+}
+
+// ─── GET /admin/scrape-health ──────────────────────────────────────────────
+// Per-slug rollup from `scrape_company_runs` (migration 0009). Used to spot
+// dead ATS endpoints without re-running the offline audit script.
+//
+// Query params:
+//   ?lookback=10   — how many recent runs per slug to consider (default 10, max 50)
+//   ?alerts_only=1 — only return slugs that tripped an alert rule
+
+interface CompanyRunRow {
+  ats: string;
+  slug: string;
+  company: string;
+  raw_count: number;
+  filtered_count: number;
+  error: string | null;
+  ran_at: string;
+}
+
+async function scrapeHealth(env: Env, url: URL): Promise<Response> {
+  const lookback = Math.min(parseInt(url.searchParams.get("lookback") || "10", 10) || 10, 50);
+  const alertsOnly = url.searchParams.get("alerts_only") === "1";
+
+  // Pull the last `lookback * (estimated companies)` rows. Cheap on D1 — the
+  // (ats, slug, ran_at DESC) index makes the per-slug group-by efficient.
+  // Caps total at 5000 to keep response size bounded.
+  const rowsResult = await env.DB
+    .prepare(
+      `SELECT ats, slug, company, raw_count, filtered_count, error, ran_at
+         FROM scrape_company_runs
+        ORDER BY ran_at DESC
+        LIMIT 5000`,
+    )
+    .all<CompanyRunRow>();
+
+  const rows = rowsResult.results || [];
+
+  // Group by (ats, slug), keep only the most recent `lookback` rows each.
+  const grouped = new Map<string, CompanyRunRow[]>();
+  for (const r of rows) {
+    const key = `${r.ats}/${r.slug}`;
+    const bucket = grouped.get(key) || [];
+    if (bucket.length < lookback) {
+      bucket.push(r);
+      grouped.set(key, bucket);
+    }
+  }
+
+  const companies = [];
+  const alerts = [];
+  for (const runs of grouped.values()) {
+    if (runs.length === 0) continue;
+    const newest = runs[0];
+
+    let consecutiveEmpty = 0;
+    for (const r of runs) {
+      if (r.raw_count === 0 && !r.error) consecutiveEmpty++;
+      else break;
+    }
+    let consecutiveError = 0;
+    for (const r of runs) {
+      if (r.error) consecutiveError++;
+      else break;
+    }
+
+    const avgRaw = runs.reduce((s, r) => s + r.raw_count, 0) / runs.length;
+    const avgFiltered = runs.reduce((s, r) => s + r.filtered_count, 0) / runs.length;
+
+    const summary = {
+      ats: newest.ats,
+      slug: newest.slug,
+      company: newest.company,
+      runs: runs.length,
+      avg_raw: Math.round(avgRaw * 10) / 10,
+      avg_filtered: Math.round(avgFiltered * 10) / 10,
+      consecutive_empty: consecutiveEmpty,
+      consecutive_error: consecutiveError,
+      last_error: newest.error,
+      last_ran_at: newest.ran_at,
+    };
+
+    // Alert rules: >=3 consecutive empties OR >=2 consecutive errors.
+    // Tuned to avoid pager noise from one-off API hiccups while still
+    // catching slugs that stayed broken across multiple 30-min cycles.
+    let alertReason: string | null = null;
+    if (consecutiveError >= 2) {
+      alertReason = `${consecutiveError} consecutive errors (latest: ${newest.error})`;
+    } else if (consecutiveEmpty >= 3) {
+      alertReason = `${consecutiveEmpty} consecutive empty runs`;
+    }
+
+    if (alertReason) {
+      alerts.push({ ats: newest.ats, slug: newest.slug, company: newest.company, reason: alertReason });
+    }
+
+    if (!alertsOnly || alertReason) {
+      companies.push(summary);
+    }
+  }
+
+  // Sort: alerts first, then by avg_raw ascending (most-broken first).
+  companies.sort((a, b) => {
+    const aBroken = a.consecutive_error >= 2 || a.consecutive_empty >= 3 ? 0 : 1;
+    const bBroken = b.consecutive_error >= 2 || b.consecutive_empty >= 3 ? 0 : 1;
+    if (aBroken !== bBroken) return aBroken - bBroken;
+    return a.avg_raw - b.avg_raw;
+  });
+
+  return jsonResponse(
+    {
+      ok: true,
+      as_of: new Date().toISOString(),
+      lookback_runs: lookback,
+      total_slugs_tracked: grouped.size,
+      alert_count: alerts.length,
+      alerts,
+      companies,
+    },
+    200,
+  );
 }
 
 // ─── helper ─────────────────────────────────────────────────────────────────

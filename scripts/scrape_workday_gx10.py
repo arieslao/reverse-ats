@@ -76,7 +76,7 @@ def main() -> int:
     for company in workday_companies:
         name = company["name"]
         t0 = time.time()
-        jobs, error = scrape_company(company, extra_keywords=[], remote_only=False)
+        jobs, _raw_count, error = scrape_company(company, extra_keywords=[], remote_only=False)
         elapsed = time.time() - t0
 
         if error:

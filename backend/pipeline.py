@@ -45,7 +45,7 @@ for _candidate in _candidates:
         break
 
 # Scraper exports we rely on
-from job_scraper import COMPANIES, CATEGORY_LABELS, scrape_company  # noqa: E402
+from job_scraper import COMPANIES, CATEGORY_LABELS, scrape_company, is_active  # noqa: E402
 
 # Local backend imports
 from db import (  # noqa: E402
@@ -155,6 +155,19 @@ def run_pipeline(
                 skipped,
             )
 
+    # Filter quarantined slugs (audit-flagged broken ATS endpoints). This runs
+    # against whichever source populated target_companies — DB or hardcoded —
+    # so DB-managed companies that match a known-broken (ats, slug) pair are
+    # also skipped without needing a separate DB migration.
+    inactive_count = sum(1 for c in target_companies if not is_active(c))
+    if inactive_count:
+        target_companies = [c for c in target_companies if is_active(c)]
+        logger.info(
+            "Skipped %d company(ies) marked inactive (registry audit). "
+            "See INACTIVE_SLUGS in scraper/job_scraper.py to reactivate.",
+            inactive_count,
+        )
+
     _print_header(len(target_companies))
 
     stats: dict = {
@@ -174,6 +187,9 @@ def run_pipeline(
     # Phase 0: this is what feeds the centralized cloud architecture without
     # changing anything about the local single-tenant flow.
     jobs_for_d1: list[dict] = []
+    # Per-company scrape outcomes, pushed to D1 in a single stats-only call
+    # at the end of the run. Powers /admin/scrape-health on the Worker side.
+    company_stats: list[dict] = []
 
     # Create the audit record before we start scraping
     run_id = create_scrape_run(conn)
@@ -187,7 +203,16 @@ def run_pipeline(
         label = f"[{i:02d}/{len(target_companies):02d}] {name:<22} ({ats})"
         print(f"  {label}", end=" ... ", flush=True)
 
-        jobs, error = scrape_company(company, extra_keywords=[], remote_only=remote_only)
+        jobs, raw_count, error = scrape_company(company, extra_keywords=[], remote_only=remote_only)
+
+        company_stats.append({
+            "company": company.get("name", ""),
+            "ats": company.get("ats", ""),
+            "slug": company.get("slug", ""),
+            "raw_count": raw_count,
+            "filtered_count": len(jobs),
+            "error": error,
+        })
 
         if error:
             msg = f"{name}: {error}"
@@ -263,6 +288,17 @@ def run_pipeline(
             # purely an additive observability stream during Phase 0.
             logger.warning("D1 push failed (local pipeline unaffected): %s", exc)
             stats["errors"].append(f"d1_push: {exc}")
+
+    # Push per-company scrape outcomes to D1 so /admin/scrape-health can
+    # flag dead slugs without operator intervention. Wrapped in the same
+    # never-fail-the-pipeline guard as the jobs push above.
+    if push_to_d1 and company_stats:
+        try:
+            from d1_uploader import push_company_stats as _push_company_stats
+            _push_company_stats(company_stats, source="pipeline-stats")
+        except Exception as exc:
+            logger.warning("D1 company_stats push failed (pipeline unaffected): %s", exc)
+            stats["errors"].append(f"d1_company_stats: {exc}")
 
     # ------------------------------------------------------------------
     # LLM scoring for new jobs
@@ -411,11 +447,20 @@ def _print_header(company_count: int) -> None:
 def _print_summary(stats: dict) -> None:
     print(f"\n{'=' * 64}")
     print(f"  Pipeline Complete")
+    # Local New/Updated is relative to whatever SQLite the runner has on disk.
+    # On ephemeral CI runners that starts empty, so `New` matches `Fetched`
+    # every run — for the real net-add count, see the D1 line below.
     print(
         f"  Fetched: {stats['total_fetched']} | "
-        f"New: {stats['new_jobs']} | "
-        f"Updated: {stats['updated_jobs']}"
+        f"Local New: {stats['new_jobs']} | "
+        f"Local Updated: {stats['updated_jobs']}"
     )
+    if "d1_pushed" in stats:
+        print(
+            f"  D1: pushed {stats['d1_pushed']} | "
+            f"net-new {stats.get('d1_new', 0)} | "
+            f"updated {stats.get('d1_updated', 0)}"
+        )
     print(
         f"  Expired: {stats.get('expired_jobs', 0)} | "
         f"LLM Scored: {stats.get('llm_scored', 0)}"

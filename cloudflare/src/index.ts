@@ -126,6 +126,37 @@ async function handleIngest(request: Request, env: Env, ctx: ExecutionContext): 
     .bind(completedAt, newCount, updatedCount, errors.length ? JSON.stringify(errors) : null, ingestRunId)
     .run();
 
+  // Persist per-company scrape outcomes if the pipeline sent them. Each row
+  // gets the current ingest_run_id so we can correlate "company X returned 0"
+  // back to a specific run timestamp + source. Older pipelines that don't
+  // send this field are a no-op — backwards-compatible.
+  if (Array.isArray(body.company_stats) && body.company_stats.length > 0) {
+    const statRanAt = completedAt;
+    for (const stat of body.company_stats) {
+      if (!stat?.company || !stat?.ats || !stat?.slug) continue;
+      try {
+        await env.DB.prepare(
+          `INSERT INTO scrape_company_runs
+             (ingest_run_id, company, ats, slug, raw_count, filtered_count, error, ran_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+          .bind(
+            ingestRunId,
+            stat.company,
+            stat.ats,
+            stat.slug,
+            Number(stat.raw_count ?? 0),
+            Number(stat.filtered_count ?? 0),
+            stat.error ?? null,
+            statRanAt,
+          )
+          .run();
+      } catch (err) {
+        errors.push(`company_stat ${stat.ats}/${stat.slug}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+
   // Kick off async preprocessing in the background — don't block the ingest response.
   ctx.waitUntil(preprocessPending(env));
 

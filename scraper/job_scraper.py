@@ -21,6 +21,117 @@ import requests
 # Company Registry
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Inactive slugs (quarantine list)
+# ---------------------------------------------------------------------------
+#
+# Companies in this set are skipped by `pipeline.py` and the CLI scraper.
+# They are kept in COMPANIES for documentation; flipping a slug back on is
+# a single-line removal once a new working slug/ATS is identified.
+#
+# Audit 2026-05-16: each entry below returned HTTP 404 or no data from the
+# public ATS API. Most have moved to a private Greenhouse SaaS board (auth
+# required), to Workday, or to an in-house careers page. See
+# `scripts/audit_ci_companies.py` to re-run the audit. Re-enable an entry
+# only after verifying `scripts/audit_ci_companies.py --ats <ats>` shows
+# a non-zero raw count for it.
+
+INACTIVE_SLUGS: set[tuple[str, str]] = {
+    # Greenhouse — 76 entries returning HTTP 404 / empty (audit 2026-05-16)
+    ("greenhouse", "1password"),
+    ("greenhouse", "airwallex"),
+    ("greenhouse", "aledade"),
+    ("greenhouse", "anduril"),
+    ("greenhouse", "arcadiasolutions"),
+    ("greenhouse", "arcadia"),
+    ("greenhouse", "atlassian"),
+    ("greenhouse", "audible"),
+    ("greenhouse", "bloomenergy"),
+    ("greenhouse", "bloomberg"),
+    ("greenhouse", "bolt"),
+    ("greenhouse", "brainly"),
+    ("greenhouse", "canva"),
+    ("greenhouse", "checkoutcom"),
+    ("greenhouse", "chegg"),
+    ("greenhouse", "chewy"),
+    ("greenhouse", "cityblockhealth"),
+    ("greenhouse", "classdojo"),
+    ("greenhouse", "coinbase"),
+    ("greenhouse", "colorgenomics"),
+    ("greenhouse", "confluent"),
+    ("greenhouse", "crowdstrike"),
+    ("greenhouse", "devoted"),
+    ("greenhouse", "doordash"),
+    ("greenhouse", "enphaseenergy"),
+    ("greenhouse", "etsy"),
+    ("greenhouse", "fanatics"),
+    ("greenhouse", "formenergy"),
+    ("greenhouse", "forrester"),
+    ("greenhouse", "goodrx"),
+    ("greenhouse", "gopuff"),
+    ("greenhouse", "handshake"),
+    ("greenhouse", "hashicorp"),
+    ("greenhouse", "himshers"),
+    ("greenhouse", "includedhealth"),
+    ("greenhouse", "instructure"),
+    ("greenhouse", "klarna"),
+    ("greenhouse", "kong"),
+    ("greenhouse", "maxar"),
+    ("greenhouse", "miro"),
+    ("greenhouse", "netflix"),
+    ("greenhouse", "notion"),
+    ("greenhouse", "openai"),
+    ("greenhouse", "oscarhealth"),
+    ("greenhouse", "outschool"),
+    ("greenhouse", "pachama"),
+    ("greenhouse", "plaid"),
+    ("greenhouse", "primer"),
+    ("greenhouse", "quantumscape"),
+    ("greenhouse", "quizlet"),
+    ("greenhouse", "ramp"),
+    ("greenhouse", "rebelliondefense"),
+    ("greenhouse", "remitly"),
+    ("greenhouse", "rivian"),
+    ("greenhouse", "ro"),
+    ("greenhouse", "secondfrontsystems"),
+    ("greenhouse", "shieldai"),
+    ("greenhouse", "shopify"),
+    ("greenhouse", "slalom"),
+    ("greenhouse", "snap"),
+    ("greenhouse", "snowflake"),
+    ("greenhouse", "span"),
+    ("greenhouse", "spotify"),
+    ("greenhouse", "substack"),
+    ("greenhouse", "swordhealth"),
+    ("greenhouse", "tempus"),
+    ("greenhouse", "thredup"),
+    ("greenhouse", "uber"),
+    ("greenhouse", "veeva"),
+    ("greenhouse", "verily"),
+    ("greenhouse", "warbyparker"),
+    ("greenhouse", "wayfair"),
+    ("greenhouse", "wealthfront"),
+    ("greenhouse", "westmonroe"),
+    ("greenhouse", "transferwise"),
+    ("greenhouse", "mondaycom"),
+    # Lever — 2 entries (audit 2026-05-16)
+    ("lever", "scaleai"),
+    ("lever", "stratadecision"),
+    # Ashby — 1 entry (audit 2026-05-16)
+    ("ashby", "anthropic"),
+}
+
+
+def is_active(company: dict) -> bool:
+    """Return False if this company's (ats, slug) is quarantined.
+
+    Used by `pipeline.py` and the standalone CLI to skip companies whose
+    public ATS endpoint is known-broken. Quarantine is data, not logic:
+    edit `INACTIVE_SLUGS` to flip a company back on or to add new ones.
+    """
+    return (company.get("ats"), company.get("slug")) not in INACTIVE_SLUGS
+
+
 COMPANIES = [
     # FAANG / Big Tech
     {"name": "Netflix",      "ats": "greenhouse", "slug": "netflix",      "category": "big_tech"},
@@ -40,7 +151,7 @@ COMPANIES = [
     # Major Fintech
     {"name": "Stripe",       "ats": "greenhouse", "slug": "stripe",        "category": "fintech"},
     {"name": "Block",        "ats": "greenhouse", "slug": "block",         "category": "fintech"},
-    {"name": "Plaid",        "ats": "greenhouse", "slug": "plaid",         "category": "fintech"},
+    {"name": "Plaid",        "ats": "ashby",      "slug": "plaid",         "category": "fintech"},
     {"name": "Affirm",       "ats": "greenhouse", "slug": "affirm",        "category": "fintech"},
     {"name": "Robinhood",    "ats": "greenhouse", "slug": "robinhood",     "category": "fintech"},
     {"name": "Coinbase",     "ats": "greenhouse", "slug": "coinbase",      "category": "fintech"},
@@ -73,17 +184,18 @@ COMPANIES = [
     {"name": "Checkout.com", "ats": "greenhouse", "slug": "checkoutcom",   "category": "fintech"},
 
     # Growth-Stage / AI-Finance
-    {"name": "Anthropic",   "ats": "ashby",      "slug": "anthropic",     "category": "ai_tech"},
-    {"name": "OpenAI",      "ats": "greenhouse", "slug": "openai",        "category": "ai_tech"},
+    {"name": "Anthropic",   "ats": "greenhouse", "slug": "anthropic",     "category": "ai_tech"},
+    {"name": "OpenAI",      "ats": "ashby",      "slug": "openai",        "category": "ai_tech"},
     {"name": "Datadog",     "ats": "greenhouse", "slug": "datadog",       "category": "ai_tech"},
     {"name": "Databricks",  "ats": "greenhouse", "slug": "databricks",    "category": "ai_tech"},
-    {"name": "Scale AI",    "ats": "lever",      "slug": "scaleai",       "category": "ai_tech"},
+    {"name": "Scale AI",    "ats": "greenhouse", "slug": "scaleai",       "category": "ai_tech"},
     {"name": "Anduril",     "ats": "greenhouse", "slug": "anduril",       "category": "ai_tech"},
     {"name": "Palantir",    "ats": "lever",      "slug": "palantir",      "category": "ai_tech"},
-    {"name": "Notion",      "ats": "greenhouse", "slug": "notion",        "category": "ai_tech"},
+    {"name": "Notion",      "ats": "ashby",      "slug": "notion",        "category": "ai_tech"},
     {"name": "Figma",       "ats": "greenhouse", "slug": "figma",         "category": "ai_tech"},
     {"name": "Vercel",      "ats": "greenhouse", "slug": "vercel",        "category": "ai_tech"},
     {"name": "Supabase",    "ats": "ashby",      "slug": "supabase",      "category": "ai_tech"},
+    {"name": "Klaviyo",     "ats": "greenhouse", "slug": "klaviyo",       "category": "ai_tech"},
 
     # HealthTech-FinTech Crossover
     {"name": "Arcadia",          "ats": "greenhouse", "slug": "arcadiasolutions", "category": "healthtech"},
@@ -166,7 +278,7 @@ COMPANIES = [
     {"name": "Gopuff",       "ats": "greenhouse", "slug": "gopuff",      "category": "retail"},
 
     # Media & Entertainment
-    {"name": "Spotify",            "ats": "greenhouse", "slug": "spotify",         "category": "media"},
+    {"name": "Spotify",            "ats": "lever",      "slug": "spotify",         "category": "media"},
     {"name": "Roblox",             "ats": "greenhouse", "slug": "roblox",          "category": "media"},
     {"name": "Unity",              "ats": "greenhouse", "slug": "unity3d",         "category": "media"},
     {"name": "Epic Games",         "ats": "greenhouse", "slug": "epicgames",       "category": "media"},
@@ -179,12 +291,12 @@ COMPANIES = [
     {"name": "The New York Times", "ats": "greenhouse", "slug": "thenewyorktimes", "category": "media"},
     {"name": "Bloomberg",          "ats": "greenhouse", "slug": "bloomberg",       "category": "media"},
     {"name": "Vox Media",          "ats": "greenhouse", "slug": "voxmedia",        "category": "media"},
-    {"name": "Substack",           "ats": "greenhouse", "slug": "substack",        "category": "media"},
+    {"name": "Substack",           "ats": "ashby",      "slug": "substack",        "category": "media"},
     {"name": "Audible",            "ats": "greenhouse", "slug": "audible",         "category": "media"},
 
     # Enterprise SaaS
-    {"name": "Snowflake",    "ats": "greenhouse", "slug": "snowflake",    "category": "enterprise_saas"},
-    {"name": "Confluent",    "ats": "greenhouse", "slug": "confluent",    "category": "enterprise_saas"},
+    {"name": "Snowflake",    "ats": "ashby",      "slug": "snowflake",    "category": "enterprise_saas"},
+    {"name": "Confluent",    "ats": "ashby",      "slug": "confluent",    "category": "enterprise_saas"},
     {"name": "MongoDB",      "ats": "greenhouse", "slug": "mongodb",      "category": "enterprise_saas"},
     {"name": "Elastic",      "ats": "greenhouse", "slug": "elastic",      "category": "enterprise_saas"},
     {"name": "HashiCorp",    "ats": "greenhouse", "slug": "hashicorp",    "category": "enterprise_saas"},
@@ -297,6 +409,31 @@ def _get(url: str, params: dict = None) -> Optional[dict]:
         return resp.json()
     except Exception as e:
         return None
+
+
+class FetchError(Exception):
+    """Raised by ATS-API fetchers when the upstream call fails distinguishably
+    (HTTP 4xx/5xx, network error, malformed JSON). The empty-list case is NOT
+    a FetchError — that's a legitimate "no jobs match" response. This split
+    lets `scrape_company` surface broken slugs in `stats["errors"]` instead of
+    swallowing them as silent empties."""
+
+
+def _get_with_status(url: str, params: dict = None) -> tuple[Optional[dict], Optional[str]]:
+    """Like `_get`, but returns (data, error_msg). Used by ATS fetchers that
+    need to tell `404` apart from `200 []`."""
+    try:
+        resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT,
+                            headers={"User-Agent": "AriesLabs-JobScraper/1.0"})
+        if resp.status_code != 200:
+            return None, f"HTTP {resp.status_code}"
+        return resp.json(), None
+    except requests.exceptions.Timeout:
+        return None, "timeout"
+    except requests.exceptions.RequestException as exc:
+        return None, f"network: {type(exc).__name__}"
+    except ValueError as exc:  # JSON decode
+        return None, f"invalid JSON: {exc}"
 
 
 def _post(url: str, payload: dict) -> Optional[dict]:
@@ -522,7 +659,9 @@ _LEVER_COMMITMENT_MAP = {
 
 def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
     url = f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs"
-    data = _get(url, params={"content": "true"})
+    data, err = _get_with_status(url, params={"content": "true"})
+    if err:
+        raise FetchError(f"greenhouse/{slug}: {err}")
     if not data or "jobs" not in data:
         return []
 
@@ -569,7 +708,9 @@ def fetch_greenhouse(slug: str, company_name: str) -> list[dict]:
 
 def fetch_lever(slug: str, company_name: str) -> list[dict]:
     url = f"https://api.lever.co/v0/postings/{slug}"
-    data = _get(url, params={"limit": 500})
+    data, err = _get_with_status(url, params={"limit": 500})
+    if err:
+        raise FetchError(f"lever/{slug}: {err}")
     if not isinstance(data, list):
         return []
 
@@ -675,7 +816,7 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
     # summaryComponents — without it the `compensation` field is omitted
     # entirely. Free for the caller; employers control disclosure per posting.
     url = f"https://api.ashbyhq.com/posting-api/job-board/{slug}"
-    data = _get(url, params={"includeCompensation": "true"})
+    data, primary_err = _get_with_status(url, params={"includeCompensation": "true"})
     if not data:
         # Fallback: try GraphQL endpoint
         gql_url = "https://jobs.ashbyhq.com/api/non-user-graphql"
@@ -695,7 +836,10 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
         }
         gql_data = _post(gql_url, payload)
         if not gql_data:
-            return []
+            # Both REST and GraphQL paths failed — surface the primary REST
+            # error so the operator can tell "Ashby returned 404" from "the
+            # board legitimately has no postings".
+            raise FetchError(f"ashby/{slug}: {primary_err or 'graphql empty'}")
         postings = (gql_data.get("data", {})
                             .get("jobBoard", {})
                             .get("jobPostings", []))
@@ -1015,7 +1159,18 @@ def fetch_custom(company: dict, company_name: str) -> list[dict]:
 # Core Pipeline
 # ---------------------------------------------------------------------------
 
-def scrape_company(company: dict, extra_keywords: list[str], remote_only: bool) -> tuple[list[dict], Optional[str]]:
+def scrape_company(
+    company: dict, extra_keywords: list[str], remote_only: bool
+) -> tuple[list[dict], int, Optional[str]]:
+    """Scrape one company. Returns (filtered_jobs, raw_count, error).
+
+    `raw_count` is what the ATS API returned before any client-side filter,
+    so per-company D1 health tracking can tell "company has no jobs matching
+    our filter" apart from "company's ATS endpoint is broken / empty board".
+
+    `error` is non-None when the ATS call itself failed (HTTP 4xx/5xx,
+    network, unknown ATS). A legitimate empty board returns ([], 0, None).
+    """
     ats = company["ats"]
     slug = company["slug"]
     name = company["name"]
@@ -1032,10 +1187,11 @@ def scrape_company(company: dict, extra_keywords: list[str], remote_only: bool) 
         elif ats == "custom":
             raw = fetch_custom(company, name)
         else:
-            return [], f"Unknown ATS type: {ats}"
+            return [], 0, f"Unknown ATS type: {ats}"
     except Exception as e:
-        return [], str(e)
+        return [], 0, str(e)
 
+    raw_count = len(raw)
     filtered = []
     for job in raw:
         if job.get("_custom"):
@@ -1051,7 +1207,7 @@ def scrape_company(company: dict, extra_keywords: list[str], remote_only: bool) 
         job["score"] = _relevance_score(job["title"], job.get("description_snippet", ""))
         filtered.append(job)
 
-    return filtered, None
+    return filtered, raw_count, None
 
 
 def run_scraper(
@@ -1067,7 +1223,7 @@ def run_scraper(
 
     target_companies = [
         c for c in COMPANIES
-        if not categories or c["category"] in categories
+        if (not categories or c["category"] in categories) and is_active(c)
     ]
 
     print(f"  Targeting {len(target_companies)} companies across "
@@ -1081,7 +1237,7 @@ def run_scraper(
         ats  = company["ats"].upper()
         print(f"  [{i:02d}/{len(target_companies):02d}] {name:<22} ({ats})", end=" ... ", flush=True)
 
-        jobs, error = scrape_company(company, extra_keywords, remote_only)
+        jobs, _raw_count, error = scrape_company(company, extra_keywords, remote_only)
 
         if error:
             errors.append(f"{name}: {error}")

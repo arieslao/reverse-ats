@@ -100,6 +100,44 @@ def push_jobs(
     return {"sent": sent, "new": new, "updated": updated, "errors": errors}
 
 
+def push_company_stats(
+    stats: list[dict],
+    *,
+    ingest_url: Optional[str] = None,
+    secret: Optional[str] = None,
+    source: str = "pipeline-stats",
+    timeout: int = DEFAULT_TIMEOUT_S,
+) -> dict:
+    """POST per-company scrape outcomes to the Worker /ingest endpoint.
+
+    The Worker writes each entry to `scrape_company_runs`, which feeds
+    /admin/scrape-health. No jobs are upserted (sends `jobs: []`), and
+    only one ingest_runs row is created — much cleaner than attaching
+    stats to an arbitrary job-bearing batch.
+
+    Backwards-compat: this is a separate call from push_jobs(). Workers
+    that haven't deployed the migration just silently drop the field.
+    """
+    url = ingest_url or os.environ.get("CF_INGEST_URL")
+    token = secret or os.environ.get("CF_INGEST_SECRET")
+    if not url or not token:
+        return {"ok": False, "error": "CF_INGEST_URL or CF_INGEST_SECRET not set"}
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    payload = {"source": source, "jobs": [], "company_stats": stats}
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+        resp.raise_for_status()
+        logger.info("d1 company_stats pushed: %d entries", len(stats))
+        return {"ok": True, "sent": len(stats)}
+    except requests.RequestException as exc:
+        logger.warning("company_stats push failed: %s", exc)
+        return {"ok": False, "error": str(exc)}
+
+
 # ───── Helpers ──────────────────────────────────────────────────────────────
 
 def _post_batch(

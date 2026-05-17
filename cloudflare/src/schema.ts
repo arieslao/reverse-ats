@@ -56,10 +56,26 @@ export interface IngestJob {
   comp_summary?: string | null;
 }
 
+// Per-company scrape outcome from one pipeline run. The pipeline pushes one
+// of these per company in the registry so we can answer "is this slug still
+// alive?" without re-running the audit script. Persisted to
+// `scrape_company_runs` (migration 0009).
+export interface CompanyStat {
+  company: string;
+  ats: string;
+  slug: string;
+  raw_count: number;       // jobs returned by ATS API (pre-filter)
+  filtered_count: number;  // jobs after title/remote filter
+  error?: string | null;   // null on success
+}
+
 export interface IngestRequest {
   source: string;          // 'github-actions' | 'manual'
   jobs: IngestJob[];
   scrape_run_id?: string;  // optional client-side correlation id
+  // Optional. Older pipeline.py versions (pre-2026-05-17) won't send this;
+  // handler treats missing field as a no-op so existing CI keeps working.
+  company_stats?: CompanyStat[];
 }
 
 export interface IngestResponse {
