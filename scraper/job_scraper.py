@@ -163,7 +163,7 @@ COMPANIES = [
     {"name": "Upstart",      "ats": "greenhouse", "slug": "upstart",       "category": "fintech"},
     {"name": "SoFi",         "ats": "greenhouse", "slug": "sofi",          "category": "fintech"},
     {"name": "Remitly",      "ats": "greenhouse", "slug": "remitly",       "category": "fintech"},
-    {"name": "Wise",         "ats": "greenhouse", "slug": "transferwise",  "category": "fintech"},
+    {"name": "Wise",         "ats": "smartrecruiters", "slug": "wise",    "category": "fintech"},
     {"name": "Toast",        "ats": "greenhouse", "slug": "toast",         "category": "fintech"},
     {"name": "Bill.com",     "ats": "greenhouse", "slug": "billcom",       "category": "fintech"},
     {"name": "Wealthfront",  "ats": "greenhouse", "slug": "wealthfront",   "category": "fintech"},
@@ -178,8 +178,7 @@ COMPANIES = [
      "careers_url": "https://careers.pypl.com/home/"},
     {"name": "Mastercard",   "ats": "custom",     "slug": "mastercard",    "category": "fintech",
      "careers_url": "https://careers.mastercard.com/us/en/search-results"},
-    {"name": "Visa",         "ats": "custom",     "slug": "visa",          "category": "fintech",
-     "careers_url": "https://corporate.visa.com/en/jobs.html"},
+    {"name": "Visa",         "ats": "smartrecruiters", "slug": "visa",     "category": "fintech"},
     {"name": "Adyen",        "ats": "greenhouse", "slug": "adyen",         "category": "fintech"},
     {"name": "Checkout.com", "ats": "greenhouse", "slug": "checkoutcom",   "category": "fintech"},
 
@@ -232,6 +231,8 @@ COMPANIES = [
      "workday": {"tenant": "citi",       "host": "wd5",  "site": "2"}},
     {"name": "Salesforce",   "ats": "workday", "slug": "salesforce",  "category": "ai_tech",
      "workday": {"tenant": "salesforce", "host": "wd12", "site": "External_Career_Site"}},
+    {"name": "CrowdStrike",  "ats": "workday", "slug": "crowdstrike", "category": "ai_tech",
+     "workday": {"tenant": "crowdstrike", "host": "wd5", "site": "crowdstrikecareers"}},
 
     # ─── Industry pack expansion (109 net new sources from industry_packs.py) ────
 
@@ -261,7 +262,7 @@ COMPANIES = [
     {"name": "Shopify",      "ats": "greenhouse", "slug": "shopify",     "category": "retail"},
     {"name": "Instacart",    "ats": "greenhouse", "slug": "instacart",   "category": "retail"},
     {"name": "DoorDash",     "ats": "greenhouse", "slug": "doordash",    "category": "retail"},
-    {"name": "Uber",         "ats": "greenhouse", "slug": "uber",        "category": "retail"},
+    {"name": "Uber",         "ats": "smartrecruiters", "slug": "uber",   "category": "retail"},
     {"name": "Lyft",         "ats": "greenhouse", "slug": "lyft",        "category": "retail"},
     {"name": "Airbnb",       "ats": "greenhouse", "slug": "airbnb",      "category": "retail"},
     {"name": "Etsy",         "ats": "greenhouse", "slug": "etsy",        "category": "retail"},
@@ -914,6 +915,149 @@ def fetch_ashby(slug: str, company_name: str) -> list[dict]:
     return jobs
 
 
+# ─── SmartRecruiters ──────────────────────────────────────────────────────
+#
+# Public posting API: https://api.smartrecruiters.com/v1/companies/{slug}/postings
+# Returns { totalFound, content: [{...}, ...], offset, limit }. No auth needed.
+# `limit` capped at 100 by SR; we paginate until we hit totalFound or our cap.
+
+_SR_PAGE_SIZE = 100
+_SR_MAX_PAGES = 10  # 1000 postings; SR's published catalog rarely exceeds this
+_SR_PAGE_SLEEP = 0.3
+
+
+def fetch_smartrecruiters(slug: str, company_name: str) -> list[dict]:
+    """Fetch all postings from SmartRecruiters' public posting API."""
+    out: list[dict] = []
+    offset = 0
+    for _ in range(_SR_MAX_PAGES):
+        url = f"https://api.smartrecruiters.com/v1/companies/{slug}/postings"
+        data, err = _get_with_status(url, params={"limit": _SR_PAGE_SIZE, "offset": offset})
+        if err:
+            raise FetchError(f"smartrecruiters/{slug}: {err}")
+        if not isinstance(data, dict):
+            return out
+        content = data.get("content") or []
+        if not content:
+            break
+        for j in content:
+            title = j.get("name", "")
+            loc = j.get("location") or {}
+            city = (loc.get("city") or "").strip()
+            region = (loc.get("region") or "").strip()
+            country = (loc.get("country") or "").strip()
+            remote = bool(loc.get("remote"))
+            location = ", ".join(p for p in (city, region, country) if p) or ("Remote" if remote else "")
+
+            # Description lives in jobAd.sections.* — concatenate the common
+            # sections (jobDescription, qualifications, additionalInformation)
+            # so the downstream preprocessor + salary regex have something to
+            # chew on. Sections are HTML; the regex tolerates tags.
+            sections = ((j.get("jobAd") or {}).get("sections") or {})
+            desc_full = " ".join(
+                (sections.get(k) or {}).get("text", "")
+                for k in ("jobDescription", "qualifications", "additionalInformation")
+            ).strip()
+
+            # SR uses ISO-8601 for releasedDate.
+            posted_at = _to_iso_z(j.get("releasedDate") or j.get("createdOn"))
+
+            # Employment type vocabulary: SR uses "full-time", "part-time",
+            # "intern", "temporary", "contract". Normalize to Ashby's TitleCase.
+            et = (j.get("typeOfEmployment") or {}).get("id") or ""
+            employment_type = _SR_EMPLOYMENT_MAP.get(et.lower())
+
+            salary = _extract_salary_from_text(desc_full) if desc_full else {}
+
+            out.append({
+                "title": title,
+                "location": location,
+                "url": j.get("postingUrl") or j.get("applyUrl") or "",
+                "department": (j.get("department") or {}).get("label") or "",
+                "remote": remote or _is_remote(location),
+                "description_snippet": desc_full[:500],
+                "description_full": desc_full,
+                "posted_at": posted_at,
+                "employment_type": employment_type,
+                "salary_min": salary.get("salary_min"),
+                "salary_max": salary.get("salary_max"),
+                "salary_currency": salary.get("salary_currency"),
+                "company": company_name,
+            })
+
+        total = data.get("totalFound", 0)
+        offset += _SR_PAGE_SIZE
+        if offset >= total:
+            break
+        time.sleep(_SR_PAGE_SLEEP)
+    return out
+
+
+_SR_EMPLOYMENT_MAP = {
+    "full-time": "FullTime",
+    "part-time": "PartTime",
+    "intern": "Intern",
+    "contract": "Contract",
+    "temporary": "Temporary",
+}
+
+
+# ─── Greenhouse embed (token-gated boards) ────────────────────────────────
+#
+# Some Greenhouse customers disable the public board API at /v1/boards/{slug}
+# but keep their iframe embed alive. The embed reads from a `for=` token —
+# an opaque hash that's NOT the slug. Token is in the company careers page
+# HTML as `?for={token}`. Once discovered, add to registry as:
+#   { "ats": "greenhouse_embed", "slug": "<display>", "greenhouse_token": "<token>" }
+#
+# We don't auto-discover tokens here (would require browser automation +
+# anti-bot bypass for protected pages). Tokens are stable for years once
+# you have them.
+
+def fetch_greenhouse_embed(company: dict, company_name: str) -> list[dict]:
+    """Fetch from Greenhouse's embed JSON API using a board token.
+
+    Mirrors the field shape of `fetch_greenhouse` so downstream stays
+    uniform. Returns [] on missing token rather than raising — operators
+    should fix the registry entry, not see pipeline errors at runtime.
+    """
+    token = company.get("greenhouse_token")
+    if not token:
+        return []
+    url = "https://boards.greenhouse.io/embed/job_board.json"
+    data, err = _get_with_status(url, params={"for": token})
+    if err:
+        raise FetchError(f"greenhouse_embed/{token}: {err}")
+    if not data or "jobs" not in data:
+        return []
+
+    jobs = []
+    for j in data["jobs"]:
+        title = j.get("title", "")
+        location = _normalize_location(
+            (j.get("location") or {}).get("name", "") if isinstance(j.get("location"), dict)
+            else j.get("location", "")
+        )
+        content = j.get("content", "") or ""
+        posted_at = _to_iso_z(j.get("updated_at") or j.get("first_published"))
+        salary = _extract_salary_from_text(content)
+        jobs.append({
+            "title": title,
+            "location": location,
+            "url": j.get("absolute_url", ""),
+            "department": (j.get("departments") or [{}])[0].get("name", "") if j.get("departments") else "",
+            "remote": _is_remote(location),
+            "description_snippet": content[:500],
+            "description_full": content,
+            "posted_at": posted_at,
+            "salary_min": salary.get("salary_min"),
+            "salary_max": salary.get("salary_max"),
+            "salary_currency": salary.get("salary_currency"),
+            "company": company_name,
+        })
+    return jobs
+
+
 # Workday CXS pagination. The endpoint caps `limit` at 20 — anything higher
 # returns 400 — so we paginate. 15 × 20 = 300 jobs/tenant: the title filter
 # prunes ~95% of those, and roles are returned newest-first so further pages
@@ -1178,10 +1322,14 @@ def scrape_company(
     try:
         if ats == "greenhouse":
             raw = fetch_greenhouse(slug, name)
+        elif ats == "greenhouse_embed":
+            raw = fetch_greenhouse_embed(company, name)
         elif ats == "lever":
             raw = fetch_lever(slug, name)
         elif ats == "ashby":
             raw = fetch_ashby(slug, name)
+        elif ats == "smartrecruiters":
+            raw = fetch_smartrecruiters(slug, name)
         elif ats == "workday":
             raw = fetch_workday(company, name)
         elif ats == "custom":
