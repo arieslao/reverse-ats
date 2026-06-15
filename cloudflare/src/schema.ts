@@ -5,6 +5,10 @@ export interface Env {
   DB: D1Database;
   AI: Ai;
   INGEST_SECRET: string;
+  // Dedicated read-only token so unattended monitors can poll
+  // GET /admin/scrape-health without an expiring admin JWT.
+  // Set via `wrangler secret put SCRAPE_HEALTH_TOKEN`.
+  SCRAPE_HEALTH_TOKEN: string;
   // Supabase — public URL (also lives in the frontend bundle, set via [vars]).
   SUPABASE_URL: string;
   // Service-role key — set via `wrangler secret put SUPABASE_SERVICE_ROLE_KEY`.

@@ -14,6 +14,18 @@ export async function handleAdmin(request: Request, env: Env): Promise<Response 
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/admin/")) return null;
 
+  // Read-only automation path: GET /admin/scrape-health also accepts a dedicated
+  // bearer token (SCRAPE_HEALTH_TOKEN) so unattended monitors can poll it without
+  // an expiring admin JWT. Scoped to THIS one read-only endpoint — every other
+  // /admin/* route still requires admin tier via requireTier below. Mirrors the
+  // shared-secret pattern used by POST /ingest.
+  if (request.method === "GET" && url.pathname === "/admin/scrape-health") {
+    const auth = request.headers.get("authorization") || "";
+    if (env.SCRAPE_HEALTH_TOKEN && auth === `Bearer ${env.SCRAPE_HEALTH_TOKEN}`) {
+      return scrapeHealth(env, url);
+    }
+  }
+
   // Every admin route requires admin tier.
   const userOrError = await requireTier(request, env, "admin");
   if (userOrError instanceof Response) return userOrError;
