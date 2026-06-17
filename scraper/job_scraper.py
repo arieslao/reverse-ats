@@ -37,6 +37,10 @@ import requests
 # a non-zero raw count for it.
 
 INACTIVE_SLUGS: set[tuple[str, str]] = {
+    # Ashby — empty board: 0 postings via REST posting-api AND GraphQL
+    # (flagged by the data-contract health gate, quarantined 2026-06-17).
+    # Re-enable if Deel resumes posting on Ashby.
+    ("ashby", "deel"),
     # Greenhouse — 76 entries returning HTTP 404 / empty (audit 2026-05-16)
     ("greenhouse", "1password"),
     ("greenhouse", "airwallex"),
