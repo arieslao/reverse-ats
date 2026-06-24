@@ -9,8 +9,16 @@
 // verified token, never from the request body.
 
 import type { Env } from "./schema";
+import { embedText, packVector } from "./embed";
 import { fetchTier, verifyRequest } from "./supabase-auth";
 import { checkAndConsume, limitFor } from "./usage";
+
+// Fields whose change should trigger a resume re-embed.
+const EMBEDDING_SOURCE_FIELDS = new Set<string>([
+  "resume_text",
+  "target_roles",
+  "must_have_skills",
+]);
 
 // ─── shape ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +36,9 @@ interface ProfileRow {
   blacklisted_companies: string; // JSON
   blacklisted_keywords: string;  // JSON
   priority_categories: string;   // JSON
+  resume_embedding: ArrayBuffer | null;
+  resume_embedding_updated_at: string | null;
+  resume_embedding_model: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -191,7 +202,72 @@ async function putProfile(request: Request, env: Env, userId: string): Promise<R
     .first<ProfileRow>();
   if (!row) return jsonResponse({ ok: false, error: "profile not found after update" }, 500);
 
+  // Re-embed the resume when any embedding source field was touched, so the
+  // cosine-based feed sort and rescore selection update with the new profile.
+  // Best-effort — never fails the PUT (the user-facing save still succeeded).
+  const touchedEmbeddingSource = Object.keys(body).some((k) => EMBEDDING_SOURCE_FIELDS.has(k));
+  if (touchedEmbeddingSource) {
+    try {
+      await reembedResume(env, userId, row);
+    } catch (err) {
+      console.log(
+        `[profile] resume embed failed for ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   return jsonResponse({ ok: true, profile: rowToOut(row) }, 200);
+}
+
+// ─── resume embedding ──────────────────────────────────────────────────────
+//
+// Compose a compact, signal-dense text from the persisted profile and embed
+// with the same bge-m3 model that jobs use. Stored as little-endian float32
+// BLOB on user_profiles so cosine ranking stays a single-table read.
+
+async function reembedResume(env: Env, userId: string, row: ProfileRow): Promise<void> {
+  const resume = (row.resume_text || "").trim();
+  if (resume.length < 50) {
+    // Too short to be meaningful — clear any stale embedding so the feed
+    // falls back to LLM-score sort instead of using a noisy vector.
+    await env.DB.prepare(
+      `UPDATE user_profiles
+          SET resume_embedding = NULL,
+              resume_embedding_updated_at = NULL,
+              resume_embedding_model = NULL
+        WHERE user_id = ?`,
+    )
+      .bind(userId)
+      .run();
+    return;
+  }
+
+  const targetRoles = parseJsonArray(row.target_roles);
+  const mustHave = parseJsonArray(row.must_have_skills);
+
+  const text = [
+    resume.slice(0, 6000),
+    targetRoles.length ? `Target roles: ${targetRoles.join(", ")}` : "",
+    mustHave.length ? `Must-have skills: ${mustHave.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  const { vector, error, model } = await embedText(env.AI, text);
+  if (!vector) {
+    console.log(`[profile] embedText failed for ${userId}: ${error}`);
+    return;
+  }
+
+  await env.DB.prepare(
+    `UPDATE user_profiles
+        SET resume_embedding = ?,
+            resume_embedding_updated_at = ?,
+            resume_embedding_model = ?
+      WHERE user_id = ?`,
+  )
+    .bind(packVector(vector), new Date().toISOString(), model, userId)
+    .run();
 }
 
 // ─── POST /api/profile/suggest-roles ────────────────────────────────────────

@@ -16,6 +16,9 @@ import type {
   IngestResponse,
   IngestJob,
   HealthResponse,
+  StructuredJob,
+  PreprocessPendingJob,
+  PreprocessResult,
 } from "./schema";
 import { preprocessJob, PREPROCESS_MODEL } from "./preprocess";
 import { embedStructuredJob, packVector, EMBEDDING_MODEL } from "./embed";
@@ -24,9 +27,19 @@ import { handleProfile } from "./profile";
 import { handleFeedAndPipeline } from "./feed";
 
 // How many jobs the scheduled handler preprocesses per 30-min cron tick.
-// 60/run × 48 runs/day = 2,880 jobs/day capacity — plenty of headroom for
-// the ~200 new jobs/day we expect across all 220+ companies.
-const PREPROCESS_BATCH_SIZE = 60;
+// The LLM structured-extraction step is the Workers-AI free-tier neuron
+// bottleneck (~10K neurons/day), so the bulk backlog is drained off-box by
+// the GX10 lane (scripts/preprocess_backlog_gx10.py -> /preprocess/*) using a
+// free local LLM. This in-Worker pass is now a small fallback trickle for new
+// jobs that arrive between GX10 runs — keep it low so it never blows the quota.
+const PREPROCESS_BATCH_SIZE = 15;
+
+// A job that hasn't been re-seen by any scrape lane in this many days is
+// treated as delisted (filled / closed / board removed) and flipped to
+// expired = 1. Every active company is re-scraped every ~2h, so a job unseen
+// for a full week is almost certainly gone. If a source breaks for >7 days its
+// jobs expire but auto-revive (expired→0) the moment they're re-seen.
+const STALE_JOB_DAYS = 7;
 
 const handler: ExportedHandler<Env> = {
   async fetch(request, env, ctx): Promise<Response> {
@@ -41,6 +54,13 @@ const handler: ExportedHandler<Env> = {
 
     if (request.method === "POST" && url.pathname === "/ingest") {
       return handleIngest(request, env, ctx);
+    }
+    // Off-box preprocessing lane (GX10 free local LLM). Bearer INGEST_SECRET.
+    if (request.method === "GET" && url.pathname === "/preprocess/pending") {
+      return handlePreprocessPending(request, env);
+    }
+    if (request.method === "POST" && url.pathname === "/preprocess/results") {
+      return handlePreprocessResults(request, env);
     }
     if (request.method === "GET" && url.pathname === "/jobs") {
       return withCors(await handleListJobs(request, env), origin);
@@ -65,7 +85,13 @@ const handler: ExportedHandler<Env> = {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // Don't await — Workers will keep the runtime alive via ctx.waitUntil.
-    ctx.waitUntil(preprocessPending(env));
+    // Reap stale jobs first (cheap single UPDATE), then trickle-preprocess.
+    ctx.waitUntil(
+      (async () => {
+        await expireStaleJobs(env);
+        await preprocessPending(env);
+      })(),
+    );
   },
 };
 
@@ -362,9 +388,20 @@ async function handleListJobs(request: Request, env: Env): Promise<Response> {
 // ─── GET /health ────────────────────────────────────────────────────────────
 
 async function handleHealth(env: Env): Promise<Response> {
-  const [jobsRow, structuredRow, embeddedRow, lastIngest] = await Promise.all([
+  const [jobsRow, activeRow, expiredRow, structuredRow, pendingRow, embeddedRow, lastIngest] = await Promise.all([
     env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs`).first<{ n: number }>(),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs WHERE expired = 0`).first<{ n: number }>(),
+    env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs WHERE expired = 1`).first<{ n: number }>(),
     env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs_structured WHERE preprocess_error IS NULL`).first<{ n: number }>(),
+    // Active jobs still awaiting structured extraction — the backlog the GX10
+    // lane is draining. This is the number to watch trend toward 0.
+    env.DB
+      .prepare(
+        `SELECT COUNT(*) AS n FROM jobs j
+           LEFT JOIN jobs_structured s ON s.job_id = j.id
+          WHERE j.expired = 0 AND s.job_id IS NULL`,
+      )
+      .first<{ n: number }>(),
     env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs_embeddings`).first<{ n: number }>(),
     env.DB
       .prepare(`SELECT started_at, jobs_new FROM ingest_runs ORDER BY id DESC LIMIT 1`)
@@ -374,7 +411,10 @@ async function handleHealth(env: Env): Promise<Response> {
   const response: HealthResponse = {
     ok: true,
     total_jobs: jobsRow?.n ?? 0,
+    active_jobs: activeRow?.n ?? 0,
+    expired_jobs: expiredRow?.n ?? 0,
     total_preprocessed: structuredRow?.n ?? 0,
+    preprocess_backlog: pendingRow?.n ?? 0,
     total_embedded: embeddedRow?.n ?? 0,
     last_ingest_at: lastIngest?.started_at ?? null,
     last_ingest_jobs: lastIngest?.jobs_new ?? null,
@@ -410,59 +450,11 @@ async function preprocessPending(env: Env): Promise<void> {
     description_snippet: string | null;
   }>) {
     const { structured, error, model } = await preprocessJob(env.AI, j);
-    const now = nowIso();
-
     if (structured) {
-      await env.DB.prepare(
-        `INSERT OR REPLACE INTO jobs_structured (
-          job_id, seniority, years_experience_min,
-          must_have_skills, nice_to_have_skills, responsibilities,
-          comp_min, comp_max, remote_policy, industry_tags,
-          preprocessed_at, preprocess_model, preprocess_error
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      )
-        .bind(
-          j.id,
-          structured.seniority,
-          structured.years_experience_min,
-          JSON.stringify(structured.must_have_skills),
-          JSON.stringify(structured.nice_to_have_skills),
-          JSON.stringify(structured.responsibilities),
-          structured.comp_min,
-          structured.comp_max,
-          structured.remote_policy,
-          JSON.stringify(structured.industry_tags),
-          now,
-          model,
-        )
-        .run();
-
-      // Embed immediately after preprocess succeeds — keeps the two in sync.
-      const { vector, error: embedError, model: embedModel } = await embedStructuredJob(
-        env.AI,
-        { title: j.title, company: j.company },
-        structured,
-      );
-      if (vector) {
-        await env.DB.prepare(
-          `INSERT OR REPLACE INTO jobs_embeddings (job_id, embedding, embedded_at, model)
-           VALUES (?, ?, ?, ?)`,
-        )
-          .bind(j.id, packVector(vector), now, embedModel)
-          .run();
-      } else {
-        console.log(`embed failed for ${j.id}: ${embedError}`);
-      }
+      await storeStructuredAndEmbed(env, { id: j.id, title: j.title, company: j.company }, structured, model);
       okCount++;
     } else {
-      // Record the error so we don't infinitely retry.
-      await env.DB.prepare(
-        `INSERT OR REPLACE INTO jobs_structured
-         (job_id, preprocessed_at, preprocess_model, preprocess_error)
-         VALUES (?, ?, ?, ?)`,
-      )
-        .bind(j.id, now, model, error || "unknown")
-        .run();
+      await storePreprocessError(env, j.id, model, error || "unknown");
     }
   }
 
@@ -478,6 +470,182 @@ async function preprocessPending(env: Env): Promise<void> {
   console.log(
     `preprocess batch: ${okCount}/${jobs.length} ok (model: ${PREPROCESS_MODEL}, embed: ${EMBEDDING_MODEL})`,
   );
+}
+
+// ─── Stale-job reaper ───────────────────────────────────────────────────────
+//
+// Flip active jobs that no scrape lane has re-seen within STALE_JOB_DAYS to
+// expired = 1. The feed only ever shows expired = 0, so this is what removes
+// filled/closed/delisted roles. Cheap single UPDATE, runs every cron tick.
+
+async function expireStaleJobs(env: Env): Promise<number> {
+  const cutoff = new Date(Date.now() - STALE_JOB_DAYS * 86_400_000).toISOString();
+  const res = await env.DB.prepare(
+    `UPDATE jobs
+        SET expired = 1, expired_at = ?
+      WHERE expired = 0 AND last_seen_at < ?`,
+  )
+    .bind(nowIso(), cutoff)
+    .run();
+  const n = res.meta.changes ?? 0;
+  if (n > 0) console.log(`reaper: expired ${n} jobs not seen since ${cutoff}`);
+  return n;
+}
+
+// ─── Shared structured-store + embed (used by in-Worker + GX10 lanes) ───────
+
+async function storeStructuredAndEmbed(
+  env: Env,
+  job: { id: string; title: string; company: string },
+  structured: StructuredJob,
+  model: string,
+): Promise<void> {
+  const now = nowIso();
+  await env.DB.prepare(
+    `INSERT OR REPLACE INTO jobs_structured (
+      job_id, seniority, years_experience_min,
+      must_have_skills, nice_to_have_skills, responsibilities,
+      comp_min, comp_max, remote_policy, industry_tags,
+      preprocessed_at, preprocess_model, preprocess_error
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+  )
+    .bind(
+      job.id,
+      structured.seniority,
+      structured.years_experience_min,
+      JSON.stringify(structured.must_have_skills ?? []),
+      JSON.stringify(structured.nice_to_have_skills ?? []),
+      JSON.stringify(structured.responsibilities ?? []),
+      structured.comp_min ?? null,
+      structured.comp_max ?? null,
+      structured.remote_policy ?? null,
+      JSON.stringify(structured.industry_tags ?? []),
+      now,
+      model,
+    )
+    .run();
+
+  // Embed on Workers AI (bge-m3) regardless of where extraction ran, so every
+  // job vector lives in the same space as the user's resume embedding.
+  const { vector, error: embedError, model: embedModel } = await embedStructuredJob(
+    env.AI,
+    { title: job.title, company: job.company },
+    structured,
+  );
+  if (vector) {
+    await env.DB.prepare(
+      `INSERT OR REPLACE INTO jobs_embeddings (job_id, embedding, embedded_at, model)
+       VALUES (?, ?, ?, ?)`,
+    )
+      .bind(job.id, packVector(vector), now, embedModel)
+      .run();
+  } else {
+    console.log(`embed failed for ${job.id}: ${embedError}`);
+  }
+}
+
+async function storePreprocessError(env: Env, jobId: string, model: string, error: string): Promise<void> {
+  await env.DB.prepare(
+    `INSERT OR REPLACE INTO jobs_structured
+     (job_id, preprocessed_at, preprocess_model, preprocess_error)
+     VALUES (?, ?, ?, ?)`,
+  )
+    .bind(jobId, nowIso(), model, error)
+    .run();
+}
+
+// ─── Off-box preprocessing lane (GX10 free local LLM) ───────────────────────
+//
+// The LLM structured-extraction step is the Workers-AI neuron bottleneck. The
+// GX10 box (residential IP, already runs the Workday scrape cron) pulls pending
+// jobs here, runs a free local LLM, and POSTs structured results back. The
+// Worker still owns embedding (bge-m3) so vectors stay consistent.
+
+async function handlePreprocessPending(request: Request, env: Env): Promise<Response> {
+  const auth = request.headers.get("authorization") || "";
+  if (!env.INGEST_SECRET || auth !== `Bearer ${env.INGEST_SECRET}`) {
+    return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+  }
+  const url = new URL(request.url);
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "100", 10) || 100, 500);
+
+  const pending = await env.DB.prepare(
+    `SELECT j.id, j.title, j.company, j.description_full, j.description_snippet
+       FROM jobs j
+       LEFT JOIN jobs_structured s ON s.job_id = j.id
+      WHERE j.expired = 0
+        AND (s.job_id IS NULL OR s.preprocess_error IS NOT NULL)
+      ORDER BY j.first_seen_at DESC
+      LIMIT ?`,
+  )
+    .bind(limit)
+    .all();
+
+  const jobs: PreprocessPendingJob[] = (pending.results || []).map((r) => {
+    const row = r as {
+      id: string;
+      title: string;
+      company: string;
+      description_full: string | null;
+      description_snippet: string | null;
+    };
+    return {
+      id: row.id,
+      title: row.title,
+      company: row.company,
+      description: row.description_full || row.description_snippet || null,
+    };
+  });
+
+  return jsonResponse({ ok: true, jobs }, 200);
+}
+
+async function handlePreprocessResults(request: Request, env: Env): Promise<Response> {
+  const auth = request.headers.get("authorization") || "";
+  if (!env.INGEST_SECRET || auth !== `Bearer ${env.INGEST_SECRET}`) {
+    return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+  }
+
+  let body: { results?: PreprocessResult[] };
+  try {
+    body = (await request.json()) as { results?: PreprocessResult[] };
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid JSON body" }, 400);
+  }
+  if (!body || !Array.isArray(body.results)) {
+    return jsonResponse({ ok: false, error: "expected { results: [...] }" }, 400);
+  }
+
+  let stored = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  for (const r of body.results) {
+    if (!r?.job_id) {
+      errors.push("skipping result with no job_id");
+      continue;
+    }
+    try {
+      if (r.structured) {
+        // Need title + company for the embedding text — fetch from jobs.
+        const job = await env.DB.prepare(`SELECT id, title, company FROM jobs WHERE id = ?`)
+          .bind(r.job_id)
+          .first<{ id: string; title: string; company: string }>();
+        if (!job) {
+          errors.push(`unknown job_id: ${r.job_id}`);
+          continue;
+        }
+        await storeStructuredAndEmbed(env, job, r.structured, "gx10-local-llm");
+        stored++;
+      } else {
+        await storePreprocessError(env, r.job_id, "gx10-local-llm", r.error || "unknown");
+        failed++;
+      }
+    } catch (err) {
+      errors.push(`${r.job_id}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return jsonResponse({ ok: true, stored, failed, errors }, 200);
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

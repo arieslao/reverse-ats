@@ -108,8 +108,26 @@ export interface StructuredJob {
 export interface HealthResponse {
   ok: true;
   total_jobs: number;
+  active_jobs: number;       // expired = 0
+  expired_jobs: number;      // expired = 1 (delisted / stale)
   total_preprocessed: number;
+  preprocess_backlog: number; // active jobs with no jobs_structured row yet
   total_embedded: number;
   last_ingest_at: string | null;
   last_ingest_jobs: number | null;
+}
+
+// One pending job handed to the off-box (GX10) preprocessing lane.
+export interface PreprocessPendingJob {
+  id: string;
+  title: string;
+  company: string;
+  description: string | null;
+}
+
+// Result the GX10 lane POSTs back per job after local-LLM extraction.
+export interface PreprocessResult {
+  job_id: string;
+  structured?: StructuredJob | null;
+  error?: string | null;
 }
