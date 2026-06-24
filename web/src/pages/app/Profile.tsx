@@ -77,6 +77,7 @@ export default function ProfilePage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
           <Link to="/app" className="text-sm font-medium tracking-tight shrink-0">Reverse ATS</Link>
           <div className="flex items-center gap-3 sm:gap-4 text-xs text-[var(--color-text-secondary)] min-w-0">
+            <Link to="/app/inventory" className="hover:text-[var(--color-text-primary)] whitespace-nowrap">Skills &amp; experience</Link>
             <Link to="/app" className="hover:text-[var(--color-text-primary)] whitespace-nowrap">Back to app</Link>
             <span className="hidden md:inline truncate max-w-[180px]">{user?.email}</span>
             <ThemeToggle />

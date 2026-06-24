@@ -12,6 +12,9 @@ export const LIMITS: Record<string, Record<AuthedUser["tier"], number>> = {
   cover_letter: { free: 2, sponsor: 30, admin: 100 },
   suggest_roles: { free: 1, sponsor: 5, admin: 20 },
   rescore: { free: 1, sponsor: 4, admin: 20 },
+  // LLM extraction of the skills/experience inventory from resume or pasted
+  // LinkedIn text. Deterministic LinkedIn-export import is NOT gated.
+  extract_inventory: { free: 5, sponsor: 30, admin: 100 },
 };
 
 // Lifetime caps (no reset). -1 = unlimited.
