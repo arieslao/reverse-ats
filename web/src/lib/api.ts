@@ -237,6 +237,21 @@ export interface SuggestRolesResult {
 export type PipelineStage =
   | 'saved' | 'applied' | 'phone_screen' | 'technical' | 'final' | 'offer' | 'rejected' | 'withdrawn'
 
+export interface MatchBreakdown {
+  required_met: string[]
+  required_missing: string[]
+  nice_met: string[]
+  nice_missing: string[]
+  required_total: number
+  years_required: number | null
+  years_have: number | null
+  years_gap: number | null
+  coverage_pct: number
+  fit_label: 'strong' | 'good' | 'stretch' | 'reach'
+  strengths: string[]
+  gaps: string[]
+}
+
 export interface Job {
   id: string
   company: string
@@ -264,6 +279,10 @@ export interface Job {
   comp_summary: string | null
   llm_score: number | null
   llm_reasoning: string | null
+  /** Deterministic 1-to-1 match of this job's requirements against the user's
+   *  skills inventory. null when the user has no inventory or the job isn't
+   *  structured yet. */
+  match_breakdown?: MatchBreakdown | null
   first_seen_at: string
   last_seen_at: string
   posted_at: string | null

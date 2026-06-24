@@ -13,6 +13,7 @@ import {
   type IndustryOption,
   type Job,
   type JobsQuery,
+  type MatchBreakdown,
   type UsageState,
 } from '../../lib/api';
 
@@ -414,6 +415,9 @@ function JobCard({
                 {score}
               </span>
             )}
+            {job.match_breakdown && job.match_breakdown.required_total > 0 && (
+              <FitBadge mb={job.match_breakdown} />
+            )}
             {(job.workplace_type || job.remote) && (
               <span
                 className="text-xs px-1.5 py-0.5 rounded-md uppercase tracking-wide font-semibold"
@@ -478,6 +482,9 @@ function JobCard({
           {job.llm_reasoning && (
             <p className="mt-2 text-xs italic text-[var(--color-text-tertiary)]">"{job.llm_reasoning}"</p>
           )}
+          {job.match_breakdown && job.match_breakdown.required_total > 0 && (
+            <MatchDetail mb={job.match_breakdown} />
+          )}
         </div>
         <div className="flex flex-col gap-1.5 shrink-0">
           <button onClick={onSave} disabled={busy} className="text-xs px-3 h-7 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] disabled:opacity-50 cursor-pointer">
@@ -491,6 +498,49 @@ function JobCard({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const FIT_STYLE: Record<MatchBreakdown['fit_label'], { label: string; bg: string; fg: string }> = {
+  strong: { label: 'Strong match', bg: 'rgba(34,197,94,0.15)', fg: '#22c55e' },
+  good: { label: 'Good match', bg: 'rgba(132,204,22,0.15)', fg: '#84cc16' },
+  stretch: { label: 'Stretch', bg: 'rgba(234,179,8,0.15)', fg: '#eab308' },
+  reach: { label: 'Reach', bg: 'rgba(239,68,68,0.15)', fg: '#ef4444' },
+};
+
+function FitBadge({ mb }: { mb: MatchBreakdown }) {
+  const s = FIT_STYLE[mb.fit_label];
+  return (
+    <span
+      className="text-xs px-2 py-0.5 rounded-md font-semibold"
+      style={{ background: s.bg, color: s.fg }}
+      title={`${mb.required_met.length}/${mb.required_total} required skills met`}
+    >
+      {s.label} · {mb.required_met.length}/{mb.required_total}
+    </span>
+  );
+}
+
+function MatchDetail({ mb }: { mb: MatchBreakdown }) {
+  return (
+    <div className="mt-2 flex flex-col gap-1.5">
+      {mb.strengths.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[11px] font-semibold text-[#22c55e]">Strengths</span>
+          {mb.strengths.map((s) => (
+            <span key={s} className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>{s}</span>
+          ))}
+        </div>
+      )}
+      {mb.gaps.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <span className="text-[11px] font-semibold text-[#eab308]">Gaps</span>
+          {mb.gaps.map((g) => (
+            <span key={g} className="text-[11px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(234,179,8,0.12)', color: '#eab308' }}>{g}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
