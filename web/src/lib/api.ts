@@ -132,6 +132,96 @@ export async function updateProfile(patch: Partial<Profile>): Promise<Profile> {
   return data.profile as Profile
 }
 
+// ─── Skills & experience inventory (Phase 2) ────────────────────────────────
+
+export interface InvSkill {
+  name: string
+  category: string | null
+  years: number | null
+  proficiency: number | null
+  last_used: string | null
+  source: string
+}
+export interface InvExperience {
+  company: string
+  title: string
+  start: string | null
+  end: string | null
+  location: string | null
+  highlights: string[]
+  source?: string
+}
+export interface InvEducation {
+  school: string
+  degree: string | null
+  field: string | null
+  start: string | null
+  end: string | null
+}
+export interface InvCertification {
+  name: string
+  issuer: string | null
+  date: string | null
+}
+export interface Inventory {
+  skills: InvSkill[]
+  experience: InvExperience[]
+  education: InvEducation[]
+  certifications: InvCertification[]
+  summary: string | null
+  total_years_experience: number | null
+  sources: string[]
+  updated_at?: string
+}
+
+export async function fetchInventory(): Promise<Inventory> {
+  const r = await authFetch('/api/inventory')
+  if (!r.ok) throw new Error(`inventory fetch failed: ${r.status}`)
+  return (await r.json()).inventory as Inventory
+}
+
+export async function saveInventory(patch: Partial<Inventory>): Promise<Inventory> {
+  const r = await authFetch('/api/inventory', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+  if (!r.ok) throw new Error(`inventory save failed: ${r.status}`)
+  return (await r.json()).inventory as Inventory
+}
+
+async function postInventory(path: string, body: unknown): Promise<Inventory> {
+  const r = await authFetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(data?.error || `request failed: ${r.status}`)
+  return data.inventory as Inventory
+}
+
+/** LLM-extract inventory from resume text (counts against daily extract cap). */
+export function extractInventoryFromResume(text: string): Promise<Inventory> {
+  return postInventory('/api/inventory/extract-resume', { text })
+}
+
+/** LLM-extract inventory from pasted LinkedIn profile text. */
+export function extractInventoryFromLinkedin(text: string): Promise<Inventory> {
+  return postInventory('/api/inventory/extract-linkedin', { text })
+}
+
+/** Deterministic import from a parsed LinkedIn data-export ZIP (no LLM, no cap). */
+export function importLinkedinExport(payload: {
+  profile?: { summary?: string; headline?: string } | null
+  positions?: Record<string, string>[]
+  skills?: string[]
+  education?: Record<string, string>[]
+  certifications?: Record<string, string>[]
+}): Promise<Inventory> {
+  return postInventory('/api/inventory/linkedin-import', payload)
+}
+
 export interface RoleSuggestion {
   title: string
   reasoning: string

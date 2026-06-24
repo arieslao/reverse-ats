@@ -39,6 +39,7 @@ export default function AppIndex() {
           <HubCard to="/app/feed" title="Job feed" hint="Browse and filter scraped jobs. Save, dismiss, or generate a cover letter." />
           <HubCard to="/app/pipeline" title="Pipeline" hint="Saved jobs by stage — applied, phone screen, technical, offer." />
           <HubCard to="/app/profile" title="Profile" hint="Resume, target roles, locations, salary, and skill preferences." />
+          <HubCard to="/app/inventory" title="Skills & experience" hint="Structured inventory from your résumé + LinkedIn. Powers strengths-vs-gaps matching." />
           <HubCard to="/app/analytics" title="Analytics" hint="Funnel + response rate + scoring coverage." />
         </div>
       </main>
