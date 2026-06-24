@@ -17,6 +17,7 @@
 //   POST /api/scoring/rescore            — score all saved+feed jobs vs. profile
 
 import type { Env } from "./schema";
+import { cosine, unpackVector } from "./embed";
 import { fetchTier, verifyRequest } from "./supabase-auth";
 import {
   LIFETIME_LIMITS,
@@ -27,6 +28,20 @@ import {
   limitFor,
   readUsage,
 } from "./usage";
+
+// Blend weights for sort_by='score' when a resume embedding exists. Cosine
+// covers the long tail (every embedded job ranks meaningfully); the LLM score
+// refines the top once it arrives. When llm_score is missing we substitute
+// the cosine score so unscored-but-relevant jobs aren't penalized.
+const BLEND_COSINE_WEIGHT = 0.5;
+const BLEND_LLM_WEIGHT = 0.5;
+
+interface ProfileFilterRow {
+  remote_only: number;
+  blacklisted_companies: string | null;
+  blacklisted_keywords: string | null;
+  resume_embedding: ArrayBuffer | null;
+}
 
 const PIPELINE_STAGES = new Set([
   "saved",
@@ -139,11 +154,26 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
   const search = (url.searchParams.get("search") || "").trim();
   const category = (url.searchParams.get("category") || "").trim();
   const minScore = parseInt(url.searchParams.get("min_score") || "0", 10) || 0;
-  const remoteOnly = url.searchParams.get("remote_only") === "true";
+  const explicitRemoteOnly = url.searchParams.get("remote_only") === "true";
   const sinceDays = parseInt(url.searchParams.get("since_days") || "0", 10) || 0;
   const sortBy = url.searchParams.get("sort_by") || "score";
   const locationsParam = url.searchParams.get("locations") || "";
   const locations = locationsParam ? locationsParam.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+  // Load the small set of profile fields the feed auto-applies. Anything
+  // strict (locations, salary, skills) stays opt-in via query params so the
+  // user isn't surprised by zero-result feeds; the safe auto-applies are
+  // remote_only and the blacklists.
+  const profile = await env.DB.prepare(
+    `SELECT remote_only, blacklisted_companies, blacklisted_keywords, resume_embedding
+       FROM user_profiles WHERE user_id = ?`,
+  )
+    .bind(userId)
+    .first<ProfileFilterRow>();
+
+  const blacklistedCompanies = parseJsonArray(profile?.blacklisted_companies);
+  const blacklistedKeywords = parseJsonArray(profile?.blacklisted_keywords);
+  const remoteOnly = explicitRemoteOnly || profile?.remote_only === 1;
 
   const where: string[] = ["j.expired = 0"];
   const binds: (string | number)[] = [];
@@ -174,6 +204,15 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
     where.push(`(${ors})`);
     for (const loc of locations) binds.push(`%${loc}%`);
   }
+  if (blacklistedCompanies.length > 0) {
+    const placeholders = blacklistedCompanies.map(() => "?").join(", ");
+    where.push(`LOWER(j.company) NOT IN (${placeholders})`);
+    for (const c of blacklistedCompanies) binds.push(c.toLowerCase());
+  }
+  for (const kw of blacklistedKeywords) {
+    where.push("j.title NOT LIKE ?");
+    binds.push(`%${kw}%`);
+  }
 
   // Score filter (against per-user score; if none, fall back to 0).
   const scoreSelect = `COALESCE(s.llm_score, 0) AS llm_score, s.llm_reasoning AS llm_reasoning`;
@@ -182,18 +221,34 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
     binds.push(minScore);
   }
 
+  const offset = (page - 1) * perPage;
+  const whereSql = where.join(" AND ");
+
+  // Cosine-blended sort path: only when the user has a resume embedding AND
+  // they're using the default 'score' sort. Other sort modes stay in SQL.
+  const useCosineRank = sortBy === "score" && profile?.resume_embedding != null;
+
+  if (useCosineRank) {
+    return listJobsCosineBlended(env, userId, {
+      whereSql,
+      binds,
+      perPage,
+      offset,
+      resumeVector: unpackVector(profile.resume_embedding!),
+      scoreSelect,
+    });
+  }
+
   const orderBy =
     sortBy === "newest" ? "j.first_seen_at DESC"
       : sortBy === "company" ? "j.company ASC, j.first_seen_at DESC"
       : "COALESCE(s.llm_score, 0) DESC, j.first_seen_at DESC";
 
-  const offset = (page - 1) * perPage;
-
   const total = await env.DB.prepare(
     `SELECT COUNT(*) AS n
        FROM jobs j
        LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
-      WHERE ${where.join(" AND ")}`,
+      WHERE ${whereSql}`,
   )
     .bind(userId, ...binds)
     .first<{ n: number }>();
@@ -217,7 +272,7 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
            FROM job_reposts
           GROUP BY fingerprint
        ) r ON r.fingerprint = j.fingerprint
-      WHERE ${where.join(" AND ")}
+      WHERE ${whereSql}
       ORDER BY ${orderBy}
       LIMIT ? OFFSET ?`,
   )
@@ -236,6 +291,118 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
     },
     200,
   );
+}
+
+// ─── cosine-blended sort path ──────────────────────────────────────────────
+//
+// Two-stage retrieval: pull (job_id, embedding, llm_score) for every candidate
+// passing the WHERE filters, compute cosine + blend in JS, sort globally, then
+// fetch full rows for just the page. Scales to ~10K embedded candidates per
+// request comfortably (each row is ~4 KB of vector + a few small columns).
+//
+// Jobs without an embedding get cosine = 0; they sink below any embedded
+// match but still appear in pagination so the user can scroll past the
+// already-ranked tier into the long tail.
+
+interface CosineBlendedArgs {
+  whereSql: string;
+  binds: (string | number)[];
+  perPage: number;
+  offset: number;
+  resumeVector: Float32Array;
+  scoreSelect: string;
+}
+
+async function listJobsCosineBlended(
+  env: Env,
+  userId: string,
+  args: CosineBlendedArgs,
+): Promise<Response> {
+  const { whereSql, binds, perPage, offset, resumeVector } = args;
+
+  const candidates = await env.DB.prepare(
+    `SELECT j.id,
+            e.embedding AS job_embedding,
+            COALESCE(s.llm_score, 0) AS llm_score
+       FROM jobs j
+       LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
+       LEFT JOIN jobs_embeddings e ON e.job_id = j.id
+      WHERE ${whereSql}`,
+  )
+    .bind(userId, ...binds)
+    .all<{ id: string; job_embedding: ArrayBuffer | null; llm_score: number }>();
+
+  const ranked = (candidates.results || []).map((row) => {
+    const cosineScore = row.job_embedding
+      ? Math.max(0, cosine(resumeVector, unpackVector(row.job_embedding))) * 100
+      : 0;
+    const llmScore = row.llm_score || 0;
+    // Substitute cosine when LLM hasn't scored this one yet, so an
+    // unscored-but-relevant job ranks on cosine alone instead of getting
+    // halved by the missing LLM weight.
+    const effectiveLlm = llmScore > 0 ? llmScore : cosineScore;
+    const blended =
+      BLEND_COSINE_WEIGHT * cosineScore + BLEND_LLM_WEIGHT * effectiveLlm;
+    return { id: row.id, blended };
+  });
+
+  ranked.sort((a, b) => b.blended - a.blended);
+
+  const total = ranked.length;
+  const pageIds = ranked.slice(offset, offset + perPage).map((r) => r.id);
+  if (pageIds.length === 0) {
+    return jsonResponse({ ok: true, jobs: [], total, page: Math.floor(offset / perPage) + 1, per_page: perPage }, 200);
+  }
+
+  const placeholders = pageIds.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT
+        j.id, j.company, j.title, j.url, j.location, j.department, j.team,
+        j.description_snippet, j.description_full, j.category, j.ats_type,
+        j.remote, j.first_seen_at, j.last_seen_at, j.expired,
+        j.posted_at, j.fingerprint,
+        j.employment_type, j.workplace_type,
+        j.salary_min, j.salary_max, j.salary_currency, j.comp_summary,
+        r.repost_count, r.repost_first_seen_at,
+        COALESCE(s.llm_score, 0) AS llm_score, s.llm_reasoning AS llm_reasoning
+       FROM jobs j
+       LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
+       LEFT JOIN (
+         SELECT fingerprint,
+                COUNT(*)         AS repost_count,
+                MIN(first_seen_at) AS repost_first_seen_at
+           FROM job_reposts
+          GROUP BY fingerprint
+       ) r ON r.fingerprint = j.fingerprint
+      WHERE j.id IN (${placeholders})`,
+  )
+    .bind(userId, ...pageIds)
+    .all();
+
+  // Re-order the SQL results into the cosine-ranked sequence the page expects.
+  const byId = new Map<string, ReturnType<typeof jobRowToOut>>();
+  for (const row of rows.results || []) {
+    const out = jobRowToOut(row);
+    byId.set(out.id, out);
+  }
+  const jobs = pageIds
+    .map((id) => byId.get(id))
+    .filter((j): j is ReturnType<typeof jobRowToOut> => j !== undefined);
+
+  return jsonResponse(
+    { ok: true, jobs, total, page: Math.floor(offset / perPage) + 1, per_page: perPage },
+    200,
+  );
+}
+
+function parseJsonArray(raw: string | null | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 async function getJob(env: Env, userId: string, jobId: string): Promise<Response> {
@@ -686,6 +853,63 @@ async function scoringStats(env: Env, userId: string): Promise<Response> {
 const SCORING_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 const SCORE_BATCH_LIMIT = 25;
 
+// Rank unscored, undismissed, non-expired jobs by cosine similarity to the
+// user's resume embedding and return the top SCORE_BATCH_LIMIT. The embedded
+// candidate set is currently a few hundred to a few thousand rows; pulling
+// (id, embedding) into the worker and sorting in JS is fine at that scale.
+async function pickRescoreTargetsByCosine(
+  env: Env,
+  userId: string,
+  resumeEmbeddingBuf: ArrayBuffer,
+): Promise<Array<{
+  id: string;
+  title: string;
+  company: string;
+  location: string | null;
+  description_snippet: string | null;
+}>> {
+  const resumeVec = unpackVector(resumeEmbeddingBuf);
+
+  const candidates = await env.DB.prepare(
+    `SELECT j.id, e.embedding AS job_embedding
+       FROM jobs j
+       JOIN jobs_embeddings e ON e.job_id = j.id
+      WHERE j.expired = 0
+        AND NOT EXISTS (SELECT 1 FROM user_job_scores s WHERE s.user_id = ? AND s.job_id = j.id)
+        AND NOT EXISTS (SELECT 1 FROM user_dismissed d WHERE d.user_id = ? AND d.job_id = j.id)`,
+  )
+    .bind(userId, userId)
+    .all<{ id: string; job_embedding: ArrayBuffer }>();
+
+  const ranked = (candidates.results || [])
+    .map((row) => ({ id: row.id, sim: cosine(resumeVec, unpackVector(row.job_embedding)) }))
+    .sort((a, b) => b.sim - a.sim)
+    .slice(0, SCORE_BATCH_LIMIT);
+
+  if (ranked.length === 0) return [];
+
+  const ids = ranked.map((r) => r.id);
+  const placeholders = ids.map(() => "?").join(", ");
+  const rows = await env.DB.prepare(
+    `SELECT j.id, j.title, j.company, j.location, j.description_snippet
+       FROM jobs j WHERE j.id IN (${placeholders})`,
+  )
+    .bind(...ids)
+    .all<{
+      id: string;
+      title: string;
+      company: string;
+      location: string | null;
+      description_snippet: string | null;
+    }>();
+
+  // Preserve cosine order in the output (SQL IN doesn't guarantee it).
+  const byId = new Map(rows.results?.map((r) => [r.id, r]));
+  return ids
+    .map((id) => byId.get(id))
+    .filter((r): r is NonNullable<typeof r> => r !== undefined);
+}
+
 async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
   const all = url.searchParams.get("all") === "true";
 
@@ -708,10 +932,16 @@ async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
   }
 
   const profile = await env.DB.prepare(
-    `SELECT resume_text, target_roles, must_have_skills FROM user_profiles WHERE user_id = ?`,
+    `SELECT resume_text, target_roles, must_have_skills, resume_embedding
+       FROM user_profiles WHERE user_id = ?`,
   )
     .bind(userId)
-    .first<{ resume_text: string | null; target_roles: string; must_have_skills: string }>();
+    .first<{
+      resume_text: string | null;
+      target_roles: string;
+      must_have_skills: string;
+      resume_embedding: ArrayBuffer | null;
+    }>();
   const resume = (profile?.resume_text || "").trim();
   if (resume.length < 50) {
     // Refund: didn't actually score.
@@ -727,26 +957,34 @@ async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
     await env.DB.prepare(`DELETE FROM user_job_scores WHERE user_id = ?`).bind(userId).run();
   }
 
-  // Pick jobs to score: not yet scored, not dismissed, not expired. Cap per call.
-  const targets = await env.DB.prepare(
-    `SELECT j.id, j.title, j.company, j.location, j.description_snippet
-       FROM jobs j
-      WHERE j.expired = 0
-        AND NOT EXISTS (SELECT 1 FROM user_job_scores s WHERE s.user_id = ? AND s.job_id = j.id)
-        AND NOT EXISTS (SELECT 1 FROM user_dismissed d WHERE d.user_id = ? AND d.job_id = j.id)
-      ORDER BY j.first_seen_at DESC
-      LIMIT ?`,
-  )
-    .bind(userId, userId, SCORE_BATCH_LIMIT)
-    .all();
-
-  const jobs = (targets.results || []) as Array<{
+  // Pick jobs to score. With a resume embedding, rank candidates by cosine
+  // and spend the daily quota on the most-relevant unscored jobs. Without
+  // one (resume too short to embed, or model failed), fall back to the
+  // legacy newest-first selection.
+  let jobs: Array<{
     id: string;
     title: string;
     company: string;
     location: string | null;
     description_snippet: string | null;
   }>;
+
+  if (profile?.resume_embedding) {
+    jobs = await pickRescoreTargetsByCosine(env, userId, profile.resume_embedding);
+  } else {
+    const targets = await env.DB.prepare(
+      `SELECT j.id, j.title, j.company, j.location, j.description_snippet
+         FROM jobs j
+        WHERE j.expired = 0
+          AND NOT EXISTS (SELECT 1 FROM user_job_scores s WHERE s.user_id = ? AND s.job_id = j.id)
+          AND NOT EXISTS (SELECT 1 FROM user_dismissed d WHERE d.user_id = ? AND d.job_id = j.id)
+        ORDER BY j.first_seen_at DESC
+        LIMIT ?`,
+    )
+      .bind(userId, userId, SCORE_BATCH_LIMIT)
+      .all();
+    jobs = (targets.results || []) as typeof jobs;
+  }
 
   if (jobs.length === 0) {
     return jsonResponse({ ok: true, scored: 0, message: "Nothing to score." }, 200);
