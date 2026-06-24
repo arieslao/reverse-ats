@@ -364,6 +364,39 @@ COMPANIES = [
     {"name": "Redwood Materials", "ats": "greenhouse", "slug": "redwoodmaterials", "category": "climate"},
     {"name": "Form Energy",       "ats": "greenhouse", "slug": "formenergy",       "category": "climate"},
     {"name": "QuantumScape",      "ats": "greenhouse", "slug": "quantumscape",     "category": "climate"},
+
+    # Top remote-first companies (remotefirstjobs.com/top-remote-companies).
+    # Resolved + job-count-verified via scripts/discover_ats_slugs.py 2026-06-24.
+    # Deduped against the registry above; common-word false positives
+    # ("remote"→General Assembly, "diligent"→Diligent Services) were dropped.
+    {"name": "NiCE",              "ats": "greenhouse", "slug": "nice",            "category": "enterprise_saas"},
+    {"name": "Samsara",           "ats": "greenhouse", "slug": "samsara",         "category": "enterprise_saas"},
+    {"name": "Waymo",             "ats": "greenhouse", "slug": "waymo",           "category": "ai_tech"},
+    {"name": "Binance",           "ats": "lever",      "slug": "binance",         "category": "fintech"},
+    {"name": "Braze",             "ats": "greenhouse", "slug": "braze",           "category": "enterprise_saas"},
+    {"name": "Xometry",           "ats": "greenhouse", "slug": "xometry",         "category": "enterprise_saas"},
+    {"name": "Celonis",           "ats": "greenhouse", "slug": "celonis",         "category": "enterprise_saas"},
+    {"name": "ClickHouse",        "ats": "greenhouse", "slug": "clickhouse",      "category": "enterprise_saas"},
+    {"name": "CoreWeave",         "ats": "greenhouse", "slug": "coreweave",       "category": "ai_tech"},
+    {"name": "Prolific",          "ats": "greenhouse", "slug": "prolific",        "category": "ai_tech"},
+    {"name": "Fundraise Up",      "ats": "greenhouse", "slug": "fundraiseup",     "category": "enterprise_saas"},
+    {"name": "Intercom",          "ats": "greenhouse", "slug": "intercom",        "category": "enterprise_saas"},
+    {"name": "NeuraFlash",        "ats": "greenhouse", "slug": "neuraflash",      "category": "consulting"},
+    {"name": "Sezzle",            "ats": "greenhouse", "slug": "sezzle",          "category": "fintech"},
+    {"name": "BridgeBio",         "ats": "greenhouse", "slug": "bridgebio",       "category": "healthtech"},
+    {"name": "Wayve",             "ats": "greenhouse", "slug": "wayve",           "category": "ai_tech"},
+    {"name": "ElevenLabs",        "ats": "ashby",      "slug": "elevenlabs",      "category": "ai_tech"},
+    {"name": "Vanta",             "ats": "ashby",      "slug": "vanta",           "category": "enterprise_saas"},
+    {"name": "AlphaSense",        "ats": "greenhouse", "slug": "alphasense",      "category": "ai_tech"},
+    {"name": "Fivetran",          "ats": "greenhouse", "slug": "fivetran",        "category": "enterprise_saas"},
+    {"name": "HelloFresh",        "ats": "greenhouse", "slug": "hellofresh",      "category": "retail"},
+    {"name": "Smartsheet",        "ats": "greenhouse", "slug": "smartsheet",      "category": "enterprise_saas"},
+    {"name": "Chainguard",        "ats": "greenhouse", "slug": "chainguard",      "category": "enterprise_saas"},
+    {"name": "Tide",              "ats": "greenhouse", "slug": "tide",            "category": "fintech"},
+    {"name": "FanDuel",           "ats": "greenhouse", "slug": "fanduel",         "category": "media"},
+    {"name": "Guidepoint",        "ats": "greenhouse", "slug": "guidepoint",      "category": "enterprise_saas"},
+    {"name": "Lyra Health",       "ats": "lever",      "slug": "lyrahealth",      "category": "healthtech"},
+    {"name": "Taboola",           "ats": "greenhouse", "slug": "taboola",         "category": "media"},
 ]
 
 # ---------------------------------------------------------------------------
