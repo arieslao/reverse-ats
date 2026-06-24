@@ -18,6 +18,12 @@
 
 import type { Env } from "./schema";
 import { cosine, unpackVector } from "./embed";
+import {
+  buildUserSkillIndex,
+  computeMatchBreakdown,
+  type MatchBreakdown,
+  type UserSkillIndex,
+} from "./match";
 import { fetchTier, verifyRequest } from "./supabase-auth";
 import {
   LIFETIME_LIMITS,
@@ -35,6 +41,60 @@ import {
 // the cosine score so unscored-but-relevant jobs aren't penalized.
 const BLEND_COSINE_WEIGHT = 0.5;
 const BLEND_LLM_WEIGHT = 0.5;
+
+// When the user has a structured inventory, requirement coverage (deterministic
+// gap match) joins the blend so jobs they're actually qualified for rank up.
+const BLEND_COV_COSINE_WEIGHT = 0.4;
+const BLEND_COV_LLM_WEIGHT = 0.25;
+const BLEND_COV_COVERAGE_WEIGHT = 0.35;
+
+// Loaded once per request: the user's skill index for the gap matcher. null
+// when the user has no inventory yet (matcher is skipped, feed behaves as before).
+async function loadUserSkillIndex(env: Env, userId: string): Promise<UserSkillIndex | null> {
+  const row = await env.DB.prepare(
+    `SELECT skills, total_years_experience FROM user_inventory WHERE user_id = ?`,
+  )
+    .bind(userId)
+    .first<{ skills: string | null; total_years_experience: number | null }>();
+  if (!row?.skills) return null;
+  let skills: Array<{ name: string }> = [];
+  try {
+    const parsed = JSON.parse(row.skills);
+    if (Array.isArray(parsed)) skills = parsed.filter((s) => s && typeof s.name === "string");
+  } catch {
+    return null;
+  }
+  if (skills.length === 0) return null;
+  return buildUserSkillIndex(skills, row.total_years_experience ?? null);
+}
+
+// Parse a jobs_structured JSON column defensively.
+function parseSkillArray(raw: unknown): string[] {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+// Build the breakdown for one job row (which must carry the jobs_structured
+// columns: must_have_skills, nice_to_have_skills, years_experience_min).
+function breakdownForRow(row: any, idx: UserSkillIndex | null): MatchBreakdown | null {
+  if (!idx) return null;
+  // No structured row yet (still in the preprocessing backlog) → nothing to match.
+  if (row.must_have_skills == null && row.nice_to_have_skills == null) return null;
+  return computeMatchBreakdown(
+    {
+      must_have_skills: parseSkillArray(row.must_have_skills),
+      nice_to_have_skills: parseSkillArray(row.nice_to_have_skills),
+      years_experience_min:
+        typeof row.years_experience_min === "number" ? row.years_experience_min : null,
+    },
+    idx,
+  );
+}
 
 interface ProfileFilterRow {
   remote_only: number;
@@ -175,6 +235,10 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
   const blacklistedKeywords = parseJsonArray(profile?.blacklisted_keywords);
   const remoteOnly = explicitRemoteOnly || profile?.remote_only === 1;
 
+  // The gap matcher's skill index (null if no inventory yet). Used to attach a
+  // per-job strengths/gaps breakdown and to fold requirement coverage into rank.
+  const skillIdx = await loadUserSkillIndex(env, userId);
+
   const where: string[] = ["j.expired = 0"];
   const binds: (string | number)[] = [];
 
@@ -236,6 +300,7 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
       offset,
       resumeVector: unpackVector(profile.resume_embedding!),
       scoreSelect,
+      skillIdx,
     });
   }
 
@@ -262,9 +327,11 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
         j.employment_type, j.workplace_type,
         j.salary_min, j.salary_max, j.salary_currency, j.comp_summary,
         r.repost_count, r.repost_first_seen_at,
+        st.must_have_skills, st.nice_to_have_skills, st.years_experience_min,
         ${scoreSelect}
        FROM jobs j
        LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
+       LEFT JOIN jobs_structured st ON st.job_id = j.id
        LEFT JOIN (
          SELECT fingerprint,
                 COUNT(*)         AS repost_count,
@@ -279,7 +346,7 @@ async function listJobs(request: Request, env: Env, userId: string): Promise<Res
     .bind(userId, ...binds, perPage, offset)
     .all();
 
-  const jobs = (rows.results || []).map(jobRowToOut);
+  const jobs = (rows.results || []).map((row) => jobRowToOut(row, skillIdx));
 
   return jsonResponse(
     {
@@ -311,6 +378,7 @@ interface CosineBlendedArgs {
   offset: number;
   resumeVector: Float32Array;
   scoreSelect: string;
+  skillIdx: UserSkillIndex | null;
 }
 
 async function listJobsCosineBlended(
@@ -318,19 +386,34 @@ async function listJobsCosineBlended(
   userId: string,
   args: CosineBlendedArgs,
 ): Promise<Response> {
-  const { whereSql, binds, perPage, offset, resumeVector } = args;
+  const { whereSql, binds, perPage, offset, resumeVector, skillIdx } = args;
+  const useCoverage = skillIdx != null;
+
+  // Pull must_have_skills + years only when we'll actually use coverage in the
+  // blend — keeps the candidate scan lean when there's no inventory.
+  const covSelect = useCoverage
+    ? ", st.must_have_skills AS must_have_skills, st.years_experience_min AS years_experience_min"
+    : "";
+  const covJoin = useCoverage ? "LEFT JOIN jobs_structured st ON st.job_id = j.id" : "";
 
   const candidates = await env.DB.prepare(
     `SELECT j.id,
             e.embedding AS job_embedding,
-            COALESCE(s.llm_score, 0) AS llm_score
+            COALESCE(s.llm_score, 0) AS llm_score${covSelect}
        FROM jobs j
        LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
        LEFT JOIN jobs_embeddings e ON e.job_id = j.id
+       ${covJoin}
       WHERE ${whereSql}`,
   )
     .bind(userId, ...binds)
-    .all<{ id: string; job_embedding: ArrayBuffer | null; llm_score: number }>();
+    .all<{
+      id: string;
+      job_embedding: ArrayBuffer | null;
+      llm_score: number;
+      must_have_skills?: string | null;
+      years_experience_min?: number | null;
+    }>();
 
   const ranked = (candidates.results || []).map((row) => {
     const cosineScore = row.job_embedding
@@ -341,8 +424,27 @@ async function listJobsCosineBlended(
     // unscored-but-relevant job ranks on cosine alone instead of getting
     // halved by the missing LLM weight.
     const effectiveLlm = llmScore > 0 ? llmScore : cosineScore;
-    const blended =
-      BLEND_COSINE_WEIGHT * cosineScore + BLEND_LLM_WEIGHT * effectiveLlm;
+
+    if (useCoverage && row.must_have_skills != null) {
+      // Deterministic requirement coverage (0-100) joins the blend so jobs the
+      // user is actually qualified for surface above merely-similar ones.
+      const bd = computeMatchBreakdown(
+        {
+          must_have_skills: parseSkillArray(row.must_have_skills),
+          nice_to_have_skills: [],
+          years_experience_min:
+            typeof row.years_experience_min === "number" ? row.years_experience_min : null,
+        },
+        skillIdx!,
+      );
+      const blended =
+        BLEND_COV_COSINE_WEIGHT * cosineScore +
+        BLEND_COV_LLM_WEIGHT * effectiveLlm +
+        BLEND_COV_COVERAGE_WEIGHT * bd.coverage_pct;
+      return { id: row.id, blended };
+    }
+
+    const blended = BLEND_COSINE_WEIGHT * cosineScore + BLEND_LLM_WEIGHT * effectiveLlm;
     return { id: row.id, blended };
   });
 
@@ -364,9 +466,11 @@ async function listJobsCosineBlended(
         j.employment_type, j.workplace_type,
         j.salary_min, j.salary_max, j.salary_currency, j.comp_summary,
         r.repost_count, r.repost_first_seen_at,
+        st.must_have_skills, st.nice_to_have_skills, st.years_experience_min,
         COALESCE(s.llm_score, 0) AS llm_score, s.llm_reasoning AS llm_reasoning
        FROM jobs j
        LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
+       LEFT JOIN jobs_structured st ON st.job_id = j.id
        LEFT JOIN (
          SELECT fingerprint,
                 COUNT(*)         AS repost_count,
@@ -382,7 +486,7 @@ async function listJobsCosineBlended(
   // Re-order the SQL results into the cosine-ranked sequence the page expects.
   const byId = new Map<string, ReturnType<typeof jobRowToOut>>();
   for (const row of rows.results || []) {
-    const out = jobRowToOut(row);
+    const out = jobRowToOut(row, skillIdx);
     byId.set(out.id, out);
   }
   const jobs = pageIds
@@ -409,10 +513,12 @@ async function getJob(env: Env, userId: string, jobId: string): Promise<Response
   const row = await env.DB.prepare(
     `SELECT j.*,
             s.llm_score AS llm_score, s.llm_reasoning AS llm_reasoning,
+            st.must_have_skills, st.nice_to_have_skills, st.years_experience_min,
             p.stage AS pipeline_stage,
             CASE WHEN d.job_id IS NOT NULL THEN 1 ELSE 0 END AS dismissed
        FROM jobs j
        LEFT JOIN user_job_scores s ON s.user_id = ? AND s.job_id = j.id
+       LEFT JOIN jobs_structured st ON st.job_id = j.id
        LEFT JOIN user_pipeline   p ON p.user_id = ? AND p.job_id = j.id
        LEFT JOIN user_dismissed  d ON d.user_id = ? AND d.job_id = j.id
       WHERE j.id = ?`,
@@ -420,7 +526,8 @@ async function getJob(env: Env, userId: string, jobId: string): Promise<Response
     .bind(userId, userId, userId, jobId)
     .first();
   if (!row) return jsonResponse({ ok: false, error: "not found" }, 404);
-  return jsonResponse({ ok: true, job: jobRowToOut(row) }, 200);
+  const skillIdx = await loadUserSkillIndex(env, userId);
+  return jsonResponse({ ok: true, job: jobRowToOut(row, skillIdx) }, 200);
 }
 
 async function dismissJob(env: Env, userId: string, jobId: string): Promise<Response> {
@@ -1240,11 +1347,13 @@ interface JobOutShape {
   expired: boolean;
   dismissed: boolean;
   pipeline_stage: string | null;
+  match_breakdown?: MatchBreakdown | null;
 }
 
-function jobRowToOut(row: any): JobOutShape {
+function jobRowToOut(row: any, skillIdx: UserSkillIndex | null = null): JobOutShape {
   const repostCount = typeof row.repost_count === "number" ? row.repost_count : 0;
   return {
+    match_breakdown: breakdownForRow(row, skillIdx),
     id: row.id,
     company: row.company,
     title: row.title,
