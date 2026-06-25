@@ -25,7 +25,7 @@ import { embedStructuredJob, packVector, EMBEDDING_MODEL } from "./embed";
 import { handleAdmin } from "./admin";
 import { handleProfile } from "./profile";
 import { handleInventory } from "./inventory";
-import { handleMatches, runDailyDigest } from "./digest";
+import { handleMatches, runDailyDigest, handleDigestBatch } from "./digest";
 import { handleFeedAndPipeline } from "./feed";
 
 // Cron expression (must match wrangler.toml) that fires the once-a-day match
@@ -67,6 +67,10 @@ const handler: ExportedHandler<Env> = {
     }
     if (request.method === "POST" && url.pathname === "/preprocess/results") {
       return handlePreprocessResults(request, env);
+    }
+    // GX10 daily-digest lane pulls the day's matches + inventory here.
+    if (request.method === "GET" && url.pathname === "/digest/batch") {
+      return withCors(await handleDigestBatch(request, env), origin);
     }
     if (request.method === "GET" && url.pathname === "/jobs") {
       return withCors(await handleListJobs(request, env), origin);
