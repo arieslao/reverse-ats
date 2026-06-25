@@ -1328,13 +1328,15 @@ async function coverLetter(env: Env, userId: string, jobId: string, request: Req
 
 const TAILORED_RESUME_MODEL = WORKERS_AI_TEXT_MODEL;
 
-const TAILORED_RESUME_SYSTEM_PROMPT = `You are an expert résumé writer tailoring a candidate's résumé to ONE specific job.
+const TAILORED_RESUME_SYSTEM_PROMPT = `You are an expert résumé writer tailoring a candidate's résumé to ONE specific job for ATS systems.
 
-You are given the candidate's structured inventory (skills, work history, education) and the target job (title, company, required + nice-to-have skills). Produce a tailored résumé that:
-- leads with a 2-3 sentence summary aimed squarely at THIS role
-- orders skills so the job's required/nice-to-have skills the candidate HAS appear first; mirror the job's exact wording for ATS keyword matching
-- rewrites each role's bullets to foreground experience relevant to this job, quantified where the source gives numbers
-- NEVER invents skills, employers, titles, dates, or metrics not present in the inventory — only reframes what's there
+You are given the candidate's structured inventory (skills, work history, education) and the target job (title, company, required + nice-to-have skills). Apply these rules (a senior candidate's own tailoring playbook):
+
+1. HEADLINE — set it to the job's EXACT title (ATS title-matching is real). If the job title is generic, use the closest specific match to the candidate's level.
+2. SUMMARY — 2-3 sentences aimed squarely at THIS role. End with one sentence that mirrors the JD's top 2-3 must-have phrases VERBATIM (kept truthful). Do NOT state a hard total-years number (e.g. "22+ years") — it invites age math and adds nothing for ATS; let the dated experience show tenure.
+3. SKILLS — REORDER, don't fabricate. Put the skill groups/keywords the JD emphasizes first, using the JD's exact terms. Spell out an acronym once next to its short form (e.g. "Retrieval-Augmented Generation (RAG)") so both match. Add a keyword ONLY if the inventory supports it. Do NOT annotate years next to skills.
+4. EXPERIENCE — rewrite each role's bullets to foreground experience relevant to this job, quantified where the source gives numbers. Action-verb first.
+5. NEVER invent skills, employers, titles, dates, or metrics not in the inventory — only reframe what's there. Frame any career-transition/sabbatical as deliberate, not a gap.
 
 Return ONLY valid JSON in this shape:
 

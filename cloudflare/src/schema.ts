@@ -14,6 +14,8 @@ export interface Env {
   // Service-role key — set via `wrangler secret put SUPABASE_SERVICE_ROLE_KEY`.
   // Used for admin operations (read all profiles, update tier, etc.).
   SUPABASE_SERVICE_ROLE_KEY: string;
+  // Resend API key for the daily match digest email. Already set as a secret.
+  RESEND_API_KEY: string;
 }
 
 // Verified Supabase identity, derived from the JWT in Authorization header.

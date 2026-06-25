@@ -25,7 +25,12 @@ import { embedStructuredJob, packVector, EMBEDDING_MODEL } from "./embed";
 import { handleAdmin } from "./admin";
 import { handleProfile } from "./profile";
 import { handleInventory } from "./inventory";
+import { handleMatches, runDailyDigest } from "./digest";
 import { handleFeedAndPipeline } from "./feed";
+
+// Cron expression (must match wrangler.toml) that fires the once-a-day match
+// digest. All other ticks run the reaper + preprocess trickle.
+const DAILY_DIGEST_CRON = "0 14 * * *"; // 14:00 UTC ≈ 6-7am PT
 
 // How many jobs the scheduled handler preprocesses per 30-min cron tick.
 // The LLM structured-extraction step is the Workers-AI free-tier neuron
@@ -77,6 +82,9 @@ const handler: ExportedHandler<Env> = {
     const inventoryResponse = await handleInventory(request, env);
     if (inventoryResponse) return withCors(inventoryResponse, origin);
 
+    const matchesResponse = await handleMatches(request, env);
+    if (matchesResponse) return withCors(matchesResponse, origin);
+
     const feedResponse = await handleFeedAndPipeline(request, env);
     if (feedResponse) return withCors(feedResponse, origin);
 
@@ -89,7 +97,12 @@ const handler: ExportedHandler<Env> = {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // Don't await — Workers will keep the runtime alive via ctx.waitUntil.
-    // Reap stale jobs first (cheap single UPDATE), then trickle-preprocess.
+    if (controller.cron === DAILY_DIGEST_CRON) {
+      // Once-a-day branch: compute + email each user's top job matches.
+      ctx.waitUntil(runDailyDigest(env));
+      return;
+    }
+    // Every other tick: reap stale jobs (cheap UPDATE), then trickle-preprocess.
     ctx.waitUntil(
       (async () => {
         await expireStaleJobs(env);

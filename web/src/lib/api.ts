@@ -432,6 +432,48 @@ export async function generateTailoredResume(jobId: string): Promise<TailoredRes
   return { resume: data.resume, job: data.job || { title: '', company: '' }, tier: data.tier, usage: data.usage }
 }
 
+// ─── Daily matches (Phase 5) ────────────────────────────────────────────────
+
+export interface DailyMatch {
+  job_id: string
+  company: string
+  title: string
+  url: string
+  location: string | null
+  category: string | null
+  remote: boolean
+  workplace_type: string | null
+  salary_min: number | null
+  salary_max: number | null
+  salary_currency: string | null
+  comp_summary: string | null
+  fit_score: number
+  coverage_pct: number
+  rank: number
+  strengths: string[]
+  gaps: string[]
+}
+
+export interface DailyMatchesResult {
+  date: string | null
+  matches: DailyMatch[]
+}
+
+export async function fetchDailyMatches(): Promise<DailyMatchesResult> {
+  const r = await authFetch('/api/matches')
+  if (!r.ok) throw new Error(`matches fetch failed: ${r.status}`)
+  const d = await r.json()
+  return { date: d.date ?? null, matches: (d.matches as DailyMatch[]) || [] }
+}
+
+/** Recompute (and email) the current user's matches now. */
+export async function runDailyMatches(): Promise<DailyMatchesResult> {
+  const r = await authFetch('/api/matches/run', { method: 'POST' })
+  const d = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(d?.error || `matches run failed: ${r.status}`)
+  return { date: d.date ?? null, matches: (d.matches as DailyMatch[]) || [] }
+}
+
 export interface UsageOverview {
   tier: Tier
   usage: Record<string, UsageState>

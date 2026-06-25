@@ -36,6 +36,7 @@ export default function AppIndex() {
         </p>
 
         <div className="mt-12 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl">
+          <HubCard to="/app/matches" title="Daily matches" hint="Your top best-fit roles, ranked to your inventory and emailed each morning. One-click tailored docs." />
           <HubCard to="/app/feed" title="Job feed" hint="Browse and filter scraped jobs. Save, dismiss, or generate a cover letter." />
           <HubCard to="/app/pipeline" title="Pipeline" hint="Saved jobs by stage — applied, phone screen, technical, offer." />
           <HubCard to="/app/profile" title="Profile" hint="Resume, target roles, locations, salary, and skill preferences." />
