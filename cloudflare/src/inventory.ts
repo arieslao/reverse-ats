@@ -14,11 +14,11 @@
 // cosine-ranked feed improves immediately.
 
 import type { Env } from "./schema";
-import { embedText, packVector } from "./embed";
+import { embedText, packVector, WORKERS_AI_TEXT_MODEL } from "./embed";
 import { verifyRequest, fetchTier } from "./supabase-auth";
 import { checkAndConsume, limitFor } from "./usage";
 
-const EXTRACT_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const EXTRACT_MODEL = WORKERS_AI_TEXT_MODEL;
 
 // ─── shapes ─────────────────────────────────────────────────────────────────
 

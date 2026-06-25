@@ -17,7 +17,7 @@
 //   POST /api/scoring/rescore            — score all saved+feed jobs vs. profile
 
 import type { Env } from "./schema";
-import { cosine, unpackVector } from "./embed";
+import { cosine, unpackVector, WORKERS_AI_TEXT_MODEL } from "./embed";
 import {
   buildUserSkillIndex,
   computeMatchBreakdown,
@@ -960,7 +960,7 @@ async function scoringStats(env: Env, userId: string): Promise<Response> {
   return jsonResponse({ ok: true, total, scored, unscored: Math.max(0, total - scored) }, 200);
 }
 
-const SCORING_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const SCORING_MODEL = WORKERS_AI_TEXT_MODEL;
 const SCORE_BATCH_LIMIT = 25;
 
 // Rank unscored, undismissed, non-expired jobs by cosine similarity to the
@@ -1183,7 +1183,7 @@ async function rescore(env: Env, userId: string, url: URL): Promise<Response> {
 
 // ─── /api/jobs/:id/cover-letter ─────────────────────────────────────────────
 
-const COVER_LETTER_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const COVER_LETTER_MODEL = WORKERS_AI_TEXT_MODEL;
 
 type CoverLetterStyle = "concise" | "standard" | "detailed";
 
@@ -1326,7 +1326,7 @@ async function coverLetter(env: Env, userId: string, jobId: string, request: Req
 // freeform resume_text) and uses the Phase-3 gap breakdown to foreground the
 // skills the job actually asks for and mirror its keywords for ATS parsing.
 
-const TAILORED_RESUME_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const TAILORED_RESUME_MODEL = WORKERS_AI_TEXT_MODEL;
 
 const TAILORED_RESUME_SYSTEM_PROMPT = `You are an expert résumé writer tailoring a candidate's résumé to ONE specific job.
 

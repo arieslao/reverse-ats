@@ -9,7 +9,7 @@
 // verified token, never from the request body.
 
 import type { Env } from "./schema";
-import { embedText, packVector } from "./embed";
+import { embedText, packVector, WORKERS_AI_TEXT_MODEL } from "./embed";
 import { fetchTier, verifyRequest } from "./supabase-auth";
 import { checkAndConsume, limitFor } from "./usage";
 
@@ -276,7 +276,7 @@ async function reembedResume(env: Env, userId: string, row: ProfileRow): Promise
 // stored resume_text. Returns two lists — current_fit (could land today) and
 // next_step (one-level-up career progression).
 
-const SUGGEST_ROLES_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const SUGGEST_ROLES_MODEL = WORKERS_AI_TEXT_MODEL;
 
 const SUGGEST_ROLES_SYSTEM_PROMPT = `You are an experienced career coach reviewing a candidate's resume.
 
