@@ -291,6 +291,20 @@ CREATE TABLE IF NOT EXISTS llm_settings (
     max_tokens      INTEGER NOT NULL DEFAULT 500,
     updated_at      TEXT
 );
+
+-- Structured skills & experience inventory (singleton, single-user local).
+-- Extracted from the résumé via the local LLM; powers gap matching + tailored docs.
+CREATE TABLE IF NOT EXISTS user_inventory (
+    id                     INTEGER PRIMARY KEY CHECK(id = 1),
+    skills                 TEXT NOT NULL DEFAULT '[]',   -- [{name,category,years,proficiency,last_used,source}]
+    experience             TEXT NOT NULL DEFAULT '[]',   -- [{company,title,start,end,location,highlights[]}]
+    education              TEXT NOT NULL DEFAULT '[]',
+    certifications         TEXT NOT NULL DEFAULT '[]',
+    summary                TEXT,
+    total_years_experience REAL,
+    sources                TEXT NOT NULL DEFAULT '[]',
+    updated_at             TEXT
+);
 """
 
 
@@ -1110,6 +1124,59 @@ def update_profile(conn: sqlite3.Connection, updates: dict) -> dict:
     )
     conn.commit()
     return get_profile(conn)
+
+
+# ---------------------------------------------------------------------------
+# Inventory (structured skills & experience) — singleton row id=1
+# ---------------------------------------------------------------------------
+
+_INVENTORY_JSON_FIELDS = {"skills", "experience", "education", "certifications", "sources"}
+
+
+def get_inventory(conn: sqlite3.Connection) -> dict:
+    """Return the single inventory row (empty default if none)."""
+    row = conn.execute("SELECT * FROM user_inventory WHERE id = 1").fetchone()
+    if row is None:
+        return {
+            "skills": [], "experience": [], "education": [], "certifications": [],
+            "summary": None, "total_years_experience": None, "sources": [], "updated_at": None,
+        }
+    d = dict(row)
+    for f in _INVENTORY_JSON_FIELDS:
+        try:
+            d[f] = json.loads(d.get(f) or "[]")
+        except (json.JSONDecodeError, TypeError):
+            d[f] = []
+    d.pop("id", None)
+    return d
+
+
+def save_inventory(conn: sqlite3.Connection, inv: dict) -> dict:
+    """Upsert the singleton inventory row from a dict."""
+    now = _now_iso()
+    conn.execute(
+        """
+        INSERT INTO user_inventory
+            (id, skills, experience, education, certifications, summary, total_years_experience, sources, updated_at)
+        VALUES (1, :skills, :experience, :education, :certifications, :summary, :tye, :sources, :now)
+        ON CONFLICT(id) DO UPDATE SET
+            skills=:skills, experience=:experience, education=:education,
+            certifications=:certifications, summary=:summary,
+            total_years_experience=:tye, sources=:sources, updated_at=:now
+        """,
+        {
+            "skills": _json_dumps(inv.get("skills") or []),
+            "experience": _json_dumps(inv.get("experience") or []),
+            "education": _json_dumps(inv.get("education") or []),
+            "certifications": _json_dumps(inv.get("certifications") or []),
+            "summary": inv.get("summary"),
+            "tye": inv.get("total_years_experience"),
+            "sources": _json_dumps(inv.get("sources") or []),
+            "now": now,
+        },
+    )
+    conn.commit()
+    return get_inventory(conn)
 
 
 # ---------------------------------------------------------------------------

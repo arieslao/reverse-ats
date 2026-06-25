@@ -621,6 +621,117 @@ def generate_cover_letter(
         return {"cover_letter": "", "provider": provider, "error": str(e)}
 
 
+INVENTORY_SYSTEM_PROMPT = """You extract a structured professional inventory from a resume.
+
+Output ONLY valid JSON in this exact shape:
+{
+  "summary": "<2-3 sentence professional summary, or null>",
+  "total_years_experience": <number or null>,
+  "skills": [{"name":"<specific skill>","category":"<language|framework|cloud|database|tool|domain|soft|other>","years":<int or null>,"proficiency":<1-5 or null>,"last_used":"<year or null>"}],
+  "experience": [{"company":"<name>","title":"<title>","start":"<YYYY or YYYY-MM or null>","end":"<YYYY or null if current>","location":"<or null>","highlights":["<concise bullet>"]}],
+  "education": [{"school":"<name>","degree":"<or null>","field":"<or null>","start":"<or null>","end":"<or null>"}],
+  "certifications": [{"name":"<cert>","issuer":"<or null>","date":"<or null>"}]
+}
+
+Rules:
+- Skills must be SPECIFIC (e.g. "Python", "Kubernetes", "Snowflake"), not vague.
+- proficiency: infer 1-5 from seniority/recency/depth; null if unclear.
+- highlights: 2-5 per role, action-verb first, under 20 words, quantified where the text gives numbers.
+- Do NOT invent data; empty arrays / null where absent.
+- Output JSON only — no prose, no markdown fences."""
+
+
+def extract_inventory(resume_text: str, settings: Optional[dict] = None) -> dict:
+    """Extract a structured skills/experience inventory from resume text using
+    the configured LLM. Returns the inventory dict, or {"error": ...}."""
+    if not settings or settings.get("provider") == "keyword_only":
+        return {"error": "Inventory extraction requires an LLM provider. Configure one in Admin → LLM Settings."}
+    provider = settings.get("provider", "openai_compatible")
+    provider_info = PROVIDERS.get(provider, PROVIDERS["openai_compatible"])
+    if provider_info["requires_key"] and not settings.get("api_key"):
+        return {"error": f"{provider_info['name']} API key not configured."}
+    if not resume_text or len(resume_text.strip()) < 40:
+        return {"error": "Résumé is too short — upload or paste your résumé first."}
+
+    user_prompt = f"## Source résumé\n\n{resume_text[:8000]}\n\nExtract the structured inventory per the instructions."
+    inv_settings = {**settings, "max_tokens": 3500, "temperature": 0.1}
+    try:
+        if provider_info["format"] == "anthropic":
+            content = _call_llm_raw_anthropic(user_prompt, INVENTORY_SYSTEM_PROMPT, inv_settings, provider_info)
+        else:
+            content = _call_llm_raw(user_prompt, INVENTORY_SYSTEM_PROMPT, inv_settings, provider_info)
+    except Exception as e:
+        logger.warning("Inventory extraction failed: %s", e)
+        return {"error": str(e)}
+
+    parsed = _parse_json_object(content)
+    if not isinstance(parsed, dict):
+        return {"error": "Model returned unparseable inventory. Try again."}
+    return _normalize_inventory(parsed)
+
+
+def _parse_json_object(text: str) -> Optional[dict]:
+    """Parse the first JSON object out of an LLM response (tolerant of fences/prose)."""
+    if not text:
+        return None
+    t = text.strip()
+    m = re.search(r"```(?:json)?\s*\n?([\s\S]*?)```", t)
+    if m:
+        t = m.group(1).strip()
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        s, e = t.find("{"), t.rfind("}")
+        if 0 <= s < e:
+            try:
+                return json.loads(t[s : e + 1])
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
+def _normalize_inventory(raw: dict) -> dict:
+    def _arr(v):
+        return v if isinstance(v, list) else []
+
+    skills = []
+    for s in _arr(raw.get("skills"))[:200]:
+        name = (s.get("name") if isinstance(s, dict) else str(s)) or ""
+        name = name.strip()
+        if not name or len(name) > 60:
+            continue
+        o = s if isinstance(s, dict) else {}
+        prof = o.get("proficiency")
+        prof = max(1, min(5, int(prof))) if isinstance(prof, (int, float)) else None
+        yrs = o.get("years")
+        yrs = int(yrs) if isinstance(yrs, (int, float)) else None
+        skills.append({"name": name, "category": o.get("category"), "years": yrs,
+                       "proficiency": prof, "last_used": o.get("last_used"), "source": "resume"})
+
+    experience = []
+    for e in _arr(raw.get("experience"))[:60]:
+        if not isinstance(e, dict):
+            continue
+        company, title = (e.get("company") or "").strip(), (e.get("title") or "").strip()
+        if not company and not title:
+            continue
+        hl = [str(h).strip() for h in _arr(e.get("highlights")) if str(h).strip()][:8]
+        experience.append({"company": company, "title": title, "start": e.get("start"),
+                           "end": e.get("end"), "location": e.get("location"), "highlights": hl, "source": "resume"})
+
+    education = [{"school": (e.get("school") or "").strip(), "degree": e.get("degree"),
+                  "field": e.get("field"), "start": e.get("start"), "end": e.get("end")}
+                 for e in _arr(raw.get("education"))[:20] if isinstance(e, dict) and (e.get("school") or "").strip()]
+    certs = [{"name": (c.get("name") or "").strip(), "issuer": c.get("issuer"), "date": c.get("date")}
+             for c in _arr(raw.get("certifications"))[:40] if isinstance(c, dict) and (c.get("name") or "").strip()]
+    tye = raw.get("total_years_experience")
+    tye = float(tye) if isinstance(tye, (int, float)) else None
+    summary = raw.get("summary")
+    summary = summary.strip()[:2000] if isinstance(summary, str) else None
+    return {"skills": skills, "experience": experience, "education": education,
+            "certifications": certs, "summary": summary, "total_years_experience": tye, "sources": ["resume"]}
+
+
 def _call_llm_raw(user_prompt: str, system_prompt: str, settings: dict, provider_info: dict) -> str:
     """Call OpenAI-compatible API and return raw text content."""
     url = settings.get("api_url") or provider_info["default_url"]

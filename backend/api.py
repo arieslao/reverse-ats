@@ -27,6 +27,8 @@ from db import (
     get_pipeline_events,
     get_profile,
     update_profile,
+    get_inventory,
+    save_inventory,
     get_analytics,
     get_latest_scrape_run,
     get_companies,
@@ -484,6 +486,48 @@ async def upload_resume_endpoint(file: UploadFile = File(...)):
     finally:
         conn.close()
     return {"resume_text": text, "chars": len(text)}
+
+
+@app.get("/api/inventory")
+def get_inventory_endpoint():
+    conn = _conn()
+    try:
+        return get_inventory(conn)
+    finally:
+        conn.close()
+
+
+@app.put("/api/inventory")
+def update_inventory_endpoint(body: dict):
+    """Manual edit of the inventory (UI sends edited sections)."""
+    conn = _conn()
+    try:
+        current = get_inventory(conn)
+        for k in ("skills", "experience", "education", "certifications", "summary", "total_years_experience", "sources"):
+            if k in body:
+                current[k] = body[k]
+        return save_inventory(conn, current)
+    finally:
+        conn.close()
+
+
+@app.post("/api/inventory/extract")
+def extract_inventory_endpoint():
+    """Extract a structured inventory from the saved résumé via the local LLM."""
+    conn = _conn()
+    try:
+        profile = get_profile(conn)
+        resume = (profile.get("resume_text") or "").strip()
+        if len(resume) < 40:
+            raise HTTPException(status_code=400, detail="Upload or paste your résumé in Profile first.")
+        settings = get_llm_settings(conn)
+        from scorer import extract_inventory
+        result = extract_inventory(resume, settings)
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail=result["error"])
+        return save_inventory(conn, result)
+    finally:
+        conn.close()
 
 
 @app.post("/api/profile/suggest-roles")
