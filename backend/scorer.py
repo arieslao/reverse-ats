@@ -622,24 +622,34 @@ def generate_cover_letter(
         return {"cover_letter": "", "provider": provider, "error": str(e)}
 
 
-INVENTORY_SYSTEM_PROMPT = """You extract a structured professional inventory from a resume.
+INVENTORY_SYSTEM_PROMPT = """You build a candidate's skill inventory by REASONING over their DATED work history — not by dumping a flat skill list.
+
+Think like an analyst: read each role and its DATES, identify the candidate's real competency areas, GROUP related skills/tools into 8-14 meaningful groups, and for EACH group compute how many years they've actually practiced it by spanning the dated roles where that group was used. A skill area only present in a recent role spans only that role's months; a career-long area spans the whole career.
 
 Output ONLY valid JSON in this exact shape:
 {
   "summary": "<2-3 sentence professional summary, or null>",
   "total_years_experience": <number or null>,
-  "skills": [{"name":"<specific skill>","category":"<language|framework|cloud|database|tool|domain|soft|other>","years":<int or null>,"proficiency":<1-5 or null>,"last_used":"<year or null>"}],
-  "experience": [{"company":"<name>","title":"<title>","start":"<YYYY or YYYY-MM or null>","end":"<YYYY or null if current>","location":"<or null>","highlights":["<concise bullet>"]}],
+  "skill_groups": [
+    {
+      "name": "<group name, e.g. 'Program & Portfolio Management'>",
+      "keywords": ["<specific skill/tool in this group>", "..."],
+      "years_label": "<human label, e.g. '22+ yrs', '~14 yrs', '<1 yr (~10 mo)'>",
+      "years_num": <best numeric estimate of years, e.g. 22, 14, 0.8>,
+      "basis": "<one line justifying the years from DATED roles, e.g. 'Epic implementations 6/2011 (Cleveland) → 12/2022 (Kaiser)'>"
+    }
+  ],
+  "experience": [{"company":"<name>","title":"<title>","start":"<YYYY or YYYY-MM>","end":"<YYYY or null if current>","location":"<or null>","highlights":["<concise bullet>"]}],
   "education": [{"school":"<name>","degree":"<or null>","field":"<or null>","start":"<or null>","end":"<or null>"}],
   "certifications": [{"name":"<cert>","issuer":"<or null>","date":"<or null>"}]
 }
 
 Rules:
-- Skills must be SPECIFIC (e.g. "Python", "Kubernetes", "Snowflake"), not vague.
-- proficiency: infer 1-5 from seniority/recency/depth; null if unclear.
-- highlights: 2-5 per role, action-verb first, under 20 words, quantified where the text gives numbers.
-- Do NOT invent data; empty arrays / null where absent.
-- Output JSON only — no prose, no markdown fences."""
+- GROUP, don't list flat. Each group's keywords are the specific matchable skills/tools (e.g. "Python","TypeScript","React").
+- years_num MUST come from the DATED history span of the roles using that group — be honest: newly-learned areas are <1 yr even if impressive.
+- basis MUST cite real roles/dates from the history (e.g. "Aries Labs 8/2025–present; self-taught"). Never invent.
+- Order groups from most years to least.
+- Do NOT invent skills, roles, dates, or metrics. Output JSON only — no prose, no markdown fences."""
 
 
 def extract_inventory(resume_text: str, settings: Optional[dict] = None) -> dict:
@@ -695,19 +705,34 @@ def _normalize_inventory(raw: dict) -> dict:
     def _arr(v):
         return v if isinstance(v, list) else []
 
+    # Skill GROUPS (preferred); fall back to a flat "skills" list if the model
+    # used the old shape. Stored in the `skills` field (each entry is a group).
+    src = raw.get("skill_groups")
+    if not isinstance(src, list):
+        src = raw.get("skills")
     skills = []
-    for s in _arr(raw.get("skills"))[:200]:
-        name = (s.get("name") if isinstance(s, dict) else str(s)) or ""
-        name = name.strip()
-        if not name or len(name) > 60:
+    for g in _arr(src)[:30]:
+        if isinstance(g, str):
+            name = g.strip()
+            if name:
+                skills.append({"name": name, "keywords": [], "years_label": None, "years_num": None, "basis": None, "source": "resume"})
             continue
-        o = s if isinstance(s, dict) else {}
-        prof = o.get("proficiency")
-        prof = max(1, min(5, int(prof))) if isinstance(prof, (int, float)) else None
-        yrs = o.get("years")
-        yrs = int(yrs) if isinstance(yrs, (int, float)) else None
-        skills.append({"name": name, "category": o.get("category"), "years": yrs,
-                       "proficiency": prof, "last_used": o.get("last_used"), "source": "resume"})
+        if not isinstance(g, dict):
+            continue
+        name = (g.get("name") or "").strip()
+        if not name or len(name) > 140:
+            continue
+        kws = [str(k).strip() for k in _arr(g.get("keywords")) if str(k).strip()][:20]
+        yn = g.get("years_num")
+        yn = round(float(yn), 1) if isinstance(yn, (int, float)) else None
+        skills.append({
+            "name": name,
+            "keywords": kws,
+            "years_label": ((g.get("years_label") or "").strip()[:30]) or None,
+            "years_num": yn,
+            "basis": ((g.get("basis") or "").strip()[:300]) or None,
+            "source": "resume",
+        })
 
     experience = []
     for e in _arr(raw.get("experience"))[:60]:

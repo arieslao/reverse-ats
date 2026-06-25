@@ -9,8 +9,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-// Inventory (structured skills & experience)
-export interface InvSkill { name: string; category: string | null; years: number | null; proficiency: number | null; last_used: string | null; source: string }
+// Inventory (skill GROUPS — name + keywords, years reasoned from dated history, basis)
+export interface InvSkill {
+  name: string
+  keywords: string[]
+  years_label: string | null
+  years_num: number | null
+  basis: string | null
+  source: string
+}
 export interface InvExperience { company: string; title: string; start: string | null; end: string | null; location: string | null; highlights: string[] }
 export interface Inventory {
   skills: InvSkill[]

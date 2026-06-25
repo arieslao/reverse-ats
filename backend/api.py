@@ -529,9 +529,11 @@ def _merge_inventory(existing: dict, new: dict) -> dict:
             by_skill[k] = dict(s)
         else:
             ex = by_skill[k]
-            ex["proficiency"] = max(ex.get("proficiency") or 0, s.get("proficiency") or 0) or None
-            ex["years"] = max(ex.get("years") or 0, s.get("years") or 0) or None
-            ex["category"] = ex.get("category") or s.get("category")
+            # Skill GROUP shape: union keywords, keep the larger year span + a basis.
+            ex["keywords"] = sorted(set((ex.get("keywords") or []) + (s.get("keywords") or [])))
+            ex["years_num"] = max(ex.get("years_num") or 0, s.get("years_num") or 0) or None
+            ex["years_label"] = ex.get("years_label") or s.get("years_label")
+            ex["basis"] = ex.get("basis") or s.get("basis")
             srcs = set(filter(None, [ex.get("source"), s.get("source")]))
             ex["source"] = "+".join(sorted(srcs)) if srcs else "resume"
 

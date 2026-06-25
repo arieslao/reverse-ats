@@ -437,7 +437,7 @@ function InventoryPanel() {
 
   const update = (i: number, patch: Partial<InvSkill>) => { setSkills((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x))); setDirty(true) }
   const remove = (i: number) => { setSkills((s) => s.filter((_, j) => j !== i)); setDirty(true) }
-  const add = () => { setSkills((s) => [...s, { name: '', category: null, years: null, proficiency: null, last_used: null, source: 'manual' }]); setDirty(true) }
+  const add = () => { setSkills((s) => [...s, { name: '', keywords: [], years_label: null, years_num: null, basis: null, source: 'manual' }]); setDirty(true) }
 
   const inputStyle: React.CSSProperties = { background: 'var(--color-bg, #1a1a1a)', border: '1px solid var(--color-border, #333)', borderRadius: 4, color: 'inherit', padding: '3px 6px', fontSize: 12 }
 
@@ -477,11 +477,11 @@ function InventoryPanel() {
 
       {err && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>{err}</div>}
 
-      {/* Editable skills */}
+      {/* Editable skill GROUPS — Skill/Group | Years | Basis */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Skills ({skills.length}) — proficiency 1–5, years</div>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Skill groups ({skills.length}) — years reasoned from your dated history</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={add} style={{ ...primaryBtnStyle, background: 'transparent', border: '1px solid var(--color-border, #444)', color: 'inherit', padding: '4px 10px' }}>+ Add skill</button>
+          <button onClick={add} style={{ ...primaryBtnStyle, background: 'transparent', border: '1px solid var(--color-border, #444)', color: 'inherit', padding: '4px 10px' }}>+ Add group</button>
           <button onClick={() => saveMut.mutate(skills)} disabled={!dirty || saveMut.isPending} style={{ ...primaryBtnStyle, padding: '4px 12px', opacity: dirty ? 1 : 0.5 }}>
             {saveMut.isPending ? 'Saving…' : dirty ? 'Save edits' : 'Saved'}
           </button>
@@ -490,15 +490,24 @@ function InventoryPanel() {
       {skills.length === 0 ? (
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>No skills yet — extract from your résumé or paste LinkedIn text above.</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 90px 1.4fr 24px', gap: 8, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
+            <div>Skill / Group</div><div>Years</div><div>Basis (from dated history)</div><div></div>
+          </div>
           {skills.map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--color-bg-elevated, #222)', border: '1px solid var(--color-border, #333)', borderRadius: 6, padding: '4px 6px' }}>
-              <input value={s.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="skill" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
-              <select value={s.proficiency ?? ''} onChange={(e) => update(i, { proficiency: e.target.value ? Number(e.target.value) : null })} style={inputStyle} title="Proficiency">
-                <option value="">–</option>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <input type="number" value={s.years ?? ''} onChange={(e) => update(i, { years: e.target.value ? Number(e.target.value) : null })} placeholder="yr" style={{ ...inputStyle, width: 38 }} title="Years" />
-              <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 14 }} title="Remove">×</button>
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 90px 1.4fr 24px', gap: 8, alignItems: 'start' }}>
+              <div>
+                <input value={s.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="Group name" style={{ ...inputStyle, width: '100%', fontWeight: 600 }} />
+                <input
+                  value={(s.keywords || []).join(', ')}
+                  onChange={(e) => update(i, { keywords: e.target.value.split(',').map((k) => k.trim()).filter(Boolean) })}
+                  placeholder="keywords: Python, SQL, …"
+                  style={{ ...inputStyle, width: '100%', marginTop: 3, fontSize: 11, color: 'var(--color-text-muted)' }}
+                />
+              </div>
+              <input value={s.years_label || ''} onChange={(e) => update(i, { years_label: e.target.value })} placeholder="~5 yrs" style={{ ...inputStyle, width: '100%' }} />
+              <textarea value={s.basis || ''} onChange={(e) => update(i, { basis: e.target.value })} placeholder="e.g. Kaiser 2017–2022" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical', fontSize: 11 }} />
+              <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 14, paddingTop: 4 }} title="Remove">×</button>
             </div>
           ))}
         </div>
