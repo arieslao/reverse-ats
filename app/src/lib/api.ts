@@ -9,6 +9,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+// Inventory (structured skills & experience)
+export interface InvSkill { name: string; category: string | null; years: number | null; proficiency: number | null; last_used: string | null; source: string }
+export interface InvExperience { company: string; title: string; start: string | null; end: string | null; location: string | null; highlights: string[] }
+export interface Inventory {
+  skills: InvSkill[]
+  experience: InvExperience[]
+  education: { school: string; degree: string | null; field: string | null }[]
+  certifications: { name: string; issuer: string | null }[]
+  summary: string | null
+  total_years_experience: number | null
+  sources: string[]
+  updated_at: string | null
+}
+export const fetchInventory = () => request<Inventory>('/api/inventory')
+export const extractInventory = () => request<Inventory>('/api/inventory/extract', { method: 'POST' })
+
 // Résumé upload — parse a PDF/DOCX/TXT server-side into the profile resume_text.
 export const uploadResume = async (file: File): Promise<{ resume_text: string; chars: number }> => {
   const fd = new FormData()

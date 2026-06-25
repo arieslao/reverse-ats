@@ -4,6 +4,8 @@ import {
   fetchProfile,
   updateProfile,
   uploadResume,
+  fetchInventory,
+  extractInventory,
   fetchCompanies,
   createCompany,
   updateCompany,
@@ -217,6 +219,10 @@ function ProfileTab() {
         />
       </Section>
 
+      {/* Structured skills & experience inventory — extracted from the résumé
+          on the local LLM. Powers gap matching + tailored docs. */}
+      <InventoryPanel />
+
       {/* AI role suggestions — uses the configured LLM to recommend
           target roles from the resume. User picks which to add. */}
       <SuggestRolesPanel
@@ -399,6 +405,69 @@ function ProfileTab() {
         {updateMut.isError && <span style={{ fontSize: 12, color: 'var(--color-danger)' }}>Save failed</span>}
       </div>
     </div>
+  )
+}
+
+// ─── Inventory Panel (lives in ProfileTab) ───────────────────────────────────
+
+function InventoryPanel() {
+  const qc = useQueryClient()
+  const { data: inv } = useQuery({ queryKey: ['inventory'], queryFn: fetchInventory })
+  const [err, setErr] = useState<string | null>(null)
+  const mut = useMutation({
+    mutationFn: extractInventory,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory'] }),
+    onError: (e: unknown) => setErr(e instanceof Error ? e.message : 'Extraction failed'),
+  })
+  const chip = (text: string, color: string) => (
+    <span key={text} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: color + '22', color, marginRight: 4, marginBottom: 4, display: 'inline-block' }}>{text}</span>
+  )
+  return (
+    <Section title="Skills & Experience Inventory">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+        <button
+          onClick={() => { setErr(null); mut.mutate() }}
+          disabled={mut.isPending}
+          style={primaryBtnStyle}
+        >
+          {mut.isPending ? 'Extracting on Qwen3.6… (~30–60s)' : '✨ Extract from résumé'}
+        </button>
+        {inv?.updated_at && (
+          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            {inv.skills.length} skills · {inv.experience.length} roles · updated {new Date(inv.updated_at).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+      {err && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>{err}</div>}
+      {inv && inv.skills.length > 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {inv.summary && <p style={{ fontSize: 13, color: 'var(--color-text-secondary, #aaa)', margin: 0 }}>{inv.summary}</p>}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>Skills ({inv.skills.length})</div>
+            <div>{inv.skills.map((s) => chip(s.proficiency ? `${s.name} ·${s.proficiency}` : s.name, '#22c55e'))}</div>
+          </div>
+          {inv.experience.length > 0 && (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>Experience</div>
+              {inv.experience.map((e, i) => (
+                <div key={i} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}{e.company ? ` · ${e.company}` : ''} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 11 }}>{[e.start, e.end || 'Present'].filter(Boolean).join(' – ')}</span></div>
+                  {e.highlights?.length > 0 && (
+                    <ul style={{ margin: '2px 0 0', paddingLeft: 18, fontSize: 12, color: 'var(--color-text-secondary, #aaa)' }}>
+                      {e.highlights.slice(0, 4).map((h, j) => <li key={j}>{h}</li>)}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
+          No inventory yet — upload/paste your résumé above, then click <strong>Extract from résumé</strong>.
+        </p>
+      )}
+    </Section>
   )
 }
 
