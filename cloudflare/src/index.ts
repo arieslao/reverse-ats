@@ -420,7 +420,8 @@ async function handleHealth(env: Env): Promise<Response> {
       .prepare(
         `SELECT COUNT(*) AS n FROM jobs j
            LEFT JOIN jobs_structured s ON s.job_id = j.id
-          WHERE j.expired = 0 AND s.job_id IS NULL`,
+          WHERE j.expired = 0 AND s.job_id IS NULL
+            AND COALESCE(NULLIF(j.description_full, ''), NULLIF(j.description_snippet, '')) IS NOT NULL`,
       )
       .first<{ n: number }>(),
     env.DB.prepare(`SELECT COUNT(*) AS n FROM jobs_embeddings`).first<{ n: number }>(),
@@ -453,6 +454,10 @@ async function preprocessPending(env: Env): Promise<void> {
        LEFT JOIN jobs_structured s ON s.job_id = j.id
       WHERE j.expired = 0
         AND (s.job_id IS NULL OR s.preprocess_error IS NOT NULL)
+        -- Skip jobs with no description text (mostly Workday, which the scraper
+        -- captures title-only). They can't be structured/matched and otherwise
+        -- clog the queue, getting re-pulled every run and never succeeding.
+        AND COALESCE(NULLIF(j.description_full, ''), NULLIF(j.description_snippet, '')) IS NOT NULL
       ORDER BY j.first_seen_at DESC
       LIMIT ?`,
   )
@@ -596,6 +601,10 @@ async function handlePreprocessPending(request: Request, env: Env): Promise<Resp
        LEFT JOIN jobs_structured s ON s.job_id = j.id
       WHERE j.expired = 0
         AND (s.job_id IS NULL OR s.preprocess_error IS NOT NULL)
+        -- Skip jobs with no description text (mostly Workday, which the scraper
+        -- captures title-only). They can't be structured/matched and otherwise
+        -- clog the queue, getting re-pulled every run and never succeeding.
+        AND COALESCE(NULLIF(j.description_full, ''), NULLIF(j.description_snippet, '')) IS NOT NULL
       ORDER BY j.first_seen_at DESC
       LIMIT ?`,
   )
