@@ -646,8 +646,8 @@ Output ONLY valid JSON in this exact shape:
 
 Rules:
 - GROUP, don't list flat. Each group's keywords are the specific matchable skills/tools (e.g. "Python","TypeScript","React").
-- years_num MUST come from the DATED history span of the roles using that group — be honest: newly-learned areas are <1 yr even if impressive.
-- basis MUST cite real roles/dates from the history (e.g. "Aries Labs 8/2025–present; self-taught"). Never invent.
+- YEARS: if the source EXPLICITLY states years for a skill (e.g. "Project Management — 20 years", or a skills table with a Years column), USE that number for years_num and set basis to "Stated by candidate". Otherwise reason years_num from the DATED history span of the roles using that group — be honest: newly-learned areas are <1 yr even if impressive.
+- basis: cite the real source — stated years, or specific roles/dates (e.g. "Aries Labs 8/2025–present"). Never invent.
 - Order groups from most years to least.
 - Do NOT invent skills, roles, dates, or metrics. Output JSON only — no prose, no markdown fences."""
 
