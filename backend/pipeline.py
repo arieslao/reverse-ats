@@ -340,6 +340,27 @@ def _score_jobs(conn, jobs: list[dict], profile: dict, llm_settings: dict) -> in
     musts = _json_load(profile.get("must_have_skills")) if profile else None
     nices = _json_load(profile.get("nice_to_have_skills")) if profile else None
 
+    # Years-weighted skill profile from the inventory — so scoring PRIORITIZES the
+    # skills the candidate has the MOST experience in (their strongest areas).
+    try:
+        from db import get_inventory
+        inv = get_inventory(conn)
+    except Exception:
+        inv = None
+    if inv and inv.get("skills"):
+        groups = sorted(inv["skills"], key=lambda g: (g.get("years_num") or 0), reverse=True)
+        lines, inv_keywords = [], []
+        for g in groups:
+            yl = g.get("years_label") or (f"{g.get('years_num')} yrs" if g.get("years_num") else "")
+            kws = ", ".join(g.get("keywords") or [])
+            lines.append(f"- {g.get('name')} ({yl}): {kws}")
+            inv_keywords.extend(g.get("keywords") or [])
+        depth = ("CANDIDATE SKILL DEPTH — strongest first, by years of experience. "
+                 "Weight the top (most-years) areas most when judging fit:\n" + "\n".join(lines))
+        resume = (depth + "\n\n" + (resume or "")).strip()
+        if inv_keywords:
+            musts = inv_keywords[:40]  # the strongest-skill keywords drive the match
+
     scored = 0
     total = len(jobs)
 

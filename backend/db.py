@@ -1148,6 +1148,9 @@ def get_inventory(conn: sqlite3.Connection) -> dict:
         except (json.JSONDecodeError, TypeError):
             d[f] = []
     d.pop("id", None)
+    # Always present skill groups strongest-first (most years of experience).
+    if isinstance(d.get("skills"), list):
+        d["skills"] = sorted(d["skills"], key=lambda g: (g.get("years_num") or 0) if isinstance(g, dict) else 0, reverse=True)
     return d
 
 

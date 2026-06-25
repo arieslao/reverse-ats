@@ -260,6 +260,23 @@ export function Feed() {
         />
       )}
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <button
+          onClick={() => setFilters((f) => ({ ...f, min_score: f.min_score >= 90 ? 0 : 90, sort_by: 'score' }))}
+          style={{
+            fontSize: 13, fontWeight: 600, padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
+            border: '1px solid', borderColor: filters.min_score >= 90 ? 'var(--color-accent)' : 'var(--color-border-muted)',
+            background: filters.min_score >= 90 ? 'rgba(34,197,94,0.15)' : 'transparent',
+            color: filters.min_score >= 90 ? '#22c55e' : 'var(--color-text-secondary)',
+          }}
+        >
+          {filters.min_score >= 90 ? '✓ Showing ≥90% matches only' : 'Show ≥90% matches only'}
+        </button>
+        <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+          ranked by fit to your strongest (most-years) skills
+        </span>
+      </div>
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {jobs.map((job) => (
           <JobCard key={job.id} job={job} />

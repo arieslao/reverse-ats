@@ -100,14 +100,20 @@ The scorer will use keyword matching only until a resume is provided.
 
 SYSTEM_PROMPT = (
     "You are a job-fit evaluator. Score how well this job matches the candidate profile.\n\n"
+    "IMPORTANT — weight by EXPERIENCE DEPTH: the candidate profile lists their skill "
+    "areas strongest-first with years of experience. A job whose core requirements fall "
+    "in the candidate's HIGH-YEARS areas should score high; a job that mainly needs "
+    "skills the candidate has few years in scores lower even if they technically have it. "
+    "Reserve 90-100 for jobs the candidate is genuinely well-qualified for on their "
+    "strongest skills — those are the only ones worth applying to.\n\n"
     "Return ONLY valid JSON with this exact structure:\n"
     '{"score": <0-100>, "reasoning": "<2-3 sentence explanation>", '
     '"match_highlights": ["<strength1>", "<strength2>"], "concerns": ["<concern1>"]}\n\n'
     "Scoring guide:\n"
-    "- 90-100: Perfect match — role, skills, seniority, and domain all align\n"
-    "- 70-89: Strong match — most criteria align, minor gaps\n"
-    "- 50-69: Moderate match — good skill overlap but some seniority/domain mismatch\n"
-    "- 30-49: Weak match — partial skill overlap, different domain or level\n"
+    "- 90-100: Excellent match — core requirements align with the candidate's STRONGEST (most-years) skills\n"
+    "- 70-89: Strong match — most criteria align, minor gaps, or relies on mid-depth skills\n"
+    "- 50-69: Moderate match — good overlap but on weaker/newer skills or some seniority/domain mismatch\n"
+    "- 30-49: Weak match — partial overlap, different domain or level\n"
     "- 0-29: Poor match — wrong field, wrong level, or missing critical skills"
 )
 
