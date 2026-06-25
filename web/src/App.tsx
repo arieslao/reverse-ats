@@ -15,6 +15,7 @@ const MfaSetup = lazy(() => import('./pages/auth/MfaSetup'));
 const AppIndex = lazy(() => import('./pages/app/Index'));
 const ProfilePage = lazy(() => import('./pages/app/Profile'));
 const InventoryPage = lazy(() => import('./pages/app/Inventory'));
+const MatchesPage = lazy(() => import('./pages/app/Matches'));
 const FeedPage = lazy(() => import('./pages/app/Feed'));
 const PipelinePage = lazy(() => import('./pages/app/Pipeline'));
 const AnalyticsPage = lazy(() => import('./pages/app/Analytics'));
@@ -44,6 +45,7 @@ export function App() {
             <Route path="/app" element={<AppIndex />} />
             <Route path="/app/profile" element={<ProfilePage />} />
             <Route path="/app/inventory" element={<InventoryPage />} />
+            <Route path="/app/matches" element={<MatchesPage />} />
             <Route path="/app/feed" element={<FeedPage />} />
             <Route path="/app/pipeline" element={<PipelinePage />} />
             <Route path="/app/analytics" element={<AnalyticsPage />} />

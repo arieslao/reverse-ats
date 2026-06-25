@@ -84,6 +84,21 @@ export async function fetchTier(env: Env, userId: string): Promise<AuthedUser["t
   return "free";
 }
 
+// Look up a user's email from the Supabase profiles table (service-role).
+// Used by the daily digest to address the email. Returns null if unknown.
+export async function fetchEmail(env: Env, userId: string): Promise<string | null> {
+  const url = `${env.SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(userId)}&select=email`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    },
+  });
+  if (!res.ok) return null;
+  const rows = (await res.json()) as Array<{ email: string | null }>;
+  return rows[0]?.email ?? null;
+}
+
 /**
  * Verify identity AND require a minimum tier. Returns the AuthedUser on
  * success, or a 401/403 Response that the caller should return as-is.
