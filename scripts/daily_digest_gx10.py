@@ -15,11 +15,13 @@ Why GX10 and not the Worker: $0 (no Workers-AI neuron cap or cost), native
 python-docx (no Worker-runtime limits), résumé/personal data never leaves the
 box, and no dependency on a Cloudflare model that can be deprecated under us.
 
+Email goes out via the Worker's POST /digest/send relay (the Worker holds the
+Resend key), so NO email secret has to live on GX10.
+
 Required env
 ------------
   CF_BASE_URL       e.g. https://reverse-ats-ingest.aries-lao.workers.dev
   CF_INGEST_SECRET  same value as the Worker INGEST_SECRET
-  RESEND_API_KEY    Resend key (same one the Worker used)
 
 Optional env
 ------------
@@ -27,15 +29,14 @@ Optional env
   LLM_MODEL             default qwen3.6-35b
   DOC_THRESHOLD         min fit_score to generate+attach docs (default 90)
   MAX_DOCS_PER_USER     safety cap on doc generations per user (default 25)
-  FROM_EMAIL            default "Reverse ATS <reverse-ats@arieslabs.ai>"
   CANDIDATE_NAME        name for the résumé header (default = email local-part)
   CANDIDATE_CONTACT     contact line under the name (phone · location · links)
   REVERSE_ATS_LOG_LEVEL default INFO
 
 Cron (deploy via safe-crontab — see CLAUDE.md):
-  30 14 * * * cd /mnt/crucial-x10/projects/reverse-ats && CF_BASE_URL=… \
-    CF_INGEST_SECRET=… RESEND_API_KEY=… CANDIDATE_NAME="Aries Lao, MBA" \
-    .venv/bin/python scripts/daily_digest_gx10.py \
+  30 7 * * * TZ=America/Los_Angeles cd /mnt/crucial-x10/projects/reverse-ats && \
+    CF_BASE_URL=… CF_INGEST_SECRET=… CANDIDATE_NAME="Aries Lao, MBA" \
+    $HOME/bin/sentinel-track reverse-ats-digest .venv/bin/python scripts/daily_digest_gx10.py \
     >> /mnt/crucial-x10/projects/reverse-ats/logs/daily_digest.log 2>&1
 """
 
@@ -259,23 +260,18 @@ def _slug(s: str) -> str:
 
 # ── email (Resend with attachments) ───────────────────────────────────────────
 
-def _send_email(resend_key: str, from_email: str, to: str, subject: str, html: str, attachments: list[dict]) -> bool:
-    payload = {"from": from_email, "to": [to], "subject": subject, "html": html}
-    if attachments:
-        payload["attachments"] = attachments
-    req = urlrequest.Request(
-        "https://api.resend.com/emails", data=json.dumps(payload).encode(), method="POST"
-    )
-    req.add_header("Authorization", f"Bearer {resend_key}")
-    req.add_header("Content-Type", "application/json")
+def _send_email(base: str, secret: str, to: str, subject: str, html: str, attachments: list[dict]) -> bool:
+    # Relay through the Worker (POST /digest/send) so the Resend key never has to
+    # live on GX10 — the Worker holds it. The résumé is still generated locally.
+    payload = {"to": to, "subject": subject, "html": html, "attachments": attachments}
     try:
-        with urlrequest.urlopen(req, timeout=30) as resp:
-            return 200 <= resp.status < 300
+        _http_json("POST", f"{base}/digest/send", secret, payload, timeout=60)
+        return True
     except HTTPError as e:
-        log.error("resend failed: %s %s", e.code, e.read().decode()[:200])
+        log.error("digest/send failed: %s %s", e.code, e.read().decode()[:200])
         return False
     except URLError as e:
-        log.error("resend error: %s", e)
+        log.error("digest/send error: %s", e)
         return False
 
 
@@ -327,12 +323,10 @@ def _build_html(date: str, matches: list[dict], doc_job_ids: set[str]) -> str:
 def main() -> int:
     base = _env("CF_BASE_URL", required=True).rstrip("/")
     secret = _env("CF_INGEST_SECRET", required=True)
-    resend_key = _env("RESEND_API_KEY", required=True)
     llm_base = _env("LLM_BASE_URL", "http://localhost:8093/v1")
     model = _env("LLM_MODEL", "qwen3.6-35b")
     threshold = int(_env("DOC_THRESHOLD", "90"))
     max_docs = int(_env("MAX_DOCS_PER_USER", "25"))
-    from_email = _env("FROM_EMAIL", "Reverse ATS <reverse-ats@arieslabs.ai>")
 
     try:
         batch = _http_json("GET", f"{base}/digest/batch", secret)
@@ -404,7 +398,7 @@ def main() -> int:
 
         html = _build_html(date, matches, doc_job_ids)
         subject = f"{len(matches)} job matches for you — {date}"
-        ok = _send_email(resend_key, from_email, email, subject, html, attachments)
+        ok = _send_email(base, secret, email, subject, html, attachments)
         log.info("user %s: emailed=%s, %d attachments", email, ok, len(attachments))
 
     return 0
