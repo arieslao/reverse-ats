@@ -20,25 +20,18 @@ import type {
   PreprocessPendingJob,
   PreprocessResult,
 } from "./schema";
-import { preprocessJob, PREPROCESS_MODEL } from "./preprocess";
-import { embedStructuredJob, packVector, EMBEDDING_MODEL } from "./embed";
+import { embedStructuredJob, packVector } from "./embed";
 import { handleAdmin } from "./admin";
 import { handleProfile } from "./profile";
-import { handleInventory } from "./inventory";
-import { handleMatches, runDailyDigest, handleDigestBatch, handleDigestSend } from "./digest";
+import { handleInventory, handleInventorySeed } from "./inventory";
+import { handleMatches, handleDigestBatch, handleDigestSend, handleDigestCompute } from "./digest";
 import { handleFeedAndPipeline } from "./feed";
 
 // Cron expression (must match wrangler.toml) that fires the once-a-day match
-// digest. All other ticks run the reaper + preprocess trickle.
-const DAILY_DIGEST_CRON = "0 14 * * *"; // 14:00 UTC ≈ 6-7am PT
-
-// How many jobs the scheduled handler preprocesses per 30-min cron tick.
-// The LLM structured-extraction step is the Workers-AI free-tier neuron
-// bottleneck (~10K neurons/day), so the bulk backlog is drained off-box by
-// the GX10 lane (scripts/preprocess_backlog_gx10.py -> /preprocess/*) using a
-// free local LLM. This in-Worker pass is now a small fallback trickle for new
-// jobs that arrive between GX10 runs — keep it low so it never blows the quota.
-const PREPROCESS_BATCH_SIZE = 15;
+// All other ticks run the reaper only — preprocessing is fully off-box on GX10
+// (scripts/preprocess_backlog_gx10.py -> /preprocess/*) so the Worker spends
+// zero neurons on it, and the daily digest is GX10-driven (it triggers
+// /digest/compute), so there's no in-Worker digest cron either.
 
 // A job that hasn't been re-seen by any scrape lane in this many days is
 // treated as delisted (filled / closed / board removed) and flipped to
@@ -68,9 +61,16 @@ const handler: ExportedHandler<Env> = {
     if (request.method === "POST" && url.pathname === "/preprocess/results") {
       return handlePreprocessResults(request, env);
     }
+    // Server-to-server inventory seed (GX10/operator → bypasses Workers AI).
+    if (request.method === "POST" && url.pathname === "/inventory/seed") {
+      return withCors(await handleInventorySeed(request, env), origin);
+    }
     // GX10 daily-digest lane pulls the day's matches + inventory here.
     if (request.method === "GET" && url.pathname === "/digest/batch") {
       return withCors(await handleDigestBatch(request, env), origin);
+    }
+    if (request.method === "POST" && url.pathname === "/digest/compute") {
+      return withCors(await handleDigestCompute(request, env), origin);
     }
     // GX10 posts the finished digest email here; Worker relays it via Resend.
     if (request.method === "POST" && url.pathname === "/digest/send") {
@@ -105,18 +105,14 @@ const handler: ExportedHandler<Env> = {
 
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // Don't await — Workers will keep the runtime alive via ctx.waitUntil.
-    if (controller.cron === DAILY_DIGEST_CRON) {
-      // Once-a-day branch: compute + email each user's top job matches.
-      ctx.waitUntil(runDailyDigest(env));
-      return;
-    }
-    // Every other tick: reap stale jobs (cheap UPDATE), then trickle-preprocess.
-    ctx.waitUntil(
-      (async () => {
-        await expireStaleJobs(env);
-        await preprocessPending(env);
-      })(),
-    );
+    // The daily digest is now driven entirely by GX10 (it triggers
+    // /digest/compute, then generates docs + emails on the local model), so the
+    // Worker's only scheduled job is the stale-job reaper.
+    // Every tick: reap stale jobs (cheap UPDATE). Preprocessing now runs
+    // entirely on GX10's free local model (scripts/preprocess_backlog_gx10.py),
+    // so we no longer spend Workers-AI neurons on the in-Worker trickle — that
+    // budget is reserved for the small on-demand calls until they move to GX10.
+    ctx.waitUntil(expireStaleJobs(env));
   },
 };
 
@@ -208,9 +204,7 @@ async function handleIngest(request: Request, env: Env, ctx: ExecutionContext): 
     }
   }
 
-  // Kick off async preprocessing in the background — don't block the ingest response.
-  ctx.waitUntil(preprocessPending(env));
-
+  // Preprocessing runs on GX10 (free local model) via /preprocess/*, not here.
   const response: IngestResponse = {
     ok: true,
     ingest_run_id: ingestRunId,
@@ -446,60 +440,6 @@ async function handleHealth(env: Env): Promise<Response> {
     last_ingest_jobs: lastIngest?.jobs_new ?? null,
   };
   return jsonResponse(response, 200);
-}
-
-// ─── Scheduled: preprocess pending jobs ─────────────────────────────────────
-
-async function preprocessPending(env: Env): Promise<void> {
-  // Find jobs that haven't been preprocessed yet (or had an error worth retrying).
-  const pending = await env.DB.prepare(
-    `SELECT j.id, j.title, j.company, j.description_full, j.description_snippet
-       FROM jobs j
-       LEFT JOIN jobs_structured s ON s.job_id = j.id
-      WHERE j.expired = 0
-        AND (s.job_id IS NULL OR s.preprocess_error IS NOT NULL)
-        -- Skip jobs with no description text (mostly Workday, which the scraper
-        -- captures title-only). They can't be structured/matched and otherwise
-        -- clog the queue, getting re-pulled every run and never succeeding.
-        AND COALESCE(NULLIF(j.description_full, ''), NULLIF(j.description_snippet, '')) IS NOT NULL
-      ORDER BY j.first_seen_at DESC
-      LIMIT ?`,
-  )
-    .bind(PREPROCESS_BATCH_SIZE)
-    .all();
-
-  const jobs = pending.results || [];
-  if (jobs.length === 0) return;
-
-  let okCount = 0;
-  for (const j of jobs as Array<{
-    id: string;
-    title: string;
-    company: string;
-    description_full: string | null;
-    description_snippet: string | null;
-  }>) {
-    const { structured, error, model } = await preprocessJob(env.AI, j);
-    if (structured) {
-      await storeStructuredAndEmbed(env, { id: j.id, title: j.title, company: j.company }, structured, model);
-      okCount++;
-    } else {
-      await storePreprocessError(env, j.id, model, error || "unknown");
-    }
-  }
-
-  // Update the latest ingest_run row with the preprocess count, for visibility.
-  await env.DB.prepare(
-    `UPDATE ingest_runs
-       SET jobs_preprocessed = COALESCE(jobs_preprocessed, 0) + ?
-     WHERE id = (SELECT MAX(id) FROM ingest_runs)`,
-  )
-    .bind(okCount)
-    .run();
-
-  console.log(
-    `preprocess batch: ${okCount}/${jobs.length} ok (model: ${PREPROCESS_MODEL}, embed: ${EMBEDDING_MODEL})`,
-  );
 }
 
 // ─── Stale-job reaper ───────────────────────────────────────────────────────

@@ -328,6 +328,14 @@ def main() -> int:
     threshold = int(_env("DOC_THRESHOLD", "90"))
     max_docs = int(_env("MAX_DOCS_PER_USER", "25"))
 
+    # GX10 drives the whole run: first trigger the (free, deterministic, no-AI)
+    # match computation in the Worker, then pull the results to generate docs +
+    # email locally. All AI work happens here on the local model.
+    try:
+        _http_json("POST", f"{base}/digest/compute", secret, {}, timeout=120)
+    except (HTTPError, URLError) as e:
+        log.warning("compute trigger failed (will use whatever matches exist): %s", e)
+
     try:
         batch = _http_json("GET", f"{base}/digest/batch", secret)
     except (HTTPError, URLError) as e:

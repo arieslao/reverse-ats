@@ -149,6 +149,18 @@ async function digestForUser(env: Env, userId: string, today: string): Promise<v
 // day's stored matches with job text + required skills. Bearer INGEST_SECRET
 // (same secret the scrape/preprocess lanes already use). Read-only.
 
+// POST /digest/compute — recompute matches for all users now (bearer
+// INGEST_SECRET). Lets an operator/cron trigger the match computation off the
+// fixed daily schedule (e.g. right after an inventory is seeded).
+export async function handleDigestCompute(request: Request, env: Env): Promise<Response> {
+  const auth = request.headers.get("authorization") || "";
+  if (!env.INGEST_SECRET || auth !== `Bearer ${env.INGEST_SECRET}`) {
+    return json({ ok: false, error: "unauthorized" }, 401);
+  }
+  await runDailyDigest(env);
+  return json({ ok: true }, 200);
+}
+
 export async function handleDigestBatch(request: Request, env: Env): Promise<Response> {
   const auth = request.headers.get("authorization") || "";
   if (!env.INGEST_SECRET || auth !== `Bearer ${env.INGEST_SECRET}`) {
