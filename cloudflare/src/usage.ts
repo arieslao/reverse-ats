@@ -15,6 +15,8 @@ export const LIMITS: Record<string, Record<AuthedUser["tier"], number>> = {
   // LLM extraction of the skills/experience inventory from resume or pasted
   // LinkedIn text. Deterministic LinkedIn-export import is NOT gated.
   extract_inventory: { free: 5, sponsor: 30, admin: 100 },
+  // Job-tailored résumé generation (DOCX). Same shape as cover letters.
+  tailored_resume: { free: 2, sponsor: 30, admin: 100 },
 };
 
 // Lifetime caps (no reset). -1 = unlimited.

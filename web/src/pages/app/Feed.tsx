@@ -7,6 +7,7 @@ import {
   fetchFeedIndustries,
   fetchJobs,
   generateCoverLetter,
+  generateTailoredResume,
   rescoreJobs,
   saveJob,
   type CoverLetterStyle,
@@ -14,8 +15,10 @@ import {
   type Job,
   type JobsQuery,
   type MatchBreakdown,
+  type TailoredResume,
   type UsageState,
 } from '../../lib/api';
+import { downloadCoverLetterDocx, downloadResumeDocx } from '../../lib/docx';
 
 const PAGE_SIZE = 20;
 const COVER_LETTER_STYLE_KEY = 'cover-letter-style';
@@ -100,6 +103,16 @@ export default function FeedPage() {
     style: CoverLetterStyle;
     loading: boolean;
     usage?: UsageState;
+    capped?: boolean;
+  } | null>(null);
+  const [tailored, setTailored] = useState<{
+    jobId: string;
+    loading: boolean;
+    resume?: TailoredResume;
+    jobTitle?: string;
+    company?: string;
+    usage?: UsageState;
+    error?: string;
     capped?: boolean;
   } | null>(null);
   const [coverLetterStyle, setCoverLetterStyle] = useState<CoverLetterStyle>(loadInitialStyle);
@@ -189,6 +202,25 @@ export default function FeedPage() {
         usage: err.usage,
         capped: err.status === 429,
       });
+    }
+  };
+
+  const onTailorResume = async (jobId: string) => {
+    const job = jobs.find((j) => j.id === jobId);
+    setTailored({ jobId, loading: true, jobTitle: job?.title, company: job?.company });
+    try {
+      const r = await generateTailoredResume(jobId);
+      setTailored({
+        jobId,
+        loading: false,
+        resume: r.resume,
+        jobTitle: r.job.title || job?.title,
+        company: r.job.company || job?.company,
+        usage: r.usage,
+      });
+    } catch (e) {
+      const err = e as Error & { status?: number };
+      setTailored({ jobId, loading: false, error: err.message || 'Failed', capped: err.status === 429 });
     }
   };
 
@@ -343,6 +375,7 @@ export default function FeedPage() {
                 onDismiss={() => onDismiss(job.id)}
                 onSave={() => onSave(job.id)}
                 onCoverLetter={() => onCoverLetter(job.id)}
+                onTailorResume={() => onTailorResume(job.id)}
               />
             ))}
           </div>
@@ -376,6 +409,17 @@ export default function FeedPage() {
           onClose={() => setCoverLetter(null)}
           onRegenerate={(style) => onCoverLetter(coverLetter.jobId, style)}
           jobTitle={jobs.find((j) => j.id === coverLetter.jobId)?.title}
+          company={jobs.find((j) => j.id === coverLetter.jobId)?.company}
+          contact={user?.email ?? undefined}
+        />
+      )}
+
+      {tailored && (
+        <TailoredResumeModal
+          state={tailored}
+          onClose={() => setTailored(null)}
+          onRegenerate={() => onTailorResume(tailored.jobId)}
+          contact={user?.email ?? undefined}
         />
       )}
     </div>
@@ -388,12 +432,14 @@ function JobCard({
   onDismiss,
   onSave,
   onCoverLetter,
+  onTailorResume,
 }: {
   job: Job;
   busy: boolean;
   onDismiss: () => void;
   onSave: () => void;
   onCoverLetter: () => void;
+  onTailorResume: () => void;
 }) {
   const score = job.llm_score;
   return (
@@ -493,6 +539,9 @@ function JobCard({
           <button onClick={onCoverLetter} disabled={busy} className="text-xs px-3 h-7 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] disabled:opacity-50 cursor-pointer">
             Cover letter
           </button>
+          <button onClick={onTailorResume} disabled={busy} className="text-xs px-3 h-7 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] disabled:opacity-50 cursor-pointer">
+            Tailor résumé
+          </button>
           <button onClick={onDismiss} disabled={busy} className="text-xs px-3 h-7 rounded-md text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] cursor-pointer">
             Hide
           </button>
@@ -550,14 +599,21 @@ function CoverLetterModal({
   onClose,
   onRegenerate,
   jobTitle,
+  company,
+  contact,
 }: {
   state: { jobId: string; text: string; style: CoverLetterStyle; loading: boolean; usage?: UsageState; capped?: boolean };
   onClose: () => void;
   onRegenerate: (style: CoverLetterStyle) => void;
   jobTitle?: string;
+  company?: string;
+  contact?: string;
 }) {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(state.text).catch(() => {});
+  };
+  const downloadDocx = () => {
+    downloadCoverLetterDocx(state.text, { contact, jobTitle, company });
   };
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
@@ -577,9 +633,14 @@ function CoverLetterModal({
               </span>
             )}
             {!state.loading && state.text && !state.capped && (
-              <button onClick={copyToClipboard} className="text-xs px-3 h-8 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] cursor-pointer">
-                Copy
-              </button>
+              <>
+                <button onClick={copyToClipboard} className="text-xs px-3 h-8 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] cursor-pointer">
+                  Copy
+                </button>
+                <button onClick={downloadDocx} className="text-xs px-3 h-8 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] cursor-pointer">
+                  Download .docx
+                </button>
+              </>
             )}
             <button onClick={onClose} className="text-xs px-3 h-8 rounded-md hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] cursor-pointer">
               Close
@@ -628,6 +689,103 @@ function CoverLetterModal({
           ) : (
             <pre className="text-sm whitespace-pre-wrap font-sans">{state.text}</pre>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TailoredResumeModal({
+  state,
+  onClose,
+  onRegenerate,
+  contact,
+}: {
+  state: {
+    jobId: string;
+    loading: boolean;
+    resume?: TailoredResume;
+    jobTitle?: string;
+    company?: string;
+    usage?: UsageState;
+    error?: string;
+    capped?: boolean;
+  };
+  onClose: () => void;
+  onRegenerate: () => void;
+  contact?: string;
+}) {
+  const r = state.resume;
+  const download = () => {
+    if (r) downloadResumeDocx(r, { contact, jobTitle: state.jobTitle, company: state.company });
+  };
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg max-w-2xl w-full max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border-subtle)]">
+          <div>
+            <div className="text-sm font-medium">Tailored résumé</div>
+            {state.jobTitle && (
+              <div className="text-xs text-[var(--color-text-secondary)]">{state.jobTitle}{state.company ? ` · ${state.company}` : ''}</div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {state.usage && (
+              <span className="text-xs text-[var(--color-text-tertiary)]">{state.usage.remaining}/{state.usage.limit} left today</span>
+            )}
+            {r && !state.loading && (
+              <>
+                <button onClick={onRegenerate} className="text-xs px-3 h-8 rounded-md border border-[var(--color-border-muted)] hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] cursor-pointer">
+                  Regenerate
+                </button>
+                <button onClick={download} className="text-xs px-3 h-8 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] cursor-pointer">
+                  Download .docx
+                </button>
+              </>
+            )}
+            <button onClick={onClose} className="text-xs px-3 h-8 rounded-md hover:bg-[var(--color-bg-tinted,rgba(120,120,120,0.08))] cursor-pointer">Close</button>
+          </div>
+        </div>
+        <div className="p-5 overflow-y-auto flex-1">
+          {state.loading ? (
+            <p className="text-sm text-[var(--color-text-secondary)]">Tailoring your résumé to this job… (~15–25s)</p>
+          ) : state.capped ? (
+            <div className="space-y-3">
+              <p className="text-sm">{state.error}</p>
+              <a href="/#pricing" className="inline-block text-xs px-3 h-8 leading-8 rounded-md bg-[var(--color-accent)] text-[var(--color-accent-fg,white)] hover:bg-[var(--color-accent-hover)] cursor-pointer">Upgrade to Sponsor</a>
+            </div>
+          ) : state.error ? (
+            <p className="text-sm text-[var(--color-danger,#dc2626)]">{state.error}</p>
+          ) : r ? (
+            <div className="text-sm space-y-4">
+              {r.headline && <p className="text-base font-semibold">{r.headline}</p>}
+              {r.summary && <p className="text-[var(--color-text-secondary)]">{r.summary}</p>}
+              {r.skills?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)] mb-1">Skills</p>
+                  <p className="text-[var(--color-text-secondary)]">{r.skills.join(' · ')}</p>
+                </div>
+              )}
+              {r.experience?.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-tertiary)] mb-1">Experience</p>
+                  <div className="space-y-3">
+                    {r.experience.map((e, i) => (
+                      <div key={i}>
+                        <p className="font-medium">{e.title}{e.company ? ` — ${e.company}` : ''}{e.dates ? ` (${e.dates})` : ''}</p>
+                        <ul className="list-disc list-inside text-[var(--color-text-secondary)] mt-0.5 space-y-0.5">
+                          {(e.bullets || []).map((b, j) => <li key={j}>{b}</li>)}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-xs text-[var(--color-text-tertiary)] pt-2">
+                Generated from your inventory, emphasizing this job's requirements. Review before sending — the .docx is fully editable.
+              </p>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
