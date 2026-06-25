@@ -643,22 +643,24 @@ def scrape_status():
         conn.close()
 
 
+RFJ_SCRIPT = Path(__file__).parent.parent / "scripts" / "rfj_to_local_sqlite.py"
+
+
 @app.post("/api/scrape/trigger")
 def trigger_scrape():
-    """Manually trigger a scrape run (runs pipeline.py as subprocess)."""
-    if not PIPELINE_SCRIPT.exists():
-        raise HTTPException(
-            status_code=500,
-            detail=f"pipeline.py not found at {PIPELINE_SCRIPT}",
-        )
+    """Refresh jobs from the curated Remote First Jobs source into local SQLite.
+    (NOT the old Greenhouse/Ashby/Workday COMPANIES scrape — those sources are
+    intentionally not used on this private instance.)"""
+    if not RFJ_SCRIPT.exists():
+        raise HTTPException(status_code=500, detail=f"RFJ loader not found at {RFJ_SCRIPT}")
+    # Inherits this process's env, including REVERSE_ATS_DB_PATH → same local DB.
     subprocess.Popen(
-        [sys.executable, str(PIPELINE_SCRIPT)],
+        [sys.executable, str(RFJ_SCRIPT)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        # Detach from parent process group so it survives if the request dies
         start_new_session=True,
     )
-    return {"status": "started", "script": str(PIPELINE_SCRIPT)}
+    return {"status": "started", "source": "remotefirstjobs"}
 
 
 @app.get("/api/scoring/stats")
