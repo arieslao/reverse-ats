@@ -23,6 +23,7 @@ keyword_only      — No LLM; pure keyword matching (free fallback)
 
 import json
 import logging
+import re
 import requests
 from typing import Optional
 
