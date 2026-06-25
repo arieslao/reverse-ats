@@ -109,6 +109,54 @@ async function getInventory(env: Env, userId: string): Promise<Response> {
   return jsonResponse({ ok: true, inventory: inv }, 200);
 }
 
+// ─── POST /inventory/seed (server-to-server, bearer INGEST_SECRET) ───────────
+//
+// Lets the GX10 lane (or an operator) write a user's inventory directly —
+// extracted on the free local model — without touching Workers AI. Resolves the
+// account by email via the Supabase service-role, then upserts user_inventory.
+export async function handleInventorySeed(request: Request, env: Env): Promise<Response> {
+  const auth = request.headers.get("authorization") || "";
+  if (!env.INGEST_SECRET || auth !== `Bearer ${env.INGEST_SECRET}`) {
+    return jsonResponse({ ok: false, error: "unauthorized" }, 401);
+  }
+  let body: { email?: string; inventory?: any };
+  try {
+    body = (await request.json()) as any;
+  } catch {
+    return jsonResponse({ ok: false, error: "invalid JSON body" }, 400);
+  }
+  if (!body?.email || !body?.inventory) {
+    return jsonResponse({ ok: false, error: "expected { email, inventory }" }, 400);
+  }
+  // Resolve user_id by email via Supabase profiles (service-role).
+  const lookup = await fetch(
+    `${env.SUPABASE_URL}/rest/v1/profiles?email=eq.${encodeURIComponent(body.email)}&select=id`,
+    { headers: { apikey: env.SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}` } },
+  );
+  if (!lookup.ok) return jsonResponse({ ok: false, error: `profile lookup failed: ${lookup.status}` }, 502);
+  const rows = (await lookup.json()) as Array<{ id: string }>;
+  const userId = rows[0]?.id;
+  if (!userId) return jsonResponse({ ok: false, error: `no account for ${body.email}` }, 404);
+
+  const inv = body.inventory;
+  const next: Inventory = {
+    skills: normalizeSkills(inv.skills, "resume"),
+    experience: normalizeExperience(inv.experience, "resume"),
+    education: normalizeEducation(inv.education),
+    certifications: normalizeCertifications(inv.certifications),
+    summary: typeof inv.summary === "string" ? inv.summary.slice(0, 2000) : null,
+    total_years_experience: cleanNum(inv.total_years_experience),
+    sources: Array.isArray(inv.sources) ? inv.sources : ["resume"],
+  };
+  await saveInventory(env, userId, next);
+  // Best-effort embedding (Workers AI bge-m3); matching works without it.
+  await reembedFromInventory(env, userId).catch(() => {});
+  return jsonResponse(
+    { ok: true, user_id: userId, skills: next.skills.length, experience: next.experience.length },
+    200,
+  );
+}
+
 async function putInventory(request: Request, env: Env, userId: string): Promise<Response> {
   let body: Record<string, unknown>;
   try {
