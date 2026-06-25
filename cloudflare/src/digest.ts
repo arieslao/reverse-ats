@@ -230,6 +230,51 @@ function safeParse(raw: unknown): any {
   try { return JSON.parse(raw); } catch { return []; }
 }
 
+// ─── POST /digest/send (email relay for the GX10 lane) ──────────────────────
+//
+// GX10 generates the digest + .docx attachments on the local model, then POSTs
+// the finished email here; the Worker relays it via Resend using the key it
+// already holds — so no Resend secret has to live on GX10. Bearer INGEST_SECRET.
+
+const DIGEST_FROM = "Reverse ATS <reverse-ats@arieslabs.ai>";
+
+export async function handleDigestSend(request: Request, env: Env): Promise<Response> {
+  const auth = request.headers.get("authorization") || "";
+  if (!env.INGEST_SECRET || auth !== `Bearer ${env.INGEST_SECRET}`) {
+    return json({ ok: false, error: "unauthorized" }, 401);
+  }
+  let body: { to?: string; subject?: string; html?: string; attachments?: Array<{ filename: string; content: string }> };
+  try {
+    body = (await request.json()) as any;
+  } catch {
+    return json({ ok: false, error: "invalid JSON body" }, 400);
+  }
+  if (!body?.to || !body?.subject || !body?.html) {
+    return json({ ok: false, error: "expected { to, subject, html, attachments? }" }, 400);
+  }
+  if (!env.RESEND_API_KEY) return json({ ok: false, error: "email not configured" }, 500);
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: DIGEST_FROM,
+        to: [body.to],
+        subject: body.subject,
+        html: body.html,
+        attachments: Array.isArray(body.attachments) ? body.attachments : undefined,
+      }),
+    });
+    if (!res.ok) {
+      return json({ ok: false, error: `resend ${res.status}: ${(await res.text()).slice(0, 200)}` }, 502);
+    }
+    return json({ ok: true }, 200);
+  } catch (err) {
+    return json({ ok: false, error: err instanceof Error ? err.message : String(err) }, 502);
+  }
+}
+
 // ─── GET /api/matches (in-app tab) ──────────────────────────────────────────
 
 export async function handleMatches(request: Request, env: Env): Promise<Response | null> {
