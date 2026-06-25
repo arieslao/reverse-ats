@@ -50,6 +50,7 @@ import os
 import re
 import sys
 import time
+from pathlib import Path
 from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
@@ -113,21 +114,30 @@ def _http_json(method: str, url: str, secret: str, payload: Any = None, timeout:
 
 
 def _llm(llm_base: str, model: str, system: str, user: str, max_tokens: int, timeout: int = 180) -> str:
+    """One chat completion, with retry+backoff. The local vLLM is SHARED with
+    trading; never burst it — on a connection reset / 5xx we back off and retry
+    rather than hammering, and callers pace between jobs."""
     payload = {
         "model": model,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         "max_tokens": max_tokens,
         "temperature": 0.3,
     }
-    req = urlrequest.Request(
-        llm_base.rstrip("/") + "/chat/completions",
-        data=json.dumps(payload).encode(),
-        method="POST",
-    )
-    req.add_header("Content-Type", "application/json")
-    with urlrequest.urlopen(req, timeout=timeout) as resp:
-        body = json.loads(resp.read().decode())
-    return (body.get("choices") or [{}])[0].get("message", {}).get("content", "")
+    data = json.dumps(payload).encode()
+    last_err: Exception | None = None
+    for attempt in range(4):
+        if attempt:
+            time.sleep([0, 3, 8, 20][attempt])  # back off; let vLLM recover
+        try:
+            req = urlrequest.Request(llm_base.rstrip("/") + "/chat/completions", data=data, method="POST")
+            req.add_header("Content-Type", "application/json")
+            with urlrequest.urlopen(req, timeout=timeout) as resp:
+                body = json.loads(resp.read().decode())
+            return (body.get("choices") or [{}])[0].get("message", {}).get("content", "")
+        except (HTTPError, URLError, TimeoutError, ConnectionError, OSError) as e:
+            last_err = e
+            log.warning("LLM call attempt %d failed (%s); backing off", attempt + 1, str(e)[:60])
+    raise last_err or RuntimeError("LLM call failed")
 
 
 def _parse_json_loose(text: str) -> Any:
@@ -321,6 +331,28 @@ def _build_html(date: str, matches: list[dict], doc_job_ids: set[str]) -> str:
 # ── main ──────────────────────────────────────────────────────────────────────
 
 def main() -> int:
+    # Single-run lock — two concurrent digests bursting the SHARED trading vLLM
+    # is what overloaded it. Refuse to start if another run holds the lock.
+    lock = Path("/tmp/reverse-ats-digest.lock")
+    if lock.exists():
+        try:
+            pid = int(lock.read_text().strip())
+            os.kill(pid, 0)  # raises if not running
+            log.warning("another digest run (pid %d) is active — exiting", pid)
+            return 0
+        except (ValueError, ProcessLookupError, PermissionError):
+            pass  # stale lock
+    lock.write_text(str(os.getpid()))
+    try:
+        return _run()
+    finally:
+        try:
+            lock.unlink()
+        except OSError:
+            pass
+
+
+def _run() -> int:
     base = _env("CF_BASE_URL", required=True).rstrip("/")
     secret = _env("CF_INGEST_SECRET", required=True)
     llm_base = _env("LLM_BASE_URL", "http://localhost:8093/v1")
@@ -403,6 +435,7 @@ def main() -> int:
                 doc_job_ids.add(m["job_id"])
             except Exception as e:  # never let one job kill the digest
                 log.warning("doc gen failed for %s: %s", m.get("job_id"), e)
+            time.sleep(2)  # pace requests — the vLLM is shared with trading
 
         html = _build_html(date, matches, doc_job_ids)
         subject = f"{len(matches)} job matches for you — {date}"

@@ -75,11 +75,14 @@ async function digestForUser(env: Env, userId: string, today: string): Promise<v
       WHERE j.expired = 0
         AND NOT EXISTS (SELECT 1 FROM user_dismissed d WHERE d.user_id = ? AND d.job_id = j.id)
         AND NOT EXISTS (SELECT 1 FROM user_pipeline  p WHERE p.user_id = ? AND p.job_id = j.id)
-        AND NOT EXISTS (SELECT 1 FROM daily_matches  m WHERE m.user_id = ? AND m.job_id = j.id)
+        -- Exclude jobs surfaced on PRIOR days only — recomputing today must keep
+        -- today's own best picks eligible (so re-runs are stable/idempotent,
+        -- not a degrade that swaps the best matches for weaker leftovers).
+        AND NOT EXISTS (SELECT 1 FROM daily_matches m WHERE m.user_id = ? AND m.job_id = j.id AND m.match_date < ?)
       ORDER BY j.first_seen_at DESC
       LIMIT ?`,
   )
-    .bind(userId, userId, userId, CANDIDATE_LIMIT)
+    .bind(userId, userId, userId, today, CANDIDATE_LIMIT)
     .all();
 
   const scored: DigestMatch[] = [];
