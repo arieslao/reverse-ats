@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   fetchProfile,
   updateProfile,
+  uploadResume,
   fetchCompanies,
   createCompany,
   updateCompany,
@@ -130,6 +131,24 @@ function ProfileTab() {
 
   const [form, setForm] = useState<Partial<Profile>>({})
   const [saved, setSaved] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState<string | null>(null)
+
+  const onResumeFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (!f) return
+    setUploading(true)
+    setUploadErr(null)
+    try {
+      const r = await uploadResume(f)
+      setForm((fm) => ({ ...fm, resume_text: r.resume_text }))
+    } catch (err) {
+      setUploadErr(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
 
   useEffect(() => {
     if (profile) {
@@ -170,10 +189,25 @@ function ProfileTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <Section title="Resume">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          <label
+            style={{
+              display: 'inline-block', padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
+              background: 'var(--color-accent, #2563eb)', color: '#fff', fontSize: 13, fontWeight: 600,
+            }}
+          >
+            {uploading ? 'Parsing…' : 'Upload résumé (PDF / DOCX / TXT)'}
+            <input type="file" accept=".pdf,.docx,.txt,.md" onChange={onResumeFile} disabled={uploading} style={{ display: 'none' }} />
+          </label>
+          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            or paste below — no copy-paste needed if you upload a file
+          </span>
+        </div>
+        {uploadErr && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>{uploadErr}</div>}
         <textarea
           value={form.resume_text || ''}
           onChange={(e) => setForm((f) => ({ ...f, resume_text: e.target.value }))}
-          placeholder="Paste your resume here (plain text or markdown)..."
+          placeholder="Paste your resume here (plain text or markdown), or upload a file above..."
           rows={12}
           style={{
             ...textareaStyle,

@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -447,6 +447,43 @@ def update_profile_endpoint(body: ProfileUpdate):
         return ProfileOut.model_validate(updated)
     finally:
         conn.close()
+
+
+@app.post("/api/profile/resume-upload")
+async def upload_resume_endpoint(file: UploadFile = File(...)):
+    """Parse an uploaded résumé (PDF / DOCX / TXT) to text and save it to the
+    profile — so the user uploads a file instead of copy-pasting."""
+    name = (file.filename or "").lower()
+    data = await file.read()
+    text = ""
+    try:
+        if name.endswith(".pdf"):
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
+            text = "\n".join((page.extract_text() or "") for page in reader.pages)
+        elif name.endswith(".docx"):
+            import docx
+            doc = docx.Document(io.BytesIO(data))
+            text = "\n".join(p.text for p in doc.paragraphs)
+        elif name.endswith(".txt") or name.endswith(".md"):
+            text = data.decode("utf-8", errors="ignore")
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file. Upload a PDF, DOCX, or TXT résumé.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read that file: {e}")
+
+    text = "\n".join(line.rstrip() for line in text.splitlines()).strip()
+    if len(text) < 30:
+        raise HTTPException(status_code=400, detail="Could not extract enough text from that file.")
+
+    conn = _conn()
+    try:
+        update_profile(conn, {"resume_text": text})
+    finally:
+        conn.close()
+    return {"resume_text": text, "chars": len(text)}
 
 
 @app.post("/api/profile/suggest-roles")

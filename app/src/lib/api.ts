@@ -9,6 +9,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+// Résumé upload — parse a PDF/DOCX/TXT server-side into the profile resume_text.
+export const uploadResume = async (file: File): Promise<{ resume_text: string; chars: number }> => {
+  const fd = new FormData()
+  fd.append('file', file)
+  // No Content-Type header — the browser sets the multipart boundary.
+  const res = await fetch('/api/profile/resume-upload', { method: 'POST', body: fd })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw new Error((d as { detail?: string }).detail || `upload failed: ${res.status}`)
+  }
+  return res.json()
+}
+
 // Jobs
 export const fetchJobs = (params: Record<string, string | number | boolean>) => {
   const qs = new URLSearchParams()
