@@ -14,12 +14,13 @@ import { cosine, unpackVector } from "./embed";
 import { buildUserSkillIndex, computeMatchBreakdown, type MatchBreakdown } from "./match";
 import { verifyRequest, fetchEmail } from "./supabase-auth";
 
-const TOP_N = 8;              // matches surfaced per user per day
+// The Worker only COMPUTES + stores matches. The GX10 lane (free local Qwen3.6)
+// pulls them via /digest/batch, generates the tailored docs with python-docx,
+// and emails the digest. So no LLM / docx / email lives in the Worker.
+const TOP_N = 25;             // matches stored per user per day (covers the ≥90% set)
 const MIN_COVERAGE = 50;      // skip anything below this requirement coverage
 const CANDIDATE_LIMIT = 1500; // recent structured jobs scanned per user
 const MAX_USERS = 50;         // safety cap per run
-const FROM = "Reverse ATS <reverse-ats@arieslabs.ai>";
-const APP_URL = "https://reverse-ats.app";
 
 interface DigestMatch {
   job_id: string;
@@ -138,77 +139,95 @@ async function digestForUser(env: Env, userId: string, today: string): Promise<v
       .bind(userId, m.job_id, today, m.fit_score, m.coverage_pct, i + 1, JSON.stringify({ strengths: m.strengths, gaps: m.gaps }), now)
       .run();
   }
-
-  // Email the digest (best-effort; never throws out of the cron).
-  const email = await fetchEmail(env, userId);
-  if (email && env.RESEND_API_KEY) {
-    const sent = await sendDigestEmail(env, email, today, top);
-    if (sent) {
-      await env.DB.prepare(`UPDATE daily_matches SET emailed = 1 WHERE user_id = ? AND match_date = ?`)
-        .bind(userId, today)
-        .run();
-    }
-  }
+  // Email is sent by the GX10 lane (see handleDigestBatch), not here.
 }
 
-// ─── email ──────────────────────────────────────────────────────────────────
+// ─── GET /digest/batch (server-to-server, GX10 lane) ────────────────────────
+//
+// Returns everything the GX10 digest script needs to generate + email the day's
+// docs entirely on the local model: each user's email, their inventory, and the
+// day's stored matches with job text + required skills. Bearer INGEST_SECRET
+// (same secret the scrape/preprocess lanes already use). Read-only.
 
-async function sendDigestEmail(env: Env, to: string, dateStr: string, matches: DigestMatch[]): Promise<boolean> {
-  const rows = matches
-    .map((m) => {
-      const strengths = m.strengths.length
-        ? `<div style="margin-top:6px"><span style="color:#16a34a;font-weight:600;font-size:12px">Strengths:</span> <span style="color:#444;font-size:12px">${esc(m.strengths.join(", "))}</span></div>`
-        : "";
-      const gaps = m.gaps.length
-        ? `<div style="margin-top:2px"><span style="color:#ca8a04;font-weight:600;font-size:12px">Gaps:</span> <span style="color:#444;font-size:12px">${esc(m.gaps.join(", "))}</span></div>`
-        : "";
-      return `
-        <tr><td style="padding:14px 0;border-bottom:1px solid #eee">
-          <div>
-            <span style="font-weight:600;font-size:15px;color:#111">${esc(m.title)}</span>
-            <span style="display:inline-block;margin-left:8px;padding:2px 8px;border-radius:6px;background:#dcfce7;color:#16a34a;font-size:12px;font-weight:600">${m.fit_score}% fit · ${m.coverage_pct}% skills</span>
-          </div>
-          <div style="color:#666;font-size:13px;margin-top:2px">${esc(m.company)}${m.location ? " · " + esc(m.location) : ""}</div>
-          ${strengths}${gaps}
-          <div style="margin-top:8px">
-            <a href="${esc(m.url)}" style="font-size:13px;color:#2563eb;text-decoration:none">Open posting →</a>
-            <a href="${APP_URL}/app/matches" style="font-size:13px;color:#2563eb;text-decoration:none;margin-left:14px">Tailor résumé & apply →</a>
-          </div>
-        </td></tr>`;
-    })
-    .join("");
-
-  const html = `
-  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px">
-    <h1 style="font-size:20px;color:#111;margin:0 0 4px">Your top ${matches.length} job matches</h1>
-    <p style="color:#666;font-size:14px;margin:0 0 16px">${dateStr} · ranked by fit to your skills & experience</p>
-    <table style="width:100%;border-collapse:collapse">${rows}</table>
-    <div style="margin-top:20px">
-      <a href="${APP_URL}/app/matches" style="display:inline-block;background:#2563eb;color:#fff;font-size:14px;font-weight:600;text-decoration:none;padding:10px 18px;border-radius:8px">View all matches in Reverse ATS</a>
-    </div>
-    <p style="color:#999;font-size:12px;margin-top:20px">Matched against your inventory. Strengths = required skills you have; gaps = what's missing. Tailored résumé + cover letter are one click away in the app.</p>
-  </div>`;
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: FROM,
-        to: [to],
-        subject: `${matches.length} new job matches for you — ${dateStr}`,
-        html,
-      }),
-    });
-    if (!res.ok) {
-      console.log(`[digest] resend failed: ${res.status} ${await res.text()}`);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.log(`[digest] resend error: ${err instanceof Error ? err.message : String(err)}`);
-    return false;
+export async function handleDigestBatch(request: Request, env: Env): Promise<Response> {
+  const auth = request.headers.get("authorization") || "";
+  if (!env.INGEST_SECRET || auth !== `Bearer ${env.INGEST_SECRET}`) {
+    return json({ ok: false, error: "unauthorized" }, 401);
   }
+  const url = new URL(request.url);
+  const date = url.searchParams.get("date") || new Date().toISOString().slice(0, 10);
+
+  const userRows = await env.DB.prepare(
+    `SELECT DISTINCT user_id FROM daily_matches WHERE match_date = ?`,
+  )
+    .bind(date)
+    .all<{ user_id: string }>();
+
+  const users: any[] = [];
+  for (const { user_id } of userRows.results || []) {
+    const inv = await env.DB.prepare(
+      `SELECT skills, experience, education, certifications, summary FROM user_inventory WHERE user_id = ?`,
+    )
+      .bind(user_id)
+      .first<any>();
+    const email = await fetchEmail(env, user_id);
+
+    const matchRows = await env.DB.prepare(
+      `SELECT m.job_id, m.fit_score, m.coverage_pct, m.rank, m.reasons,
+              j.title, j.company, j.location, j.url, j.description_full, j.description_snippet,
+              st.must_have_skills, st.nice_to_have_skills, st.years_experience_min
+         FROM daily_matches m
+         JOIN jobs j ON j.id = m.job_id
+         LEFT JOIN jobs_structured st ON st.job_id = j.id
+        WHERE m.user_id = ? AND m.match_date = ?
+        ORDER BY m.rank ASC`,
+    )
+      .bind(user_id, date)
+      .all();
+
+    const matches = (matchRows.results || []).map((r: any) => {
+      let reasons: any = {};
+      try { reasons = JSON.parse(r.reasons || "{}"); } catch { reasons = {}; }
+      return {
+        job_id: r.job_id,
+        title: r.title,
+        company: r.company,
+        location: r.location ?? null,
+        url: r.url,
+        fit_score: r.fit_score,
+        coverage_pct: r.coverage_pct,
+        rank: r.rank,
+        strengths: reasons.strengths || [],
+        gaps: reasons.gaps || [],
+        description: (r.description_full || r.description_snippet || "").slice(0, 3500),
+        required_skills: parseArr(r.must_have_skills),
+        nice_skills: parseArr(r.nice_to_have_skills),
+        years_required: typeof r.years_experience_min === "number" ? r.years_experience_min : null,
+      };
+    });
+
+    users.push({
+      user_id,
+      email,
+      inventory: inv
+        ? {
+            skills: safeParse(inv.skills),
+            experience: safeParse(inv.experience),
+            education: safeParse(inv.education),
+            certifications: safeParse(inv.certifications),
+            summary: inv.summary ?? null,
+          }
+        : null,
+      matches,
+    });
+  }
+
+  return json({ ok: true, date, users }, 200);
+}
+
+function safeParse(raw: unknown): any {
+  if (typeof raw !== "string" || !raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
 }
 
 // ─── GET /api/matches (in-app tab) ──────────────────────────────────────────
@@ -312,10 +331,6 @@ function parseArr(raw: unknown): string[] {
   } catch {
     return [];
   }
-}
-
-function esc(s: string): string {
-  return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] || c));
 }
 
 function json(body: unknown, status: number): Response {
