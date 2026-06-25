@@ -362,25 +362,6 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
     `## Candidate Resume\n\n${resume.slice(0, 6000)}\n\n` +
     `Recommend roles per the system instructions.`;
 
-  // Workers AI structured-output: pass a JSON schema and the runtime
-  // constrains the model so the output is always valid JSON of this shape.
-  const roleItem = {
-    type: "object",
-    properties: {
-      title: { type: "string" },
-      reasoning: { type: "string" },
-    },
-    required: ["title", "reasoning"],
-  };
-  const responseSchema = {
-    type: "object",
-    properties: {
-      current_fit: { type: "array", items: roleItem },
-      next_step: { type: "array", items: roleItem },
-    },
-    required: ["current_fit", "next_step"],
-  };
-
   let parsed: unknown = null;
   try {
     const response = (await env.AI.run(SUGGEST_ROLES_MODEL, {
@@ -388,19 +369,17 @@ async function suggestRolesHandler(env: Env, userId: string): Promise<Response> 
         { role: "system", content: SUGGEST_ROLES_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
+      // No response_format json_schema — Workers-AI constrained decoding can fail
+      // it (error 5024) on longer résumés. Prompt + loose parse is reliable.
       max_tokens: 2500,
       temperature: 0.2,
-      response_format: { type: "json_schema", json_schema: responseSchema },
     } as Parameters<typeof env.AI.run>[1])) as { response?: unknown };
 
-    // With json_schema, Workers AI returns `response` as an already-parsed
-    // object. Older paths (or fallback) return a string we need to parse.
     const r = response.response;
-    if (r && typeof r === "object") {
-      parsed = r;
-    } else if (typeof r === "string") {
+    if (typeof r === "string") {
       parsed = parseJsonLoose(r);
-      console.log(`[suggest-roles] string response (${r.length} chars):`, r.slice(0, 300));
+    } else if (r && typeof r === "object") {
+      parsed = r;
     }
   } catch (err) {
     return jsonResponse(
