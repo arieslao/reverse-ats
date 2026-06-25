@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -511,21 +511,75 @@ def update_inventory_endpoint(body: dict):
         conn.close()
 
 
+def _merge_inventory(existing: dict, new: dict) -> dict:
+    """Union a freshly-extracted inventory into the existing one. Skills dedup by
+    normalized name (keep best proficiency/years, union sources); experience /
+    education / certs dedup by identity key. So résumé + LinkedIn combine."""
+    import re as _re
+
+    def norm(s):
+        return _re.sub(r"[^a-z0-9]+", " ", (s or "").lower()).strip()
+
+    by_skill: dict = {}
+    for s in (existing.get("skills") or []) + (new.get("skills") or []):
+        k = norm(s.get("name"))
+        if not k:
+            continue
+        if k not in by_skill:
+            by_skill[k] = dict(s)
+        else:
+            ex = by_skill[k]
+            ex["proficiency"] = max(ex.get("proficiency") or 0, s.get("proficiency") or 0) or None
+            ex["years"] = max(ex.get("years") or 0, s.get("years") or 0) or None
+            ex["category"] = ex.get("category") or s.get("category")
+            srcs = set(filter(None, [ex.get("source"), s.get("source")]))
+            ex["source"] = "+".join(sorted(srcs)) if srcs else "resume"
+
+    def dedup(items, keyfn):
+        seen, out = set(), []
+        for it in items:
+            k = keyfn(it)
+            if k in seen:
+                continue
+            seen.add(k)
+            out.append(it)
+        return out
+
+    return {
+        "skills": list(by_skill.values()),
+        "experience": dedup((existing.get("experience") or []) + (new.get("experience") or []),
+                            lambda e: norm(e.get("company")) + "|" + norm(e.get("title"))),
+        "education": dedup((existing.get("education") or []) + (new.get("education") or []),
+                           lambda e: norm(e.get("school")) + "|" + norm(e.get("degree"))),
+        "certifications": dedup((existing.get("certifications") or []) + (new.get("certifications") or []),
+                                lambda c: norm(c.get("name"))),
+        "summary": new.get("summary") or existing.get("summary"),
+        "total_years_experience": new.get("total_years_experience") or existing.get("total_years_experience"),
+        "sources": sorted(set((existing.get("sources") or []) + (new.get("sources") or []))),
+    }
+
+
 @app.post("/api/inventory/extract")
-def extract_inventory_endpoint():
-    """Extract a structured inventory from the saved résumé via the local LLM."""
+def extract_inventory_endpoint(body: Optional[dict] = Body(default=None)):
+    """Extract a structured inventory and MERGE it into the existing one. Uses
+    pasted `text` (e.g. LinkedIn experience + skills) when provided, else the
+    saved résumé. `source` tags provenance (default linkedin for pasted text)."""
     conn = _conn()
     try:
-        profile = get_profile(conn)
-        resume = (profile.get("resume_text") or "").strip()
-        if len(resume) < 40:
-            raise HTTPException(status_code=400, detail="Upload or paste your résumé in Profile first.")
+        text = ((body or {}).get("text") or "").strip()
+        source = (body or {}).get("source") or ("linkedin" if text else "resume")
+        if not text:
+            text = (get_profile(conn).get("resume_text") or "").strip()
+        if len(text) < 40:
+            raise HTTPException(status_code=400, detail="Paste your experience/skills, or add a résumé in Profile first.")
         settings = get_llm_settings(conn)
         from scorer import extract_inventory
-        result = extract_inventory(resume, settings)
+        result = extract_inventory(text, settings)
         if result.get("error"):
             raise HTTPException(status_code=502, detail=result["error"])
-        return save_inventory(conn, result)
+        result["sources"] = [source]
+        merged = _merge_inventory(get_inventory(conn), result)
+        return save_inventory(conn, merged)
     finally:
         conn.close()
 

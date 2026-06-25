@@ -6,6 +6,9 @@ import {
   uploadResume,
   fetchInventory,
   extractInventory,
+  extractInventoryFromText,
+  saveInventory,
+  type InvSkill,
   fetchCompanies,
   createCompany,
   updateCompany,
@@ -414,58 +417,103 @@ function InventoryPanel() {
   const qc = useQueryClient()
   const { data: inv } = useQuery({ queryKey: ['inventory'], queryFn: fetchInventory })
   const [err, setErr] = useState<string | null>(null)
-  const mut = useMutation({
-    mutationFn: extractInventory,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['inventory'] }),
-    onError: (e: unknown) => setErr(e instanceof Error ? e.message : 'Extraction failed'),
+  const [skills, setSkills] = useState<InvSkill[]>([])
+  const [dirty, setDirty] = useState(false)
+  const [showPaste, setShowPaste] = useState(false)
+  const [pasteText, setPasteText] = useState('')
+
+  // Sync editable skills from the server inventory whenever it changes.
+  useEffect(() => { if (inv) { setSkills(inv.skills); setDirty(false) } }, [inv])
+
+  const onDone = () => qc.invalidateQueries({ queryKey: ['inventory'] })
+  const onErr = (e: unknown) => setErr(e instanceof Error ? e.message : 'Something went wrong')
+  const extractResume = useMutation({ mutationFn: () => extractInventory(), onSuccess: onDone, onError: onErr })
+  const extractText = useMutation({
+    mutationFn: (t: string) => extractInventoryFromText(t, 'linkedin'),
+    onSuccess: () => { setPasteText(''); setShowPaste(false); onDone() }, onError: onErr,
   })
-  const chip = (text: string, color: string) => (
-    <span key={text} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: color + '22', color, marginRight: 4, marginBottom: 4, display: 'inline-block' }}>{text}</span>
-  )
+  const saveMut = useMutation({ mutationFn: (s: InvSkill[]) => saveInventory({ skills: s }), onSuccess: () => { onDone(); setDirty(false) }, onError: onErr })
+  const busy = extractResume.isPending || extractText.isPending
+
+  const update = (i: number, patch: Partial<InvSkill>) => { setSkills((s) => s.map((x, j) => (j === i ? { ...x, ...patch } : x))); setDirty(true) }
+  const remove = (i: number) => { setSkills((s) => s.filter((_, j) => j !== i)); setDirty(true) }
+  const add = () => { setSkills((s) => [...s, { name: '', category: null, years: null, proficiency: null, last_used: null, source: 'manual' }]); setDirty(true) }
+
+  const inputStyle: React.CSSProperties = { background: 'var(--color-bg, #1a1a1a)', border: '1px solid var(--color-border, #333)', borderRadius: 4, color: 'inherit', padding: '3px 6px', fontSize: 12 }
+
   return (
     <Section title="Skills & Experience Inventory">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-        <button
-          onClick={() => { setErr(null); mut.mutate() }}
-          disabled={mut.isPending}
-          style={primaryBtnStyle}
-        >
-          {mut.isPending ? 'Extracting on Qwen3.6… (~30–60s)' : '✨ Extract from résumé'}
+      <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 0 }}>
+        The editable skill list below is what jobs are matched against. Build it from your résumé or by pasting your LinkedIn sections — then refine.
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+        <button onClick={() => { setErr(null); extractResume.mutate() }} disabled={busy} style={primaryBtnStyle}>
+          {extractResume.isPending ? 'Extracting… (~30–60s)' : '✨ Extract from résumé'}
         </button>
-        {inv?.updated_at && (
-          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
-            {inv.skills.length} skills · {inv.experience.length} roles · updated {new Date(inv.updated_at).toLocaleDateString()}
-          </span>
-        )}
+        <button onClick={() => { setErr(null); setShowPaste((v) => !v) }} disabled={busy} style={{ ...primaryBtnStyle, background: 'transparent', border: '1px solid var(--color-border, #444)', color: 'inherit' }}>
+          {showPaste ? 'Cancel paste' : '📋 Paste LinkedIn text'}
+        </button>
+        {inv?.updated_at && <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{skills.length} skills · {inv.experience.length} roles · sources: {(inv.sources || []).join(', ') || '—'}</span>}
       </div>
-      {err && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>{err}</div>}
-      {inv && inv.skills.length > 0 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {inv.summary && <p style={{ fontSize: 13, color: 'var(--color-text-secondary, #aaa)', margin: 0 }}>{inv.summary}</p>}
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>Skills ({inv.skills.length})</div>
-            <div>{inv.skills.map((s) => chip(s.proficiency ? `${s.name} ·${s.proficiency}` : s.name, '#22c55e'))}</div>
-          </div>
-          {inv.experience.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>Experience</div>
-              {inv.experience.map((e, i) => (
-                <div key={i} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{e.title}{e.company ? ` · ${e.company}` : ''} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)', fontSize: 11 }}>{[e.start, e.end || 'Present'].filter(Boolean).join(' – ')}</span></div>
-                  {e.highlights?.length > 0 && (
-                    <ul style={{ margin: '2px 0 0', paddingLeft: 18, fontSize: 12, color: 'var(--color-text-secondary, #aaa)' }}>
-                      {e.highlights.slice(0, 4).map((h, j) => <li key={j}>{h}</li>)}
-                    </ul>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+
+      {showPaste && (
+        <div style={{ marginBottom: 12 }}>
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            rows={8}
+            placeholder="Paste your LinkedIn About + Experience + Skills sections here…"
+            style={{ ...textareaStyle, fontSize: 12 }}
+          />
+          <button
+            onClick={() => { setErr(null); extractText.mutate(pasteText) }}
+            disabled={busy || pasteText.trim().length < 40}
+            style={{ ...primaryBtnStyle, marginTop: 6 }}
+          >
+            {extractText.isPending ? 'Extracting & merging…' : 'Extract skills from this text'}
+          </button>
         </div>
+      )}
+
+      {err && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>{err}</div>}
+
+      {/* Editable skills */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Skills ({skills.length}) — proficiency 1–5, years</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={add} style={{ ...primaryBtnStyle, background: 'transparent', border: '1px solid var(--color-border, #444)', color: 'inherit', padding: '4px 10px' }}>+ Add skill</button>
+          <button onClick={() => saveMut.mutate(skills)} disabled={!dirty || saveMut.isPending} style={{ ...primaryBtnStyle, padding: '4px 12px', opacity: dirty ? 1 : 0.5 }}>
+            {saveMut.isPending ? 'Saving…' : dirty ? 'Save edits' : 'Saved'}
+          </button>
+        </div>
+      </div>
+      {skills.length === 0 ? (
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>No skills yet — extract from your résumé or paste LinkedIn text above.</p>
       ) : (
-        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
-          No inventory yet — upload/paste your résumé above, then click <strong>Extract from résumé</strong>.
-        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 6 }}>
+          {skills.map((s, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--color-bg-elevated, #222)', border: '1px solid var(--color-border, #333)', borderRadius: 6, padding: '4px 6px' }}>
+              <input value={s.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="skill" style={{ ...inputStyle, flex: 1, minWidth: 0 }} />
+              <select value={s.proficiency ?? ''} onChange={(e) => update(i, { proficiency: e.target.value ? Number(e.target.value) : null })} style={inputStyle} title="Proficiency">
+                <option value="">–</option>{[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+              <input type="number" value={s.years ?? ''} onChange={(e) => update(i, { years: e.target.value ? Number(e.target.value) : null })} placeholder="yr" style={{ ...inputStyle, width: 38 }} title="Years" />
+              <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 14 }} title="Remove">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {inv && inv.experience.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>Experience (from extraction)</div>
+          {inv.experience.map((e, i) => (
+            <div key={i} style={{ marginBottom: 6, fontSize: 12 }}>
+              <span style={{ fontWeight: 600 }}>{e.title}{e.company ? ` · ${e.company}` : ''}</span>
+              <span style={{ color: 'var(--color-text-muted)', marginLeft: 6 }}>{[e.start, e.end || 'Present'].filter(Boolean).join(' – ')}</span>
+            </div>
+          ))}
+        </div>
       )}
     </Section>
   )

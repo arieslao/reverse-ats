@@ -23,7 +23,11 @@ export interface Inventory {
   updated_at: string | null
 }
 export const fetchInventory = () => request<Inventory>('/api/inventory')
-export const extractInventory = () => request<Inventory>('/api/inventory/extract', { method: 'POST' })
+export const extractInventory = () => request<Inventory>('/api/inventory/extract', { method: 'POST', body: JSON.stringify({}) })
+export const extractInventoryFromText = (text: string, source = 'linkedin') =>
+  request<Inventory>('/api/inventory/extract', { method: 'POST', body: JSON.stringify({ text, source }) })
+export const saveInventory = (patch: Partial<Inventory>) =>
+  request<Inventory>('/api/inventory', { method: 'PUT', body: JSON.stringify(patch) })
 
 // Résumé upload — parse a PDF/DOCX/TXT server-side into the profile resume_text.
 export const uploadResume = async (file: File): Promise<{ resume_text: string; chars: number }> => {
