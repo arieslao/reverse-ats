@@ -129,3 +129,13 @@ export function cosine(a: Float32Array, b: Float32Array): number {
 
 export const EMBEDDING_MODEL = EMBED_MODEL;
 export const EMBEDDING_DIM = EMBED_DIM;
+
+// Shared Workers-AI text-generation model for ALL chat/extraction calls
+// (preprocess, suggest-roles, scoring, cover letter, inventory extraction,
+// tailored résumé). Centralized so a model deprecation is a one-line change.
+//
+// MUST support response_format json_schema — verified 2026-06-24:
+//   llama-3.3-70b-instruct-fp8-fast → OK
+//   llama-3.1-8b-instruct           → DEPRECATED 2026-05-30 (error 5028)
+//   llama-3.1-8b-instruct-fp8       → rejects JSON Schema (error 5025)
+export const WORKERS_AI_TEXT_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";

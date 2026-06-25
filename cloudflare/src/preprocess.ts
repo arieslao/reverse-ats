@@ -5,8 +5,9 @@
 
 import type { Ai } from "@cloudflare/workers-types";
 import type { StructuredJob } from "./schema";
+import { WORKERS_AI_TEXT_MODEL } from "./embed";
 
-const MODEL = "@cf/meta/llama-3.1-8b-instruct";
+const MODEL = WORKERS_AI_TEXT_MODEL;
 
 const SYSTEM_PROMPT = `You extract structured information from job postings.
 
