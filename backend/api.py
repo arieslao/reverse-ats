@@ -874,6 +874,29 @@ def test_llm_settings():
 
 
 # ---------------------------------------------------------------------------
+# Serve the built React app (private GX10 instance) — single-server SPA.
+# Mounted LAST so it never shadows /api or /health. No-op if app/dist is absent.
+# ---------------------------------------------------------------------------
+
+_DIST = Path(__file__).resolve().parent.parent / "app" / "dist"
+if _DIST.is_dir():
+    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
+
+    if (_DIST / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_DIST / "assets")), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def _spa(full_path: str):
+        if full_path.startswith("api/") or full_path == "health":
+            raise HTTPException(status_code=404, detail="not found")
+        candidate = _DIST / full_path
+        if candidate.is_file():
+            return FileResponse(str(candidate))
+        return FileResponse(str(_DIST / "index.html"))
+
+
+# ---------------------------------------------------------------------------
 # Run
 # ---------------------------------------------------------------------------
 
