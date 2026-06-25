@@ -98,6 +98,9 @@ def _http_json(method: str, url: str, secret: str, payload: Any = None, timeout:
     data = json.dumps(payload).encode() if payload is not None else None
     req = urlrequest.Request(url, data=data, method=method)
     req.add_header("Authorization", f"Bearer {secret}")
+    # Cloudflare's edge bot-protection 403s the default Python-urllib UA, so
+    # present a browser-like agent (same as scripts/discover_ats_slugs.py).
+    req.add_header("User-Agent", "Mozilla/5.0 (reverse-ats-gx10)")
     if data is not None:
         req.add_header("Content-Type", "application/json")
     with urlrequest.urlopen(req, timeout=timeout) as resp:
