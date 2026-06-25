@@ -170,70 +170,6 @@ Rules:
 - Do NOT invent data. If a section is absent, return an empty array (or null for summary).
 - Output JSON only — no prose, no markdown fences.`;
 
-const EXTRACT_SCHEMA = {
-  type: "object",
-  properties: {
-    summary: { type: ["string", "null"] },
-    total_years_experience: { type: ["number", "null"] },
-    skills: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          category: { type: ["string", "null"] },
-          years: { type: ["integer", "null"] },
-          proficiency: { type: ["integer", "null"] },
-          last_used: { type: ["string", "null"] },
-        },
-        required: ["name"],
-      },
-    },
-    experience: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          company: { type: "string" },
-          title: { type: "string" },
-          start: { type: ["string", "null"] },
-          end: { type: ["string", "null"] },
-          location: { type: ["string", "null"] },
-          highlights: { type: "array", items: { type: "string" } },
-        },
-        required: ["company", "title"],
-      },
-    },
-    education: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          school: { type: "string" },
-          degree: { type: ["string", "null"] },
-          field: { type: ["string", "null"] },
-          start: { type: ["string", "null"] },
-          end: { type: ["string", "null"] },
-        },
-        required: ["school"],
-      },
-    },
-    certifications: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          name: { type: "string" },
-          issuer: { type: ["string", "null"] },
-          date: { type: ["string", "null"] },
-        },
-        required: ["name"],
-      },
-    },
-  },
-  required: ["skills", "experience", "education", "certifications"],
-};
-
 async function extractFromText(
   request: Request,
   env: Env,
@@ -267,18 +203,22 @@ async function extractFromText(
 
   let parsed: any = null;
   try {
+    // NOTE: we deliberately do NOT pass response_format json_schema here. The
+    // inventory schema is deeply nested (skills + experience-with-highlights +
+    // education + certs) and Workers-AI constrained decoding fails it on long
+    // résumés (error 5024). The 70B model reliably emits clean JSON from the
+    // schema-in-prompt; parseJsonLoose recovers it. Verified 2026-06-24.
     const response = (await env.AI.run(EXTRACT_MODEL, {
       messages: [
         { role: "system", content: EXTRACT_SYSTEM_PROMPT },
         { role: "user", content: `## Source document\n\n${text.slice(0, 8000)}\n\nExtract per the instructions.` },
       ],
-      max_tokens: 3500,
+      max_tokens: 4000,
       temperature: 0.1,
-      response_format: { type: "json_schema", json_schema: EXTRACT_SCHEMA },
     } as Parameters<typeof env.AI.run>[1])) as { response?: unknown };
     const r = response.response;
-    if (r && typeof r === "object") parsed = r;
-    else if (typeof r === "string") parsed = parseJsonLoose(r);
+    if (typeof r === "string") parsed = parseJsonLoose(r);
+    else if (r && typeof r === "object") parsed = r;
   } catch (err) {
     return jsonResponse({ ok: false, error: `LLM call failed: ${err instanceof Error ? err.message : String(err)}` }, 502);
   }

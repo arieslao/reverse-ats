@@ -1351,31 +1351,6 @@ Return ONLY valid JSON in this shape:
 
 Output JSON only — no prose, no markdown fences.`;
 
-const TAILORED_RESUME_SCHEMA = {
-  type: "object",
-  properties: {
-    headline: { type: "string" },
-    summary: { type: "string" },
-    skills: { type: "array", items: { type: "string" } },
-    experience: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          company: { type: "string" },
-          title: { type: "string" },
-          dates: { type: "string" },
-          bullets: { type: "array", items: { type: "string" } },
-        },
-        required: ["company", "title", "bullets"],
-      },
-    },
-    education: { type: "array", items: { type: "string" } },
-    certifications: { type: "array", items: { type: "string" } },
-  },
-  required: ["headline", "summary", "skills", "experience"],
-};
-
 async function tailoredResume(env: Env, userId: string, jobId: string, _request: Request): Promise<Response> {
   const tier = await fetchTier(env, userId);
   const usage = await checkAndConsume(env, userId, "tailored_resume", tier);
@@ -1464,13 +1439,14 @@ async function tailoredResume(env: Env, userId: string, jobId: string, _request:
         { role: "system", content: TAILORED_RESUME_SYSTEM_PROMPT },
         { role: "user", content: userPrompt },
       ],
-      max_tokens: 2500,
+      // No response_format json_schema — the nested résumé schema trips Workers-AI
+      // constrained decoding (error 5024). Prompt + loose parse is reliable on 70B.
+      max_tokens: 3000,
       temperature: 0.3,
-      response_format: { type: "json_schema", json_schema: TAILORED_RESUME_SCHEMA },
     } as Parameters<typeof env.AI.run>[1])) as { response?: unknown };
     const r = response.response;
-    if (r && typeof r === "object") parsed = r;
-    else if (typeof r === "string") parsed = parseJsonLooseLocal(r);
+    if (typeof r === "string") parsed = parseJsonLooseLocal(r);
+    else if (r && typeof r === "object") parsed = r;
   } catch (err) {
     await refund();
     return jsonResponse(
