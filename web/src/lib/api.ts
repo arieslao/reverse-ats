@@ -399,6 +399,39 @@ export async function generateCoverLetter(
   }
 }
 
+// ─── Tailored résumé (Phase 4) ──────────────────────────────────────────────
+
+export interface TailoredResume {
+  headline: string
+  summary: string
+  skills: string[]
+  experience: Array<{ company: string; title: string; dates?: string; bullets: string[] }>
+  education?: string[]
+  certifications?: string[]
+}
+
+export interface TailoredResumeResult {
+  resume: TailoredResume
+  job: { title: string; company: string }
+  tier?: Tier
+  usage?: UsageState
+}
+
+export async function generateTailoredResume(jobId: string): Promise<TailoredResumeResult> {
+  const r = await authFetch(`/api/jobs/${encodeURIComponent(jobId)}/tailored-resume`, { method: 'POST' })
+  const data = (await r.json().catch(() => null)) as
+    | { resume?: TailoredResume; job?: { title: string; company: string }; error?: string; tier?: Tier; usage?: UsageState }
+    | null
+  if (!r.ok || !data?.resume) {
+    const err = new Error(data?.error || `tailored-resume: ${r.status}`) as Error & { status?: number; tier?: Tier; usage?: UsageState }
+    err.status = r.status
+    err.tier = data?.tier
+    err.usage = data?.usage
+    throw err
+  }
+  return { resume: data.resume, job: data.job || { title: '', company: '' }, tier: data.tier, usage: data.usage }
+}
+
 export interface UsageOverview {
   tier: Tier
   usage: Record<string, UsageState>

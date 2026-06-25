@@ -139,8 +139,10 @@ export async function handleFeedAndPipeline(request: Request, env: Env): Promise
     return listJobs(request, env, userId);
   }
 
-  // /api/jobs/:id  and  /api/jobs/:id/(dismiss|save|cover-letter)
-  const jobMatch = path.match(/^\/api\/jobs\/([A-Za-z0-9_\-:.]+)(\/(dismiss|save|cover-letter))?$/);
+  // /api/jobs/:id  and  /api/jobs/:id/(dismiss|save|cover-letter|tailored-resume)
+  const jobMatch = path.match(
+    /^\/api\/jobs\/([A-Za-z0-9_\-:.]+)(\/(dismiss|save|cover-letter|tailored-resume))?$/,
+  );
   if (jobMatch) {
     const jobId = jobMatch[1];
     const action = jobMatch[3];
@@ -148,6 +150,7 @@ export async function handleFeedAndPipeline(request: Request, env: Env): Promise
     if (action === "dismiss" && request.method === "POST") return dismissJob(env, userId, jobId);
     if (action === "save" && request.method === "POST") return saveJobToPipeline(env, userId, jobId);
     if (action === "cover-letter" && request.method === "POST") return coverLetter(env, userId, jobId, request);
+    if (action === "tailored-resume" && request.method === "POST") return tailoredResume(env, userId, jobId, request);
   }
 
   if (path === "/api/feed/industries" && request.method === "GET") return feedIndustries(env);
@@ -1313,6 +1316,240 @@ async function coverLetter(env: Env, userId: string, jobId: string, request: Req
       { ok: false, error: `LLM call failed: ${err instanceof Error ? err.message : String(err)}` },
       502,
     );
+  }
+}
+
+// ─── /api/jobs/:id/tailored-resume ──────────────────────────────────────────
+//
+// Generates a job-tailored résumé as STRUCTURED JSON (the browser turns it into
+// a .docx). Pulls from the structured inventory when present (richer than the
+// freeform resume_text) and uses the Phase-3 gap breakdown to foreground the
+// skills the job actually asks for and mirror its keywords for ATS parsing.
+
+const TAILORED_RESUME_MODEL = "@cf/meta/llama-3.1-8b-instruct";
+
+const TAILORED_RESUME_SYSTEM_PROMPT = `You are an expert résumé writer tailoring a candidate's résumé to ONE specific job.
+
+You are given the candidate's structured inventory (skills, work history, education) and the target job (title, company, required + nice-to-have skills). Produce a tailored résumé that:
+- leads with a 2-3 sentence summary aimed squarely at THIS role
+- orders skills so the job's required/nice-to-have skills the candidate HAS appear first; mirror the job's exact wording for ATS keyword matching
+- rewrites each role's bullets to foreground experience relevant to this job, quantified where the source gives numbers
+- NEVER invents skills, employers, titles, dates, or metrics not present in the inventory — only reframes what's there
+
+Return ONLY valid JSON in this shape:
+
+{
+  "headline": "<target-role-aligned headline>",
+  "summary": "<2-3 sentence pitch for THIS job>",
+  "skills": ["<skill>", ...],
+  "experience": [
+    {"company": "<name>", "title": "<title>", "dates": "<start – end>", "bullets": ["<tailored bullet>", ...]}
+  ],
+  "education": ["<degree, school, year>", ...],
+  "certifications": ["<cert>", ...]
+}
+
+Output JSON only — no prose, no markdown fences.`;
+
+const TAILORED_RESUME_SCHEMA = {
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    summary: { type: "string" },
+    skills: { type: "array", items: { type: "string" } },
+    experience: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          company: { type: "string" },
+          title: { type: "string" },
+          dates: { type: "string" },
+          bullets: { type: "array", items: { type: "string" } },
+        },
+        required: ["company", "title", "bullets"],
+      },
+    },
+    education: { type: "array", items: { type: "string" } },
+    certifications: { type: "array", items: { type: "string" } },
+  },
+  required: ["headline", "summary", "skills", "experience"],
+};
+
+async function tailoredResume(env: Env, userId: string, jobId: string, _request: Request): Promise<Response> {
+  const tier = await fetchTier(env, userId);
+  const usage = await checkAndConsume(env, userId, "tailored_resume", tier);
+  if (!usage.ok) {
+    return jsonResponse(
+      {
+        ok: false,
+        error:
+          tier === "free"
+            ? `You've used your ${usage.limit} tailored résumés for today. Upgrade for ${limitFor("tailored_resume", "sponsor")} per day.`
+            : `You've reached your ${usage.limit} tailored résumés for today. Resets at UTC midnight.`,
+        tier,
+        usage: { used: usage.used, remaining: 0, limit: usage.limit },
+      },
+      429,
+    );
+  }
+
+  const refund = async () => {
+    await env.DB.prepare(
+      `UPDATE user_usage SET count = MAX(0, count - 1) WHERE user_id = ? AND action = ? AND day = ?`,
+    )
+      .bind(userId, "tailored_resume", new Date().toISOString().slice(0, 10))
+      .run();
+  };
+
+  // Prefer the structured inventory; fall back to freeform resume_text.
+  const inv = await env.DB.prepare(
+    `SELECT skills, experience, education, certifications, summary FROM user_inventory WHERE user_id = ?`,
+  )
+    .bind(userId)
+    .first<{ skills: string; experience: string; education: string; certifications: string; summary: string | null }>();
+  const profile = await env.DB.prepare(`SELECT resume_text FROM user_profiles WHERE user_id = ?`)
+    .bind(userId)
+    .first<{ resume_text: string | null }>();
+
+  const inventoryText = inv ? buildInventoryDigest(inv) : "";
+  const resumeText = (profile?.resume_text || "").trim();
+  const candidateBlock = inventoryText || resumeText;
+  if (candidateBlock.length < 50) {
+    await refund();
+    return jsonResponse(
+      { ok: false, error: "Build your Skills & Experience inventory (or save a résumé) first." },
+      400,
+    );
+  }
+
+  const job = await env.DB.prepare(
+    `SELECT j.title, j.company, j.location, j.description_full, j.description_snippet,
+            st.must_have_skills, st.nice_to_have_skills, st.years_experience_min
+       FROM jobs j LEFT JOIN jobs_structured st ON st.job_id = j.id
+      WHERE j.id = ?`,
+  )
+    .bind(jobId)
+    .first<{
+      title: string;
+      company: string;
+      location: string | null;
+      description_full: string | null;
+      description_snippet: string | null;
+      must_have_skills: string | null;
+      nice_to_have_skills: string | null;
+      years_experience_min: number | null;
+    }>();
+  if (!job) {
+    await refund();
+    return jsonResponse({ ok: false, error: "job not found" }, 404);
+  }
+
+  const required = parseSkillArray(job.must_have_skills);
+  const nice = parseSkillArray(job.nice_to_have_skills);
+  const description = (job.description_full || job.description_snippet || "").slice(0, 3000);
+
+  const userPrompt =
+    `## Candidate inventory\n${candidateBlock.slice(0, 5000)}\n\n` +
+    `## Target job\n${job.title} at ${job.company}${job.location ? ` (${job.location})` : ""}\n` +
+    (required.length ? `Required skills: ${required.join(", ")}\n` : "") +
+    (nice.length ? `Nice-to-have: ${nice.join(", ")}\n` : "") +
+    `\n${description}\n\n` +
+    `Produce the tailored résumé JSON per the system instructions.`;
+
+  let parsed: any = null;
+  try {
+    const response = (await env.AI.run(TAILORED_RESUME_MODEL, {
+      messages: [
+        { role: "system", content: TAILORED_RESUME_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 2500,
+      temperature: 0.3,
+      response_format: { type: "json_schema", json_schema: TAILORED_RESUME_SCHEMA },
+    } as Parameters<typeof env.AI.run>[1])) as { response?: unknown };
+    const r = response.response;
+    if (r && typeof r === "object") parsed = r;
+    else if (typeof r === "string") parsed = parseJsonLooseLocal(r);
+  } catch (err) {
+    await refund();
+    return jsonResponse(
+      { ok: false, error: `LLM call failed: ${err instanceof Error ? err.message : String(err)}` },
+      502,
+    );
+  }
+  if (!parsed || typeof parsed !== "object") {
+    await refund();
+    return jsonResponse({ ok: false, error: "Model returned unparseable résumé. Try again." }, 502);
+  }
+
+  return jsonResponse(
+    {
+      ok: true,
+      resume: parsed,
+      job: { title: job.title, company: job.company },
+      model: TAILORED_RESUME_MODEL,
+      tier,
+      usage: { used: usage.used, remaining: usage.remaining, limit: usage.limit },
+    },
+    200,
+  );
+}
+
+// Compact text digest of the structured inventory for the résumé prompt.
+function buildInventoryDigest(inv: {
+  skills: string;
+  experience: string;
+  education: string;
+  certifications: string;
+  summary: string | null;
+}): string {
+  const skills = safeJson<Array<{ name: string }>>(inv.skills, []);
+  const exp = safeJson<Array<{ company: string; title: string; start?: string; end?: string; highlights?: string[] }>>(inv.experience, []);
+  const edu = safeJson<Array<{ degree?: string; field?: string; school: string; end?: string }>>(inv.education, []);
+  const certs = safeJson<Array<{ name: string; issuer?: string }>>(inv.certifications, []);
+  const lines: string[] = [];
+  if (inv.summary) lines.push(`Summary: ${inv.summary}`);
+  if (skills.length) lines.push(`Skills: ${skills.map((s) => s.name).join(", ")}`);
+  if (exp.length) {
+    lines.push("Experience:");
+    for (const e of exp) {
+      lines.push(`- ${e.title} at ${e.company} (${e.start || "?"} – ${e.end || "Present"})`);
+      for (const h of e.highlights || []) lines.push(`  • ${h}`);
+    }
+  }
+  if (edu.length) lines.push("Education: " + edu.map((e) => `${e.degree || ""} ${e.field || ""} ${e.school} ${e.end || ""}`.trim()).join("; "));
+  if (certs.length) lines.push("Certifications: " + certs.map((c) => c.name).join(", "));
+  return lines.join("\n");
+}
+
+function safeJson<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseJsonLooseLocal(text: string): unknown {
+  if (!text) return null;
+  let cleaned = text.trim();
+  const fence = cleaned.match(/```(?:json)?\s*\n?([\s\S]*?)```/);
+  if (fence) cleaned = fence[1].trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf("{");
+    const end = cleaned.lastIndexOf("}");
+    if (start >= 0 && end > start) {
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1));
+      } catch {
+        return null;
+      }
+    }
+    return null;
   }
 }
 
