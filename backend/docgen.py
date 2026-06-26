@@ -9,6 +9,15 @@ import io
 import re
 
 
+def _clean_dates(dates) -> str:
+    """Drop placeholder 'None' tokens so missing dates don't render as 'None–Present'."""
+    s = str(dates or "").strip()
+    for tok in ("None", "none", "null", "N/A", "?"):
+        s = s.replace(tok, "")
+    s = re.sub(r"^[\s–—\-–—]+|[\s–—\-–—]+$", "", s)  # strip leading/trailing dashes
+    return s if any(ch.isalnum() for ch in s) else ""
+
+
 def resume_to_docx(resume: dict, name: str, contact: str) -> bytes:
     from docx import Document
     from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -51,8 +60,9 @@ def resume_to_docx(resume: dict, name: str, contact: str) -> bytes:
             rb.bold = True
             if e.get("company"):
                 p.add_run(f"  —  {e['company']}")
-            if e.get("dates"):
-                p.add_run(f"   ({e['dates']})").italic = True
+            dates = _clean_dates(e.get("dates"))
+            if dates:
+                p.add_run(f"   ({dates})").italic = True
             for b in e.get("bullets") or []:
                 doc.add_paragraph(b, style="List Bullet")
     if resume.get("education"):
