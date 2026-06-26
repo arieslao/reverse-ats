@@ -571,6 +571,66 @@ Return ONLY valid JSON:
 JSON only — no prose, no markdown fences."""
 
 
+MASTER_TAILOR_SYSTEM_PROMPT = """You tailor a candidate's MASTER résumé to ONE job by editing ONLY three fields. You must NOT rewrite their experience, projects, education, or certifications.
+
+You are given the JD and the master's current SUMMARY + CORE SKILLS. Produce ONLY:
+1. target_title — the JD's EXACT job title (verbatim from the posting; if generic, the closest specific title that is still truthful).
+2. summary_addon — ONE sentence (≤25 words) to APPEND to the existing summary, mirroring the JD's top 2-3 must-have phrases verbatim where the candidate genuinely has them. Must be TRUE. Do NOT restate years; do NOT include any "X+ years" number.
+3. core_skills — the SAME skill lines, REORDERED so the groups the JD emphasizes come first and, within each line, the JD's exact terms appear first. Spell out an acronym once next to its short form (e.g. "Retrieval-Augmented Generation (RAG)"). You MAY add a keyword only if the master already demonstrates it elsewhere. NEVER invent skills. Keep each line's "**Group:**" bold label. Return core_skills as an array of strings, one per skill line.
+
+Rules: change nothing else. Stay truthful. No fabrication.
+Return ONLY valid JSON: {"target_title":"","summary_addon":"","core_skills":["",""]}
+No prose, no markdown fences."""
+
+
+def tailor_master_resume(master_text: str, job: dict, settings: Optional[dict] = None) -> dict:
+    """Surgically tailor a master résumé to a job. Returns {name, contact, target_title, sections} or {error}."""
+    import resume_tailor as rt
+
+    if not settings or settings.get("provider") == "keyword_only":
+        return {"error": "Tailored résumé requires an LLM provider (Admin → LLM Settings)."}
+    provider = settings.get("provider", "openai_compatible")
+    provider_info = PROVIDERS.get(provider, PROVIDERS["openai_compatible"])
+
+    name, contact, sections = rt.split_master(master_text)
+    if not sections:
+        return {"error": "Could not parse the master résumé structure."}
+    cur_summary = rt.summary_text(sections)
+    cur_skills = rt.core_skills_text(sections)
+
+    desc = (job.get("description_full") or job.get("description_snippet") or "")[:3500]
+    user_prompt = (
+        f"## Target job\n{job.get('title','')} at {job.get('company','')}"
+        f"{(' (' + job.get('location') + ')') if job.get('location') else ''}\n\n{desc}\n\n"
+        f"## Master SUMMARY (current)\n{cur_summary}\n\n"
+        f"## Master CORE SKILLS (current)\n{cur_skills}\n\n"
+        "Return the JSON with target_title, summary_addon, and reordered core_skills."
+    )
+    rs = {**settings, "max_tokens": 1500, "temperature": 0.2}
+    try:
+        if provider_info["format"] == "anthropic":
+            content = _call_llm_raw_anthropic(user_prompt, MASTER_TAILOR_SYSTEM_PROMPT, rs, provider_info)
+        else:
+            content = _call_llm_raw(user_prompt, MASTER_TAILOR_SYSTEM_PROMPT, rs, provider_info)
+    except Exception as e:
+        return {"error": str(e)}
+    parsed = _parse_json_object(content)
+    if not isinstance(parsed, dict):
+        return {"error": "Model returned unparseable tailoring. Try again."}
+
+    target_title = (parsed.get("target_title") or job.get("title") or "").strip()
+    addon = (parsed.get("summary_addon") or "").strip()
+    skills = parsed.get("core_skills") or []
+    if isinstance(skills, str):
+        skills = [l for l in skills.splitlines() if l.strip()]
+    skills = [str(s).strip() for s in skills if str(s).strip()]
+    if not skills:  # safety: keep the master's skills verbatim if the model returned nothing
+        skills = [l for l in cur_skills.splitlines() if l.strip()]
+
+    new_sections = rt.apply_tailoring(sections, target_title, addon, skills)
+    return {"name": name, "contact": contact, "target_title": target_title, "sections": new_sections}
+
+
 def generate_tailored_resume(inventory: dict, job: dict, settings: Optional[dict] = None) -> dict:
     """Generate a job-tailored résumé as structured JSON from the inventory."""
     if not settings or settings.get("provider") == "keyword_only":

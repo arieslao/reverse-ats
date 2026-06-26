@@ -255,22 +255,39 @@ _DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.doc
 
 @app.post("/api/jobs/{job_id}/tailored-resume")
 def tailored_resume_endpoint(job_id: str):
-    """Generate a job-tailored résumé from the inventory and return it as a .docx."""
+    """Tailor the user's MASTER résumé to a job (surgical: title + summary + skills);
+    fall back to building from the inventory if no master résumé is on file."""
     conn = _conn()
     try:
         job = get_job(conn, job_id)
         if job is None:
             raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
-        inv = get_inventory(conn)
-        if not inv.get("skills"):
-            raise HTTPException(status_code=400, detail="Build your Skills & Experience inventory first (Admin → Profile).")
         settings = get_llm_settings(conn)
-        from scorer import generate_tailored_resume
-        result = generate_tailored_resume(inv, job, settings)
-        if result.get("error"):
-            raise HTTPException(status_code=502, detail=result["error"])
-        from docgen import resume_to_docx, slug
-        data = resume_to_docx(result, os.environ.get("CANDIDATE_NAME", ""), os.environ.get("CANDIDATE_CONTACT", ""))
+        profile = get_profile(conn)
+        master = (profile.get("resume_text") or "").strip()
+        import resume_tailor as rt
+        from docgen import slug
+
+        if master and rt.looks_like_master(master):
+            from scorer import tailor_master_resume
+            res = tailor_master_resume(master, job, settings)
+            if res.get("error"):
+                raise HTTPException(status_code=502, detail=res["error"])
+            from docgen import master_resume_to_docx
+            data = master_resume_to_docx(
+                res.get("name") or os.environ.get("CANDIDATE_NAME", ""),
+                res.get("contact", ""), res.get("target_title", ""), res.get("sections", []),
+            )
+        else:
+            inv = get_inventory(conn)
+            if not inv.get("skills"):
+                raise HTTPException(status_code=400, detail="Upload your résumé (Admin → Profile) or build the Skills inventory first.")
+            from scorer import generate_tailored_resume
+            result = generate_tailored_resume(inv, job, settings)
+            if result.get("error"):
+                raise HTTPException(status_code=502, detail=result["error"])
+            from docgen import resume_to_docx
+            data = resume_to_docx(result, os.environ.get("CANDIDATE_NAME", ""), os.environ.get("CANDIDATE_CONTACT", ""))
         fn = f"resume_{slug(job.get('company',''))}_{slug(job.get('title',''))}.docx"
         return Response(content=data, media_type=_DOCX_MIME,
                         headers={"Content-Disposition": f'attachment; filename="{fn}"'})

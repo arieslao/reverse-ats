@@ -78,6 +78,67 @@ def resume_to_docx(resume: dict, name: str, contact: str) -> bytes:
     return buf.getvalue()
 
 
+def _add_inline(paragraph, text: str) -> None:
+    """Render a line with **bold** spans into runs on an existing paragraph."""
+    for i, chunk in enumerate(re.split(r"\*\*(.+?)\*\*", text)):
+        if not chunk:
+            continue
+        run = paragraph.add_run(chunk)
+        if i % 2 == 1:  # odd chunks were inside ** **
+            run.bold = True
+
+
+def master_resume_to_docx(name: str, contact: str, target_title: str, sections) -> bytes:
+    """Render the surgically-tailored master résumé (ordered sections) to a .docx.
+
+    Keeps the master's structure; only SUMMARY/CORE SKILLS/title were edited upstream.
+    """
+    from docx import Document
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import Pt
+
+    doc = Document()
+
+    def centered(text: str, *, bold=False, italic=False, size=11):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        r = p.add_run(text)
+        r.bold, r.italic, r.font.size = bold, italic, Pt(size)
+
+    if name:
+        centered(name, bold=True, size=16)
+    if target_title:
+        centered(target_title, italic=True, size=11)
+    if contact:
+        centered(contact, size=9)
+
+    for head, body in sections:
+        sp = doc.add_paragraph()
+        rs = sp.add_run(head.upper())
+        rs.bold = True
+        rs.font.size = Pt(11)
+        for raw in body:
+            ln = raw.rstrip()
+            s = ln.strip()
+            if not s or s == "---":
+                continue
+            if s.startswith("### "):
+                p = doc.add_paragraph()
+                r = p.add_run(s[4:].strip())
+                r.bold = True
+                continue
+            if s.startswith("- ") or s.startswith("• "):
+                p = doc.add_paragraph(style="List Bullet")
+                _add_inline(p, s[2:].strip())
+                continue
+            p = doc.add_paragraph()
+            _add_inline(p, s)
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 def cover_to_docx(text: str, name: str, contact: str, company: str) -> bytes:
     from docx import Document
     from docx.shared import Pt
