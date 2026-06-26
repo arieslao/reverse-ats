@@ -9,35 +9,40 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
-// Tailored résumé / cover letter — POST returns a .docx; trigger a download.
-async function downloadDocx(path: string, fallbackName: string): Promise<void> {
-  const res = await fetch(`${BASE}${path}`, { method: 'POST' })
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({}))
-    throw new Error((d as { detail?: string }).detail || `failed: ${res.status}`)
-  }
-  const blob = await res.blob()
-  const cd = res.headers.get('Content-Disposition') || ''
-  const m = cd.match(/filename="?([^"]+)"?/)
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = m ? m[1] : fallbackName
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  // Keep the blob URL alive until the browser has finished writing the file.
-  // Revoking synchronously truncates the download — especially into a cloud-synced
-  // folder (Google Drive) — leaving a stuck .crdownload. Defer cleanup.
-  setTimeout(() => {
-    a.remove()
-    URL.revokeObjectURL(url)
-  }, 60_000)
+// Tailored résumé / cover letter — browser-native download.
+// We navigate a hidden iframe to a GET endpoint that responds with the .docx as a
+// Content-Disposition attachment, so the browser's own download manager writes the
+// file. This avoids blob/object-URL handling, which fails silently on insecure (HTTP)
+// origins and when saving straight into a cloud-synced folder (the stuck .crdownload).
+function browserDownload(path: string): Promise<void> {
+  const token = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`
+  const sep = path.includes('?') ? '&' : '?'
+  const iframe = document.createElement('iframe')
+  iframe.style.display = 'none'
+  iframe.src = `${BASE}${path}${sep}token=${token}`
+  document.body.appendChild(iframe)
+  // The server sets cookie rats_dl=<token> on the download response, so we can tell
+  // when the file has actually been delivered to the browser's download manager.
+  return new Promise((resolve, reject) => {
+    const started = Date.now()
+    const timer = window.setInterval(() => {
+      if (document.cookie.includes(`rats_dl=${token}`)) {
+        window.clearInterval(timer)
+        document.cookie = 'rats_dl=; path=/; max-age=0'
+        setTimeout(() => iframe.remove(), 5_000)
+        resolve()
+      } else if (Date.now() - started > 75_000) {
+        window.clearInterval(timer)
+        iframe.remove()
+        reject(new Error('Download did not start — check chrome://downloads or try again.'))
+      }
+    }, 500)
+  })
 }
 export const downloadTailoredResume = (jobId: string) =>
-  downloadDocx(`/api/jobs/${encodeURIComponent(jobId)}/tailored-resume`, 'tailored_resume.docx')
+  browserDownload(`/api/jobs/${encodeURIComponent(jobId)}/tailored-resume.docx`)
 export const downloadCoverLetterDocx = (jobId: string) =>
-  downloadDocx(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter-docx`, 'cover_letter.docx')
+  browserDownload(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter.docx`)
 
 // Inventory (skill GROUPS — name + keywords, years reasoned from dated history, basis)
 export interface InvSkill {

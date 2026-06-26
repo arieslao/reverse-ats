@@ -324,6 +324,25 @@ def cover_letter_docx_endpoint(job_id: str):
         conn.close()
 
 
+# Browser-native GET aliases — the browser downloads these directly (Content-Disposition
+# attachment), avoiding blob/object-URL handling that fails on insecure (HTTP) origins
+# and into cloud-synced folders.
+@app.get("/api/jobs/{job_id}/tailored-resume.docx")
+def tailored_resume_get(job_id: str, token: str = ""):
+    resp = tailored_resume_endpoint(job_id)
+    if token:
+        resp.set_cookie("rats_dl", token, max_age=30, path="/")
+    return resp
+
+
+@app.get("/api/jobs/{job_id}/cover-letter.docx")
+def cover_letter_get(job_id: str, token: str = ""):
+    resp = cover_letter_docx_endpoint(job_id)
+    if token:
+        resp.set_cookie("rats_dl", token, max_age=30, path="/")
+    return resp
+
+
 # ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
