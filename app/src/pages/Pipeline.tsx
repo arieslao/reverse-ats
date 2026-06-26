@@ -7,6 +7,7 @@ import {
   generateCoverLetter,
   downloadTailoredResume,
   downloadCoverLetterDocx,
+  emailJobDocs,
 } from '../lib/api'
 import type { PipelineEntry, PipelineStage } from '../lib/types'
 import { StageTag, STAGE_CONFIG } from '../components/StageTag'
@@ -144,15 +145,32 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
   const [showCoverLetter, setShowCoverLetter] = useState(false)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const [hovered, setHovered] = useState(false)
-  const [docBusy, setDocBusy] = useState<'' | 'resume' | 'cover'>('')
+  const [docBusy, setDocBusy] = useState<'' | 'resume' | 'cover' | 'email'>('')
   const [docError, setDocError] = useState<string | null>(null)
+  const [docOk, setDocOk] = useState<string | null>(null)
 
   const handleDownload = async (kind: 'resume' | 'cover') => {
     if (!entry.job_id) return
     setDocBusy(kind)
     setDocError(null)
+    setDocOk(null)
     try {
       await (kind === 'resume' ? downloadTailoredResume(entry.job_id) : downloadCoverLetterDocx(entry.job_id))
+    } catch (e) {
+      setDocError((e as Error).message)
+    } finally {
+      setDocBusy('')
+    }
+  }
+
+  const handleEmail = async () => {
+    if (!entry.job_id) return
+    setDocBusy('email')
+    setDocError(null)
+    setDocOk(null)
+    try {
+      const r = await emailJobDocs(entry.job_id)
+      setDocOk(`Emailed to ${r.to} (${r.attached.length} file${r.attached.length === 1 ? '' : 's'})`)
     } catch (e) {
       setDocError((e as Error).message)
     } finally {
@@ -603,6 +621,18 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
                 >
                   {docBusy === 'cover' ? 'Writing…' : '✉️ Cover Letter (.docx)'}
                 </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleEmail() }}
+                  disabled={docBusy !== ''}
+                  title="Generate résumé + cover letter and email them to you as .docx attachments"
+                  style={{
+                    background: 'rgba(34, 197, 94, 0.12)', border: '1px solid rgba(34, 197, 94, 0.35)',
+                    color: 'var(--color-success)', borderRadius: 5, fontSize: 12, fontWeight: 600,
+                    padding: '6px 12px', cursor: docBusy ? 'not-allowed' : 'pointer', opacity: docBusy ? 0.6 : 1,
+                  }}
+                >
+                  {docBusy === 'email' ? 'Emailing…' : '📧 Email résumé + cover'}
+                </button>
               </>
             )}
 
@@ -623,6 +653,9 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
             )}
             {docError && (
               <span style={{ fontSize: 11, color: 'var(--color-danger)' }}>{docError}</span>
+            )}
+            {docOk && (
+              <span style={{ fontSize: 11, color: 'var(--color-success)' }}>✅ {docOk}</span>
             )}
           </div>
         </div>
