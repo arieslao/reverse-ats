@@ -7,6 +7,7 @@ import io
 import json
 import subprocess
 import sys
+import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -427,13 +428,19 @@ def email_docs_endpoint(job_id: str):
         req.add_header("Authorization", f"Bearer {secret}")
         req.add_header("User-Agent", "Mozilla/5.0 (reverse-ats-gx10)")
         req.add_header("Content-Type", "application/json")
-        try:
-            with urllib.request.urlopen(req, timeout=60) as r:
-                relay = json.loads(r.read().decode())
-        except Exception as e:
-            raise HTTPException(status_code=502, detail=f"Email relay failed: {e}")
+        relay = {}
+        last_err = ""
+        for attempt in range(3):  # the relay/Resend occasionally 502s transiently
+            try:
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    relay = json.loads(r.read().decode())
+                break
+            except urllib.error.HTTPError as e:
+                last_err = f"relay {e.code}: {e.read().decode()[:300]}"
+            except Exception as e:
+                last_err = f"relay error: {e}"
         if not relay.get("ok"):
-            raise HTTPException(status_code=502, detail=f"Email send failed: {relay.get('error')}")
+            raise HTTPException(status_code=502, detail=f"Email send failed — {last_err or relay.get('error')}")
         return {"status": "sent", "to": to, "attached": [a["filename"] for a in attachments]}
     finally:
         conn.close()
