@@ -17,24 +17,25 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 function browserDownload(path: string): Promise<void> {
   const token = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`
   const sep = path.includes('?') ? '&' : '?'
-  const iframe = document.createElement('iframe')
-  iframe.style.display = 'none'
-  iframe.src = `${BASE}${path}${sep}token=${token}`
-  document.body.appendChild(iframe)
-  // The server sets cookie rats_dl=<token> on the download response, so we can tell
-  // when the file has actually been delivered to the browser's download manager.
-  return new Promise((resolve, reject) => {
+  // Standard same-origin download: <a download> pointed at the GET endpoint. The
+  // browser's own download manager fetches + writes the file (Content-Disposition
+  // attachment) — no blob, no iframe, works on HTTP origins.
+  const a = document.createElement('a')
+  a.href = `${BASE}${path}${sep}token=${token}`
+  a.setAttribute('download', '')
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => a.remove(), 2_000)
+  // The server sets cookie rats_dl=<token> once the file is delivered; resolve on
+  // that, or after a hard 35s cap so the button never spins indefinitely.
+  return new Promise((resolve) => {
     const started = Date.now()
     const timer = window.setInterval(() => {
-      if (document.cookie.includes(`rats_dl=${token}`)) {
+      if (document.cookie.includes(`rats_dl=${token}`) || Date.now() - started > 35_000) {
         window.clearInterval(timer)
         document.cookie = 'rats_dl=; path=/; max-age=0'
-        setTimeout(() => iframe.remove(), 5_000)
         resolve()
-      } else if (Date.now() - started > 75_000) {
-        window.clearInterval(timer)
-        iframe.remove()
-        reject(new Error('Download did not start — check chrome://downloads or try again.'))
       }
     }, 500)
   })
