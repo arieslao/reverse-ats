@@ -575,7 +575,7 @@ MASTER_TAILOR_SYSTEM_PROMPT = """You tailor a candidate's MASTER résumé to ONE
 
 You are given the JD and the master's current SUMMARY + CORE SKILLS. Produce ONLY:
 1. target_title — the JD's EXACT job title (verbatim from the posting; if generic, the closest specific title that is still truthful).
-2. summary_addon — ONE sentence (≤25 words) to APPEND to the existing summary, mirroring the JD's top 2-3 must-have phrases verbatim where the candidate genuinely has them. Must be TRUE. Do NOT restate years; do NOT include any "X+ years" number.
+2. summary_addon — ONE sentence (≤25 words) to APPEND to the existing summary. Mirror ONLY the JD must-have phrases that the master SUMMARY or CORE SKILLS already demonstrably support; use those exact terms. If the JD's core asks are NOT supported by the master (e.g. a marketing/sales role vs. an engineering profile), do NOT claim them — instead write a transferable-framing sentence grounded in the master (e.g. enterprise technology / healthcare delivery). NEVER claim a capability absent from the master. Must be TRUE. No years / no "X+ years" number. If nothing honest fits, return an empty string.
 3. core_skills — the SAME skill lines, REORDERED so the groups the JD emphasizes come first and, within each line, the JD's exact terms appear first. Spell out an acronym once next to its short form (e.g. "Retrieval-Augmented Generation (RAG)"). You MAY add a keyword only if the master already demonstrates it elsewhere. NEVER invent skills. Keep each line's "**Group:**" bold label. Return core_skills as an array of strings, one per skill line.
 
 Rules: change nothing else. Stay truthful. No fabrication.
