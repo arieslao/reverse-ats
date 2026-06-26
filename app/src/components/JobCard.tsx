@@ -322,7 +322,7 @@ export function JobCard({ job }: JobCardProps) {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <a
               href={job.url}
               target="_blank"
