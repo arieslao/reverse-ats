@@ -112,6 +112,14 @@ def summary_text(sections) -> str:
     return "\n".join(l for l in sections[i][1] if l.strip() and l.strip() != "---").strip()
 
 
+# Phrases the user does not want in generated résumés, regardless of the master.
+_SCRUB = re.compile(r"\b(?:F500|Fortune\s*500)\b\s*", re.IGNORECASE)
+
+
+def scrub(text: str) -> str:
+    return re.sub(r"\s{2,}", " ", _SCRUB.sub("", text or "")).strip()
+
+
 def apply_tailoring(sections, target_title: str, summary_addon: str, core_skills_lines):
     """Return a new sections list with SUMMARY + CORE SKILLS replaced."""
     out = []
@@ -121,7 +129,7 @@ def apply_tailoring(sections, target_title: str, summary_addon: str, core_skills
             base = " ".join(l.strip() for l in body if l.strip() and l.strip() != "---").strip()
             add = (summary_addon or "").strip()
             merged = (base + (" " + add if add and add.lower() not in base.lower() else "")).strip()
-            out.append((head, [merged]))
+            out.append((head, [scrub(merged)]))
         elif ("CORE SKILL" in h or h.strip() == "SKILLS") and core_skills_lines:
             out.append((head, list(core_skills_lines)))
         else:
