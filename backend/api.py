@@ -384,7 +384,12 @@ def email_docs_endpoint(job_id: str):
     via the existing cloud relay (POST /digest/send). Bypasses browser downloads."""
     cfg = _digest_env()
     base, secret = cfg.get("CF_BASE_URL", "").rstrip("/"), cfg.get("CF_INGEST_SECRET", "")
-    to = cfg.get("EMAIL_TO") or cfg.get("CANDIDATE_CONTACT") or "aries.lao@gmail.com"
+    # Resolve a clean ASCII email — CANDIDATE_CONTACT is a full contact line with
+    # non-ASCII separators (·), which Resend rejects. Extract just the address.
+    import re as _re
+    _candidates = f"{cfg.get('EMAIL_TO','')} {cfg.get('CANDIDATE_CONTACT','')}"
+    _m = _re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", _candidates)
+    to = (_m.group(0) if _m else "aries.lao@gmail.com").strip()
     if not base or not secret:
         raise HTTPException(status_code=503, detail="Email relay not configured (CF_BASE_URL / CF_INGEST_SECRET).")
     conn = _conn()
