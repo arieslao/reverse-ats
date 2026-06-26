@@ -112,26 +112,43 @@ def summary_text(sections) -> str:
     return "\n".join(l for l in sections[i][1] if l.strip() and l.strip() != "---").strip()
 
 
-# Phrases the user does not want in generated résumés, regardless of the master.
-_SCRUB = re.compile(r"\b(?:F500|Fortune\s*500)\b\s*", re.IGNORECASE)
+# Phrases the user does not want in generated résumés, regardless of the master:
+#  - "F500"/"Fortune 500" qualifier
+#  - estimated cost-savings claims (not actual figures) e.g. "...that eliminated an
+#    estimated $18K+/month in equivalent cloud AI cost"
+_SCRUB_PATTERNS = (
+    re.compile(r"\b(?:F500|Fortune\s*500)\b\s*", re.IGNORECASE),
+    re.compile(r"\s*(?:[—–-]\s*)?(?:that |which )?(?:eliminated|saved|cut|avoided|reduced)[^.\n]*?estimated\s+\$[^.\n]*", re.IGNORECASE),
+    re.compile(r"\s*(?:[—–-]\s*)?(?:an?\s+)?estimated\s+\$[\d.,]+\s*[KMB]?\+?\s*/?\s*month[^.\n]*", re.IGNORECASE),
+)
+
+
+def scrub_phrases(text: str) -> str:
+    """Remove unwanted phrases while preserving line formatting (for verbatim sections)."""
+    s = text or ""
+    for p in _SCRUB_PATTERNS:
+        s = p.sub("", s)
+    return s
 
 
 def scrub(text: str) -> str:
-    return re.sub(r"\s{2,}", " ", _SCRUB.sub("", text or "")).strip()
+    """Phrase removal + whitespace normalization (for the rewritten summary)."""
+    return re.sub(r"\s{2,}", " ", scrub_phrases(text)).strip()
 
 
-def apply_tailoring(sections, target_title: str, summary_addon: str, core_skills_lines):
-    """Return a new sections list with SUMMARY + CORE SKILLS replaced."""
+def apply_tailoring(sections, target_title: str, new_summary: str, core_skills_lines):
+    """Return a new sections list with SUMMARY (full grounded rewrite) + CORE SKILLS replaced."""
     out = []
     for head, body in sections:
         h = head.upper()
         if "SUMMARY" in h or "PROFILE" in h:
             base = " ".join(l.strip() for l in body if l.strip() and l.strip() != "---").strip()
-            add = (summary_addon or "").strip()
-            merged = (base + (" " + add if add and add.lower() not in base.lower() else "")).strip()
-            out.append((head, [scrub(merged)]))
+            summ = (new_summary or "").strip() or base
+            out.append((head, [scrub(summ)]))
         elif ("CORE SKILL" in h or h.strip() == "SKILLS") and core_skills_lines:
-            out.append((head, list(core_skills_lines)))
+            out.append((head, [scrub_phrases(l) for l in core_skills_lines]))
         else:
-            out.append((head, body))
+            # Verbatim sections (projects, experience, education, certs) — but still
+            # strip the user's unwanted phrases (F500, estimated cost savings).
+            out.append((head, [scrub_phrases(l) for l in body]))
     return out

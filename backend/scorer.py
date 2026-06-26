@@ -573,13 +573,13 @@ JSON only — no prose, no markdown fences."""
 
 MASTER_TAILOR_SYSTEM_PROMPT = """You tailor a candidate's MASTER résumé to ONE job by editing ONLY three fields. You must NOT rewrite their experience, projects, education, or certifications.
 
-You are given the JD and the master's current SUMMARY + CORE SKILLS. Produce ONLY:
+You are given the JD and the candidate's FULL master résumé. Produce ONLY:
 1. target_title — the JD's EXACT job title (verbatim from the posting; if generic, the closest specific title that is still truthful).
-2. summary_addon — ONE sentence (≤25 words) to APPEND to the existing summary. Mirror ONLY the JD must-have phrases that the master SUMMARY or CORE SKILLS already demonstrably support; use those exact terms. If the JD's core asks are NOT supported by the master (e.g. a marketing/sales role vs. an engineering profile), do NOT claim them — instead write a transferable-framing sentence grounded in the master (e.g. enterprise technology / healthcare delivery). NEVER claim a capability absent from the master. Must be TRUE. No years / no "X+ years" number. If nothing honest fits, return an empty string.
+2. summary — REWRITE the professional summary (3-4 sentences) so it is CATERED to THIS job: lead with the experience, domains, and skills from the master that are most relevant to the JD, and use the JD's key terms WHERE THE CANDIDATE GENUINELY HAS THEM. Every clause must be GROUNDED in the master (its summary, skills, projects, or experience) — do NOT introduce any skill, tool, employer, metric, domain, or claim that is not already in the master. If the JD asks for things the candidate lacks, simply don't mention them (lead with their real transferable strengths instead). Keep the candidate's authentic, senior voice. Do NOT state years or any "X+ years" number.
 3. core_skills — the SAME skill lines, REORDERED so the groups the JD emphasizes come first and, within each line, the JD's exact terms appear first. Spell out an acronym once next to its short form (e.g. "Retrieval-Augmented Generation (RAG)"). You MAY add a keyword only if the master already demonstrates it elsewhere. NEVER invent skills. Keep each line's "**Group:**" bold label. Return core_skills as an array of strings, one per skill line.
 
-Rules: change nothing else. Stay truthful. No fabrication.
-Return ONLY valid JSON: {"target_title":"","summary_addon":"","core_skills":["",""]}
+Rules: change nothing else. Stay strictly truthful — grounded only in the master. No fabrication, no inflation.
+Return ONLY valid JSON: {"target_title":"","summary":"","core_skills":["",""]}
 No prose, no markdown fences."""
 
 
@@ -597,14 +597,15 @@ def tailor_master_resume(master_text: str, job: dict, settings: Optional[dict] =
         return {"error": "Could not parse the master résumé structure."}
     cur_summary = rt.summary_text(sections)
     cur_skills = rt.core_skills_text(sections)
+    full_master = rt.strip_cheatsheet(master_text)[:8000]
 
     desc = (job.get("description_full") or job.get("description_snippet") or "")[:3500]
     user_prompt = (
         f"## Target job\n{job.get('title','')} at {job.get('company','')}"
         f"{(' (' + job.get('location') + ')') if job.get('location') else ''}\n\n{desc}\n\n"
-        f"## Master SUMMARY (current)\n{cur_summary}\n\n"
-        f"## Master CORE SKILLS (current)\n{cur_skills}\n\n"
-        "Return the JSON with target_title, summary_addon, and reordered core_skills."
+        f"## Candidate FULL master résumé (ground everything in this — do not go beyond it)\n{full_master}\n\n"
+        f"## Current CORE SKILLS lines (reorder these)\n{cur_skills}\n\n"
+        "Return the JSON with target_title, a JD-catered grounded summary, and reordered core_skills."
     )
     rs = {**settings, "max_tokens": 1500, "temperature": 0.2}
     try:
@@ -619,7 +620,9 @@ def tailor_master_resume(master_text: str, job: dict, settings: Optional[dict] =
         return {"error": "Model returned unparseable tailoring. Try again."}
 
     target_title = (parsed.get("target_title") or job.get("title") or "").strip()
-    addon = (parsed.get("summary_addon") or "").strip()
+    new_summary = (parsed.get("summary") or "").strip()
+    if not new_summary:  # safety: fall back to the master's summary verbatim
+        new_summary = cur_summary
     skills = parsed.get("core_skills") or []
     if isinstance(skills, str):
         skills = [l for l in skills.splitlines() if l.strip()]
@@ -627,7 +630,7 @@ def tailor_master_resume(master_text: str, job: dict, settings: Optional[dict] =
     if not skills:  # safety: keep the master's skills verbatim if the model returned nothing
         skills = [l for l in cur_skills.splitlines() if l.strip()]
 
-    new_sections = rt.apply_tailoring(sections, target_title, addon, skills)
+    new_sections = rt.apply_tailoring(sections, target_title, new_summary, skills)
     return {"name": name, "contact": contact, "target_title": target_title, "sections": new_sections}
 
 
