@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Job } from '../lib/types'
-import { dismissJob, saveJob, generateCoverLetter, downloadTailoredResume, downloadCoverLetterDocx } from '../lib/api'
+import { dismissJob, saveJob, generateCoverLetter, downloadTailoredResume, downloadCoverLetterDocx, emailJobDocs } from '../lib/api'
 import { ScoreBadge } from './ScoreBadge'
 
 interface JobCardProps {
@@ -58,14 +58,30 @@ export function JobCard({ job }: JobCardProps) {
   const [coverLetterLoading, setCoverLetterLoading] = useState(false)
   const [coverLetterError, setCoverLetterError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const [docBusy, setDocBusy] = useState<'' | 'resume' | 'cover'>('')
+  const [docBusy, setDocBusy] = useState<'' | 'resume' | 'cover' | 'email'>('')
   const [docError, setDocError] = useState<string | null>(null)
+  const [docOk, setDocOk] = useState<string | null>(null)
 
   const handleDownload = async (kind: 'resume' | 'cover') => {
     setDocBusy(kind)
     setDocError(null)
+    setDocOk(null)
     try {
       await (kind === 'resume' ? downloadTailoredResume(job.id) : downloadCoverLetterDocx(job.id))
+    } catch (e) {
+      setDocError((e as Error).message)
+    } finally {
+      setDocBusy('')
+    }
+  }
+
+  const handleEmail = async () => {
+    setDocBusy('email')
+    setDocError(null)
+    setDocOk(null)
+    try {
+      const r = await emailJobDocs(job.id)
+      setDocOk(`Emailed to ${r.to} (${r.attached.length} file${r.attached.length === 1 ? '' : 's'})`)
     } catch (e) {
       setDocError((e as Error).message)
     } finally {
@@ -417,6 +433,25 @@ export function JobCard({ job }: JobCardProps) {
               {docBusy === 'cover' ? 'Writing…' : '✉️ Cover Letter (.docx)'}
             </button>
 
+            <button
+              disabled={docBusy !== ''}
+              onClick={handleEmail}
+              title="Generate résumé + cover letter and email them to you as .docx attachments"
+              style={{
+                background: 'rgba(34, 197, 94, 0.12)',
+                border: '1px solid rgba(34, 197, 94, 0.35)',
+                color: 'var(--color-success)',
+                borderRadius: 6,
+                padding: '6px 14px',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                opacity: docBusy ? 0.6 : 1,
+              }}
+            >
+              {docBusy === 'email' ? 'Emailing…' : '📧 Email résumé + cover letter'}
+            </button>
+
             {!job.dismissed && (
               <button
                 disabled={dismissMut.isPending}
@@ -468,6 +503,20 @@ export function JobCard({ job }: JobCardProps) {
               color: 'var(--color-danger)',
             }}>
               {docError}
+            </div>
+          )}
+
+          {docOk && (
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              background: 'rgba(34, 197, 94, 0.06)',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+              borderRadius: 6,
+              fontSize: 13,
+              color: 'var(--color-success)',
+            }}>
+              ✅ {docOk}
             </div>
           )}
 

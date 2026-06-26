@@ -44,6 +44,10 @@ export const downloadTailoredResume = (jobId: string) =>
   browserDownload(`/api/jobs/${encodeURIComponent(jobId)}/tailored-resume.docx`)
 export const downloadCoverLetterDocx = (jobId: string) =>
   browserDownload(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter.docx`)
+// Email both docs as .docx attachments (no browser download involved).
+export const emailJobDocs = (jobId: string) =>
+  request<{ status: string; to: string; attached: string[] }>(
+    `/api/jobs/${encodeURIComponent(jobId)}/email-docs`, { method: 'POST' })
 
 // Inventory (skill GROUPS — name + keywords, years reasoned from dated history, basis)
 export interface InvSkill {
