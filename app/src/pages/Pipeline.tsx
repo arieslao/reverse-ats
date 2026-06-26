@@ -5,6 +5,8 @@ import {
   updatePipelineEntry,
   deletePipelineEntry,
   generateCoverLetter,
+  downloadTailoredResume,
+  downloadCoverLetterDocx,
 } from '../lib/api'
 import type { PipelineEntry, PipelineStage } from '../lib/types'
 import { StageTag, STAGE_CONFIG } from '../components/StageTag'
@@ -142,6 +144,21 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
   const [showCoverLetter, setShowCoverLetter] = useState(false)
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false)
   const [hovered, setHovered] = useState(false)
+  const [docBusy, setDocBusy] = useState<'' | 'resume' | 'cover'>('')
+  const [docError, setDocError] = useState<string | null>(null)
+
+  const handleDownload = async (kind: 'resume' | 'cover') => {
+    if (!entry.job_id) return
+    setDocBusy(kind)
+    setDocError(null)
+    try {
+      await (kind === 'resume' ? downloadTailoredResume(entry.job_id) : downloadCoverLetterDocx(entry.job_id))
+    } catch (e) {
+      setDocError((e as Error).message)
+    } finally {
+      setDocBusy('')
+    }
+  }
   const [form, setForm] = useState({
     stage: entry.stage,
     notes: entry.notes || '',
@@ -560,6 +577,35 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
               {updateMut.isPending ? 'Saving…' : 'Save Changes'}
             </button>
 
+            {entry.job_id && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDownload('resume') }}
+                  disabled={docBusy !== ''}
+                  title="Generate a résumé tailored to this job and download as .docx"
+                  style={{
+                    background: 'rgba(59, 130, 246, 0.12)', border: '1px solid rgba(59, 130, 246, 0.35)',
+                    color: 'var(--color-accent)', borderRadius: 5, fontSize: 12, fontWeight: 500,
+                    padding: '6px 12px', cursor: docBusy ? 'not-allowed' : 'pointer', opacity: docBusy ? 0.6 : 1,
+                  }}
+                >
+                  {docBusy === 'resume' ? 'Tailoring…' : '📄 Tailored Résumé'}
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDownload('cover') }}
+                  disabled={docBusy !== ''}
+                  title="Generate the cover letter and download as .docx"
+                  style={{
+                    background: 'rgba(168, 85, 247, 0.10)', border: '1px solid rgba(168, 85, 247, 0.3)',
+                    color: '#a855f7', borderRadius: 5, fontSize: 12, fontWeight: 500,
+                    padding: '6px 12px', cursor: docBusy ? 'not-allowed' : 'pointer', opacity: docBusy ? 0.6 : 1,
+                  }}
+                >
+                  {docBusy === 'cover' ? 'Writing…' : '✉️ Cover Letter (.docx)'}
+                </button>
+              </>
+            )}
+
             {url && (
               <a
                 href={url}
@@ -574,6 +620,9 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
 
             {updateMut.isError && (
               <span style={{ fontSize: 11, color: 'var(--color-danger)' }}>Save failed</span>
+            )}
+            {docError && (
+              <span style={{ fontSize: 11, color: 'var(--color-danger)' }}>{docError}</span>
             )}
           </div>
         </div>
