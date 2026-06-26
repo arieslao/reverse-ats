@@ -49,6 +49,15 @@ export const emailJobDocs = (jobId: string) =>
   request<{ status: string; to: string; attached: string[] }>(
     `/api/jobs/${encodeURIComponent(jobId)}/email-docs`, { method: 'POST' })
 
+// Target-role résumé — tailor the master to any free-text role (+ optional focus/JD).
+export const emailTargetResume = (role: string, focus: string) =>
+  request<{ status: string; to: string; attached: string[] }>('/api/target-resume/email', {
+    method: 'POST', body: JSON.stringify({ role, focus }),
+  })
+export const downloadTargetResume = (role: string, focus: string) =>
+  browserDownload(
+    `/api/target-resume.docx?role=${encodeURIComponent(role)}&focus=${encodeURIComponent(focus)}`)
+
 // Inventory (skill GROUPS — name + keywords, years reasoned from dated history, basis)
 export interface InvSkill {
   name: string

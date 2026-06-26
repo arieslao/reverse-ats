@@ -5,6 +5,7 @@ import base64
 import csv
 import io
 import json
+import re
 import subprocess
 import sys
 import urllib.error
@@ -447,6 +448,95 @@ def email_docs_endpoint(job_id: str):
         if not relay.get("ok"):
             raise HTTPException(status_code=502, detail=f"Email send failed — {last_err or relay.get('error')}")
         return {"status": "sent", "to": to, "attached": [a["filename"] for a in attachments]}
+    finally:
+        conn.close()
+
+
+def _relay_send(to: str, subject: str, html: str, attachments: list) -> str:
+    """POST an email through the Worker /digest/send relay (3× retry). Returns '' on
+    success or an error message."""
+    cfg = _digest_env()
+    base, secret = cfg.get("CF_BASE_URL", "").rstrip("/"), cfg.get("CF_INGEST_SECRET", "")
+    if not base or not secret:
+        return "Email relay not configured (CF_BASE_URL / CF_INGEST_SECRET)."
+    payload = json.dumps({"to": to, "subject": subject, "html": html, "attachments": attachments}).encode()
+    req = urllib.request.Request(f"{base}/digest/send", data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {secret}")
+    req.add_header("User-Agent", "Mozilla/5.0 (reverse-ats-gx10)")
+    req.add_header("Content-Type", "application/json")
+    last = ""
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=90) as r:
+                if json.loads(r.read().decode()).get("ok"):
+                    return ""
+        except urllib.error.HTTPError as e:
+            last = f"relay {e.code}: {e.read().decode()[:200]}"
+        except Exception as e:  # noqa: BLE001
+            last = f"relay error: {e}"
+    return last or "send failed"
+
+
+def _relay_recipient() -> str:
+    cfg = _digest_env()
+    m = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+                  f"{cfg.get('EMAIL_TO','')} {cfg.get('CANDIDATE_CONTACT','')}")
+    return (m.group(0) if m else "aries.lao@gmail.com").strip()
+
+
+def _target_resume_bytes(conn, role: str, focus: str):
+    """Tailor the master résumé to a free-text target role (optionally + focus/JD text)."""
+    role = (role or "").strip()
+    if not role:
+        raise HTTPException(status_code=400, detail="Enter a target role (e.g. 'Healthcare Program Manager').")
+    profile = get_profile(conn)
+    master = (profile.get("resume_text") or "").strip()
+    import resume_tailor as rt
+    if not (master and rt.looks_like_master(master)):
+        raise HTTPException(status_code=400, detail="No master résumé on file — upload it in Admin → Profile first.")
+    job = {"title": role, "company": "", "location": "Remote",
+           "description_full": (f"Target role: {role}.\n\n{(focus or '').strip()}").strip()}
+    from scorer import tailor_master_resume
+    from docgen import master_resume_to_docx, slug
+    res = tailor_master_resume(master, job, get_llm_settings(conn))
+    if res.get("error"):
+        raise HTTPException(status_code=502, detail=res["error"])
+    data = master_resume_to_docx(res.get("name") or os.environ.get("CANDIDATE_NAME", ""),
+                                 res.get("contact", ""), res.get("target_title", ""), res.get("sections", []))
+    return f"resume_{slug(role)}.docx", data
+
+
+@app.get("/api/target-resume.docx")
+def target_resume_get(role: str = "", focus: str = "", token: str = ""):
+    """Browser-native download of a résumé tailored to a free-text target role."""
+    conn = _conn()
+    try:
+        fn, data = _target_resume_bytes(conn, role, focus)
+        resp = Response(content=data, media_type=_DOCX_MIME,
+                        headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+        if token:
+            resp.set_cookie("rats_dl", token, max_age=30, path="/")
+        return resp
+    finally:
+        conn.close()
+
+
+@app.post("/api/target-resume/email")
+def target_resume_email(payload: dict = Body(...)):
+    """Generate a target-role résumé and email it as a .docx attachment."""
+    conn = _conn()
+    try:
+        fn, data = _target_resume_bytes(conn, payload.get("role", ""), payload.get("focus", ""))
+        to = _relay_recipient()
+        role = (payload.get("role") or "").strip()
+        html = (f"<p>Your résumé tailored toward <b>{role}</b> is attached (.docx), "
+                f"generated from your master résumé.</p>"
+                f"<p style='color:#888;font-size:12px'>Private Reverse-ATS instance.</p>")
+        err = _relay_send(to, f"Tailored résumé — {role}", html,
+                          [{"filename": fn, "content": base64.b64encode(data).decode()}])
+        if err:
+            raise HTTPException(status_code=502, detail=f"Email send failed — {err}")
+        return {"status": "sent", "to": to, "attached": [fn]}
     finally:
         conn.close()
 

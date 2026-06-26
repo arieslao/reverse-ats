@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import { fetchJobs, fetchFeedIndustries, fetchFeedLocations } from '../lib/api'
 import { JobCard } from '../components/JobCard'
 import { FilterBar } from '../components/FilterBar'
+import { TargetRoleResume } from '../components/TargetRoleResume'
 
 const PAGE_SIZE = 20
 
@@ -180,6 +181,9 @@ export function Feed() {
         </button>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
+
+      {/* Generate a résumé for any target role (not tied to a posting) */}
+      <TargetRoleResume />
 
       {/* Filters */}
       <FilterBar
