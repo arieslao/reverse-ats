@@ -86,10 +86,10 @@ Output ONLY valid JSON:
 JSON only — no prose, no markdown fences."""
 
 COVER_SYSTEM = (
-    "You write concise, specific cover letters. 3 short paragraphs (~300 words), no fluff, no clichés. "
-    "Reference real experience from the candidate inventory and real requirements from the job. "
-    "Lead with the candidate's strongest matches to the role. Return ONLY the letter body — no greeting "
-    "line, no signature, no markdown."
+    "Write a SHORT, simple, straightforward cover letter. 3 short paragraphs, ~180 words total, plain "
+    "everyday language — no clichés, no flowery adjectives, no buzzwords, no fluff. Get straight to the "
+    "point: why this candidate fits THIS specific role, citing 2-3 concrete things from their experience. "
+    "Sound like a real, direct person. Return ONLY the letter body — no greeting line, no signature, no markdown."
 )
 
 
@@ -393,8 +393,11 @@ def _run() -> int:
 
         attachments: list[dict] = []
         doc_job_ids: set[str] = set()
-        to_doc = [m for m in matches if m.get("fit_score", 0) >= threshold][:max_docs]
-        log.info("user %s: %d matches, generating docs for %d (≥%d%%)", email, len(matches), len(to_doc), threshold)
+        # Attach docs for the TOP N matches by fit (default 5), not every ≥threshold.
+        top_n = int(_env("DOC_TOP_N", "5"))
+        ranked = sorted(matches, key=lambda m: m.get("fit_score", 0), reverse=True)
+        to_doc = ranked[:top_n]
+        log.info("user %s: %d matches, generating docs for top %d", email, len(matches), len(to_doc))
 
         for m in to_doc:
             try:

@@ -9,6 +9,30 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+// Tailored résumé / cover letter — POST returns a .docx; trigger a download.
+async function downloadDocx(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(`${BASE}${path}`, { method: 'POST' })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    throw new Error((d as { detail?: string }).detail || `failed: ${res.status}`)
+  }
+  const blob = await res.blob()
+  const cd = res.headers.get('Content-Disposition') || ''
+  const m = cd.match(/filename="?([^"]+)"?/)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = m ? m[1] : fallbackName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+export const downloadTailoredResume = (jobId: string) =>
+  downloadDocx(`/api/jobs/${encodeURIComponent(jobId)}/tailored-resume`, 'tailored_resume.docx')
+export const downloadCoverLetterDocx = (jobId: string) =>
+  downloadDocx(`/api/jobs/${encodeURIComponent(jobId)}/cover-letter-docx`, 'cover_letter.docx')
+
 // Inventory (skill GROUPS — name + keywords, years reasoned from dated history, basis)
 export interface InvSkill {
   name: string

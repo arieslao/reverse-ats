@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Job } from '../lib/types'
-import { dismissJob, saveJob, generateCoverLetter } from '../lib/api'
+import { dismissJob, saveJob, generateCoverLetter, downloadTailoredResume, downloadCoverLetterDocx } from '../lib/api'
 import { ScoreBadge } from './ScoreBadge'
 
 interface JobCardProps {
@@ -58,6 +58,20 @@ export function JobCard({ job }: JobCardProps) {
   const [coverLetterLoading, setCoverLetterLoading] = useState(false)
   const [coverLetterError, setCoverLetterError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [docBusy, setDocBusy] = useState<'' | 'resume' | 'cover'>('')
+  const [docError, setDocError] = useState<string | null>(null)
+
+  const handleDownload = async (kind: 'resume' | 'cover') => {
+    setDocBusy(kind)
+    setDocError(null)
+    try {
+      await (kind === 'resume' ? downloadTailoredResume(job.id) : downloadCoverLetterDocx(job.id))
+    } catch (e) {
+      setDocError((e as Error).message)
+    } finally {
+      setDocBusy('')
+    }
+  }
 
   const dismissMut = useMutation({
     mutationFn: () => dismissJob(job.id),
@@ -365,6 +379,44 @@ export function JobCard({ job }: JobCardProps) {
               {coverLetterLoading ? 'Generating...' : 'Draft Cover Letter'}
             </button>
 
+            <button
+              disabled={docBusy !== ''}
+              onClick={() => handleDownload('resume')}
+              title="Generate a résumé tailored to this job and download as .docx"
+              style={{
+                background: 'rgba(59, 130, 246, 0.12)',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                color: 'var(--color-accent)',
+                borderRadius: 6,
+                padding: '6px 14px',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                opacity: docBusy ? 0.6 : 1,
+              }}
+            >
+              {docBusy === 'resume' ? 'Tailoring…' : '📄 Tailored Résumé (.docx)'}
+            </button>
+
+            <button
+              disabled={docBusy !== ''}
+              onClick={() => handleDownload('cover')}
+              title="Generate the cover letter and download as .docx"
+              style={{
+                background: 'rgba(168, 85, 247, 0.10)',
+                border: '1px solid rgba(168, 85, 247, 0.3)',
+                color: '#a855f7',
+                borderRadius: 6,
+                padding: '6px 14px',
+                fontSize: 13,
+                fontWeight: 500,
+                cursor: 'pointer',
+                opacity: docBusy ? 0.6 : 1,
+              }}
+            >
+              {docBusy === 'cover' ? 'Writing…' : '✉️ Cover Letter (.docx)'}
+            </button>
+
             {!job.dismissed && (
               <button
                 disabled={dismissMut.isPending}
@@ -402,6 +454,20 @@ export function JobCard({ job }: JobCardProps) {
               color: 'var(--color-danger)',
             }}>
               {coverLetterError}
+            </div>
+          )}
+
+          {docError && (
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              background: 'rgba(239, 68, 68, 0.05)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              borderRadius: 6,
+              fontSize: 13,
+              color: 'var(--color-danger)',
+            }}>
+              {docError}
             </div>
           )}
 

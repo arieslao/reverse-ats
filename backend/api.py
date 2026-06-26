@@ -11,7 +11,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Body, FastAPI, File, HTTPException, Query, UploadFile
+import os
+
+from fastapi import Body, FastAPI, File, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -244,6 +246,63 @@ def generate_cover_letter_endpoint(job_id: str):
                 )
                 conn.commit()
         return result
+    finally:
+        conn.close()
+
+
+_DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+@app.post("/api/jobs/{job_id}/tailored-resume")
+def tailored_resume_endpoint(job_id: str):
+    """Generate a job-tailored résumé from the inventory and return it as a .docx."""
+    conn = _conn()
+    try:
+        job = get_job(conn, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+        inv = get_inventory(conn)
+        if not inv.get("skills"):
+            raise HTTPException(status_code=400, detail="Build your Skills & Experience inventory first (Admin → Profile).")
+        settings = get_llm_settings(conn)
+        from scorer import generate_tailored_resume
+        result = generate_tailored_resume(inv, job, settings)
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail=result["error"])
+        from docgen import resume_to_docx, slug
+        data = resume_to_docx(result, os.environ.get("CANDIDATE_NAME", ""), os.environ.get("CANDIDATE_CONTACT", ""))
+        fn = f"resume_{slug(job.get('company',''))}_{slug(job.get('title',''))}.docx"
+        return Response(content=data, media_type=_DOCX_MIME,
+                        headers={"Content-Disposition": f'attachment; filename="{fn}"'})
+    finally:
+        conn.close()
+
+
+@app.post("/api/jobs/{job_id}/cover-letter-docx")
+def cover_letter_docx_endpoint(job_id: str):
+    """Generate the (succinct) cover letter and return it as a .docx download."""
+    conn = _conn()
+    try:
+        job = get_job(conn, job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+        profile = get_profile(conn)
+        settings = get_llm_settings(conn)
+        from scorer import generate_cover_letter
+        result = generate_cover_letter(
+            title=job["title"], company=job["company"], location=job.get("location", ""),
+            department=job.get("department", ""),
+            description=job.get("description_snippet", "") or job.get("description_full", ""),
+            resume_text=profile.get("resume_text"), settings=settings,
+        )
+        if result.get("error"):
+            raise HTTPException(status_code=502, detail=result["error"])
+        from docgen import cover_to_docx, slug
+        data = cover_to_docx(result.get("cover_letter", ""), os.environ.get("CANDIDATE_NAME", ""),
+                             os.environ.get("CANDIDATE_CONTACT", ""), job.get("company", ""))
+        fn = f"cover_{slug(job.get('company',''))}_{slug(job.get('title',''))}.docx"
+        return Response(content=data, media_type=_DOCX_MIME,
+                        headers={"Content-Disposition": f'attachment; filename="{fn}"'})
     finally:
         conn.close()
 

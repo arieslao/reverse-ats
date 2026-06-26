@@ -545,20 +545,77 @@ def _validate_result(result: dict) -> dict:
 # Cover letter generation
 # ---------------------------------------------------------------------------
 
-COVER_LETTER_SYSTEM_PROMPT = """You are an expert career coach and professional writer. Generate a concise, compelling cover letter that positions the candidate as a strong fit for this specific role.
+COVER_LETTER_SYSTEM_PROMPT = """Write a SHORT, simple, straightforward cover letter for this specific role.
 
 Guidelines:
-- Keep it to 3-4 short paragraphs (250-350 words total)
-- Opening: State the specific role and company, and one compelling reason you're a great fit
-- Middle: Connect 2-3 of the candidate's most relevant achievements/skills directly to the job requirements. Use specific metrics and outcomes from the resume, not generic claims
-- Closing: Express enthusiasm and a clear call to action
-- Tone: Professional but warm, confident but not arrogant
-- Do NOT use cliches like "I am writing to express my interest" or "I believe I would be a great fit"
-- Do NOT fabricate experience — only reference what's in the resume
-- Tailor the language to the company's industry and culture
-- If the candidate's resume is missing or minimal, write a shorter letter focused on transferable skills
+- 3 short paragraphs, ~180 words total. Plain, everyday language.
+- NO clichés, NO flowery adjectives, NO buzzwords, NO fluff. Sound like a real, direct person.
+- Get to the point: why this candidate fits THIS role, citing 2-3 concrete things from their experience (real metrics/outcomes, not generic claims).
+- Do NOT use openers like "I am writing to express my interest" or "I believe I would be a great fit".
+- Do NOT fabricate experience — only what's in the résumé/inventory.
 
-Return ONLY the cover letter text. No JSON, no markdown headers, no "Dear Hiring Manager" unless it fits naturally. Start with a strong opening sentence."""
+Return ONLY the cover letter body — no JSON, no markdown, no greeting/signature lines."""
+
+
+TAILORED_RESUME_SYSTEM_PROMPT = """You are an expert résumé writer tailoring a candidate's résumé to ONE specific job for ATS systems.
+
+Use the candidate's inventory + the target job. Apply these rules:
+1. HEADLINE — the job's EXACT title (ATS title-matching is real); closest specific match if generic.
+2. SUMMARY — 2-3 sentences aimed at THIS role; end with a sentence mirroring the JD's top 2-3 must-have phrases verbatim (kept truthful). Do NOT state a hard total-years number.
+3. SKILLS — reorder so the JD's required/nice-to-have skills the candidate HAS appear first, using the JD's exact terms. Spell out an acronym once next to its short form. Add a keyword ONLY if the inventory supports it.
+4. EXPERIENCE — rewrite each role's bullets to foreground experience relevant to THIS job, quantified where the source gives numbers, action-verb first.
+5. NEVER invent skills, employers, titles, dates, or metrics — only reframe what's there. Frame any career transition as deliberate.
+
+Return ONLY valid JSON:
+{"headline":"","summary":"","skills":["",""],"experience":[{"company":"","title":"","dates":"","bullets":["",""]}],"education":["",""],"certifications":["",""]}
+JSON only — no prose, no markdown fences."""
+
+
+def generate_tailored_resume(inventory: dict, job: dict, settings: Optional[dict] = None) -> dict:
+    """Generate a job-tailored résumé as structured JSON from the inventory."""
+    if not settings or settings.get("provider") == "keyword_only":
+        return {"error": "Tailored résumé requires an LLM provider (Admin → LLM Settings)."}
+    provider = settings.get("provider", "openai_compatible")
+    provider_info = PROVIDERS.get(provider, PROVIDERS["openai_compatible"])
+
+    # Compact inventory digest (skill groups + experience).
+    lines = []
+    if inventory.get("summary"):
+        lines.append(f"Summary: {inventory['summary']}")
+    groups = sorted(inventory.get("skills") or [], key=lambda g: (g.get("years_num") or 0), reverse=True)
+    if groups:
+        lines.append("Skill areas (strongest first): " + "; ".join(
+            f"{g.get('name')} ({g.get('years_label') or ''}): {', '.join(g.get('keywords') or [])}" for g in groups))
+    for e in inventory.get("experience") or []:
+        lines.append(f"- {e.get('title','')} at {e.get('company','')} ({e.get('start','?')}–{e.get('end') or 'Present'})")
+        for h in (e.get("highlights") or []):
+            lines.append(f"  • {h}")
+    if inventory.get("education"):
+        lines.append("Education: " + "; ".join(
+            f"{x.get('degree','')} {x.get('field','')} {x.get('school','')}".strip() for x in inventory["education"]))
+    if inventory.get("certifications"):
+        lines.append("Certifications: " + ", ".join(c.get("name", "") for c in inventory["certifications"]))
+    inv_text = "\n".join(lines)
+
+    desc = (job.get("description_full") or job.get("description_snippet") or "")[:3000]
+    user_prompt = (
+        f"## Candidate inventory\n{inv_text[:5000]}\n\n"
+        f"## Target job\n{job.get('title','')} at {job.get('company','')}"
+        f"{(' (' + job.get('location') + ')') if job.get('location') else ''}\n\n{desc}\n\n"
+        "Produce the tailored résumé JSON per the instructions."
+    )
+    rs = {**settings, "max_tokens": 3000, "temperature": 0.3}
+    try:
+        if provider_info["format"] == "anthropic":
+            content = _call_llm_raw_anthropic(user_prompt, TAILORED_RESUME_SYSTEM_PROMPT, rs, provider_info)
+        else:
+            content = _call_llm_raw(user_prompt, TAILORED_RESUME_SYSTEM_PROMPT, rs, provider_info)
+    except Exception as e:
+        return {"error": str(e)}
+    parsed = _parse_json_object(content)
+    if not isinstance(parsed, dict):
+        return {"error": "Model returned unparseable résumé. Try again."}
+    return parsed
 
 
 def generate_cover_letter(
