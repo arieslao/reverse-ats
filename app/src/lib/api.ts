@@ -23,10 +23,16 @@ async function downloadDocx(path: string, fallbackName: string): Promise<void> {
   const a = document.createElement('a')
   a.href = url
   a.download = m ? m[1] : fallbackName
+  a.rel = 'noopener'
   document.body.appendChild(a)
   a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
+  // Keep the blob URL alive until the browser has finished writing the file.
+  // Revoking synchronously truncates the download — especially into a cloud-synced
+  // folder (Google Drive) — leaving a stuck .crdownload. Defer cleanup.
+  setTimeout(() => {
+    a.remove()
+    URL.revokeObjectURL(url)
+  }, 60_000)
 }
 export const downloadTailoredResume = (jobId: string) =>
   downloadDocx(`/api/jobs/${encodeURIComponent(jobId)}/tailored-resume`, 'tailored_resume.docx')
