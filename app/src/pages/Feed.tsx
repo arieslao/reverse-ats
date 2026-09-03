@@ -8,6 +8,16 @@ import { TargetRoleResume } from '../components/TargetRoleResume'
 
 const PAGE_SIZE = 20
 
+// Prominent one-click status filters shown above the job list (maps to the
+// backend `stage` param — filters across ALL pages, not just the visible one).
+const STATUS_CHIPS = [
+  { value: '', label: 'All' },
+  { value: 'none', label: 'Not in Pipeline' },
+  { value: 'saved', label: 'Saved' },
+  { value: 'applied', label: '✓ Applied' },
+  { value: 'in_pipeline', label: 'In Pipeline' },
+]
+
 interface FilterState {
   search: string
   category: string
@@ -15,6 +25,8 @@ interface FilterState {
   remote_only: boolean
   since_days: number
   sort_by: string
+  stage: string
+  dismissed: boolean
   exclude_companies: string
   locations: string[]
 }
@@ -28,6 +40,8 @@ function parseFilters(params: URLSearchParams): FilterState {
     remote_only: params.get('remote_only') === 'true',
     since_days: Number(params.get('since_days') || 0),
     sort_by: params.get('sort_by') || 'score',
+    stage: params.get('stage') || '',
+    dismissed: params.get('dismissed') === 'true',
     exclude_companies: params.get('exclude_companies') || '',
     locations: rawLocs ? rawLocs.split(',').map((s) => s.trim()).filter(Boolean) : [],
   }
@@ -38,6 +52,7 @@ export function Feed() {
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState<FilterState>(() => parseFilters(searchParams))
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [refreshMsg, setRefreshMsg] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   useEffect(() => {
@@ -52,8 +67,19 @@ export function Feed() {
   if (filters.category) queryParams.category = filters.category
   if (filters.min_score > 0) queryParams.min_score = filters.min_score
   if (filters.remote_only) queryParams.remote_only = true
-  if (filters.since_days > 0) queryParams.since_days = filters.since_days
+  if (filters.since_days > 0) {
+    // Backend filters by an ISO `new_since` cutoff, NOT a day count. Floor to
+    // local midnight so the value is STABLE across renders — using Date.now()
+    // here changed the value every render, making React Query refetch forever
+    // ("Loading jobs…" never settling). Only changes when the calendar day does.
+    const cutoff = new Date()
+    cutoff.setHours(0, 0, 0, 0)
+    cutoff.setDate(cutoff.getDate() - (filters.since_days - 1))
+    queryParams.new_since = cutoff.toISOString()
+  }
   if (filters.sort_by && filters.sort_by !== 'score') queryParams.sort_by = filters.sort_by
+  if (filters.stage) queryParams.stage = filters.stage
+  if (filters.dismissed) queryParams.dismissed = true
   if (filters.exclude_companies) queryParams.exclude_companies = filters.exclude_companies
   if (filters.locations.length > 0) queryParams.locations = filters.locations.join(',')
 
@@ -101,21 +127,42 @@ export function Feed() {
     if (newFilters.remote_only) params.remote_only = 'true'
     if (newFilters.since_days > 0) params.since_days = String(newFilters.since_days)
     if (newFilters.sort_by && newFilters.sort_by !== 'score') params.sort_by = newFilters.sort_by
+    if (newFilters.stage) params.stage = newFilters.stage
+    if (newFilters.dismissed) params.dismissed = 'true'
     if (newFilters.exclude_companies) params.exclude_companies = newFilters.exclude_companies
     if (newFilters.locations.length > 0) params.locations = newFilters.locations.join(',')
     setSearchParams(params, { replace: true })
   }
 
+  // Pull from ALL configured sources, then score new jobs so they surface:
+  //   1. Remote First Jobs + scoring — backend (free, local Qwen)
+  //   2. Indeed + scoring — Mac apply-agent (best-effort; uses Claude credits)
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    // Trigger a full scrape + score run on the backend (runs in background)
+    setRefreshMsg(null)
     try {
       await fetch('/api/scrape/trigger', { method: 'POST' })
-    } catch { /* ignore — scrape runs async */ }
-    // Refresh the UI data
+    } catch { /* runs async on the backend */ }
+    let indeed = false
+    try {
+      const r = await fetch('http://127.0.0.1:8765/pull_indeed', { method: 'POST' })
+      indeed = r.ok
+    } catch { indeed = false }
+    setRefreshMsg(
+      indeed
+        ? 'Pulling Remote First Jobs + IA40 boards + Indeed and scoring in the background (~2–4 min). New jobs appear here automatically as they finish — no need to click Refresh again.'
+        : 'Pulling Remote First Jobs + IA40 boards + scoring in the background (~1–2 min). New jobs appear automatically. (Indeed skipped — the Mac apply-agent isn’t running.)',
+    )
     await queryClient.invalidateQueries({ queryKey: ['jobs'] })
     await queryClient.invalidateQueries({ queryKey: ['scrape-status'] })
     setTimeout(() => setIsRefreshing(false), 2000)
+    // Auto-refetch as the background pull + scoring complete, so the user never
+    // has to re-click Refresh (which would re-trigger a paid Indeed pull).
+    setTimeout(() => queryClient.invalidateQueries({ queryKey: ['jobs'] }), 60_000)
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      setRefreshMsg(null)
+    }, 200_000)
   }
 
   const totalPages = data ? Math.ceil(data.total / PAGE_SIZE) : 1
@@ -181,6 +228,16 @@ export function Feed() {
         </button>
         <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
+
+      {refreshMsg && (
+        <div style={{
+          marginBottom: 12, padding: '8px 14px',
+          background: 'rgba(59,130,246,0.10)', border: '1px solid rgba(59,130,246,0.3)',
+          borderRadius: 6, fontSize: 13, color: 'var(--color-accent)',
+        }}>
+          ⏳ {refreshMsg}
+        </div>
+      )}
 
       {/* Generate a résumé for any target role (not tied to a posting) */}
       <TargetRoleResume />
@@ -256,6 +313,8 @@ export function Feed() {
               filters.min_score > 0 ||
               filters.exclude_companies ||
               filters.since_days > 0 ||
+              filters.stage ||
+              filters.dismissed ||
               filters.locations.length > 0,
           )}
           totalEverScraped={data?.total ?? 0}
@@ -263,6 +322,43 @@ export function Feed() {
           onTriggerScrape={handleRefresh}
         />
       )}
+
+      {/* Quick status filter — one click, filters across all pages */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 2 }}>Status:</span>
+        {STATUS_CHIPS.map((c) => {
+          const active = (filters.stage || '') === c.value
+          return (
+            <button
+              key={c.value || 'all'}
+              onClick={() => handleFilterChange({ ...filters, stage: c.value })}
+              style={{
+                fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+                border: '1px solid',
+                borderColor: active ? 'var(--color-accent)' : 'var(--color-border-muted)',
+                background: active ? 'rgba(59,130,246,0.18)' : 'transparent',
+                color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              }}
+            >
+              {c.label}
+            </button>
+          )
+        })}
+        <div style={{ width: 1, height: 18, background: 'var(--color-border-muted)', margin: '0 4px' }} />
+        <button
+          onClick={() => handleFilterChange({ ...filters, dismissed: !filters.dismissed })}
+          title="Show the jobs you've dismissed (with a Restore button on each)"
+          style={{
+            fontSize: 12, fontWeight: 600, padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+            border: '1px solid',
+            borderColor: filters.dismissed ? 'var(--color-danger)' : 'var(--color-border-muted)',
+            background: filters.dismissed ? 'rgba(239,68,68,0.15)' : 'transparent',
+            color: filters.dismissed ? 'var(--color-danger)' : 'var(--color-text-secondary)',
+          }}
+        >
+          🗑 {filters.dismissed ? 'Showing dismissed' : 'Show dismissed'}
+        </button>
+      </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <button

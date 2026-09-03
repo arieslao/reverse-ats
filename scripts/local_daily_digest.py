@@ -58,7 +58,11 @@ def _recipient(profile_contact: str) -> str:
 def _run(cmd: list, label: str) -> None:
     env = {**os.environ, "REVERSE_ATS_DB_PATH": DB_PATH}
     log(f"{label}: {' '.join(cmd)}")
-    r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=1800)
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True, timeout=1800)
+    except subprocess.TimeoutExpired:
+        log(f"{label} timed out after 1800s — continuing; scoring commits per-job and resumes next run")
+        return
     if r.returncode != 0:
         log(f"{label} exited {r.returncode}: {r.stderr[-300:]}")
     else:
@@ -110,8 +114,9 @@ def main() -> int:
         log("CF_BASE_URL / CF_INGEST_SECRET missing — cannot send. Exiting.")
         return 2
 
-    # 1. Pull RFJ into local SQLite, then 2. score unscored jobs.
+    # 1. Pull RFJ + IA40 boards into local SQLite, then 2. score unscored jobs.
     _run([sys.executable, os.path.join(HERE, "rfj_to_local_sqlite.py")], "pull-rfj")
+    _run([sys.executable, os.path.join(HERE, "ia40_to_local_sqlite.py")], "pull-ia40")
     _run([sys.executable, os.path.join(BACKEND, "pipeline.py"), "--score-only"], "score")
 
     conn = db.get_connection()
@@ -159,7 +164,8 @@ def main() -> int:
                 title=title, company=company, location=job.get("location", ""),
                 department=job.get("department", ""),
                 description=job.get("description_snippet", "") or job.get("description_full", ""),
-                resume_text=master, settings=settings)
+                resume_text=master,
+                cover_letter_samples=profile.get("cover_letter_samples"), settings=settings)
             if not cl.get("error") and cl.get("cover_letter"):
                 cbytes = cover_to_docx(cl["cover_letter"], os.environ.get("CANDIDATE_NAME", ""),
                                        res.get("contact", ""), company)

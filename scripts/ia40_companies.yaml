@@ -1,0 +1,375 @@
+# IA40 (Intelligent Applications 40, 2026 list) company registry
+# Source: https://www.ia40.com/the-list  — scraped 2026-09-03
+# ATS boards resolved 2026-09-03 by probing public APIs (Ashby posting-api,
+# Greenhouse boards-api, Lever postings, SmartRecruiters). job_count is the
+# board size at probe time (before any remote filtering) — informational only.
+# Consumed by scripts/ia40_to_local_sqlite.py.
+
+companies:
+  - name: "Yutori"
+    website: "https://yutori.com"
+    ats: ashby
+    slug: yutori
+    tier: "Early"
+    sector: "Productivity"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 3
+  - name: "AI Underwriting Company"
+    website: "https://aiuc.com"
+    ats: ashby
+    slug: aiuc
+    tier: "Early"
+    sector: "Insurance"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 13
+  - name: "Clarify"
+    website: "https://clarify.ai"
+    ats: ashby
+    slug: clarify
+    tier: "Early"
+    sector: "Sales"
+    hq: "Seattle, WA"
+    job_count_at_probe: 2
+  - name: "Fable Security"
+    website: "https://fablesecurity.com"
+    ats: ashby
+    slug: fable
+    tier: "Early"
+    sector: "Security"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 7
+  - name: "Resend"
+    website: "https://resend.com"
+    ats: ashby
+    slug: resend
+    tier: "Early"
+    sector: "Infrastructure"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 11
+  - name: "Roadrunner"
+    website: "https://roadrunner.ai"
+    ats: ashby
+    slug: roadrunner
+    tier: "Early"
+    sector: "Sales"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 9
+  - name: "Zed Industries"
+    website: "https://zed.dev"
+    ats: ashby
+    slug: zed
+    tier: "Early"
+    sector: "Coding"
+    hq: "Boulder, CO"
+    job_count_at_probe: 2
+  - name: "Wispr Flow"
+    website: "https://wisprflow.ai"
+    ats: ashby
+    slug: wispr-flow
+    tier: "Mid"
+    sector: "Voice & Video"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 23
+  - name: "Granola"
+    website: "https://granola.ai"
+    ats: ashby
+    slug: granola
+    tier: "Mid"
+    sector: "Productivity"
+    hq: "London, England"
+    job_count_at_probe: 17
+  - name: "Serval"
+    website: "https://serval.com"
+    ats: ashby
+    slug: serval
+    tier: "Mid"
+    sector: "AIOps"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 50
+  - name: "Profound"
+    website: "https://tryprofound.com"
+    ats: ashby
+    slug: profound
+    tier: "Mid"
+    sector: "Marketing"
+    hq: "New York, NY"
+    job_count_at_probe: 76
+  - name: "Gamma"
+    website: "https://gamma.app"
+    ats: ashby
+    slug: gamma
+    tier: "Mid"
+    sector: "Content Creation"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 32
+  - name: "Linear"
+    website: "https://linear.app"
+    ats: ashby
+    slug: linear
+    tier: "Mid"
+    sector: "AIOps"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 28
+  - name: "CodeRabbit"
+    website: "https://coderabbit.ai"
+    ats: ashby
+    slug: coderabbit
+    tier: "Mid"
+    sector: "Coding"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 47
+  - name: "Gradial"
+    website: "https://gradial.com"
+    ats: greenhouse
+    slug: gradial
+    tier: "Mid"
+    sector: "Marketing"
+    hq: "Seattle, WA"
+    job_count_at_probe: 13
+  - name: "Listen Labs"
+    website: "https://listenlabs.ai"
+    ats: ashby
+    slug: listenlabs
+    tier: "Mid"
+    sector: "Research"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 34
+  - name: "Town"
+    website: "https://town.com"
+    ats: ashby
+    slug: town
+    tier: "Mid"
+    sector: "Productivity"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 17
+  - name: "HeyGen"
+    website: "https://heygen.com"
+    ats: greenhouse
+    slug: heygen
+    tier: "Mid"
+    sector: "Voice & Video"
+    hq: "Los Angeles, CA"
+    job_count_at_probe: 20
+  - name: "ElevenLabs"
+    website: "https://elevenlabs.io"
+    ats: ashby
+    slug: elevenlabs
+    tier: "Late"
+    sector: "Voice & Video"
+    hq: "New York, NY"
+    job_count_at_probe: 252
+  - name: "Anduril"
+    website: "https://anduril.com"
+    ats: greenhouse
+    slug: andurilindustries
+    tier: "Late"
+    sector: "Defense"
+    hq: "Costa Mesa, CA"
+    job_count_at_probe: 2202
+  - name: "Ramp"
+    website: "https://ramp.com"
+    ats: ashby
+    slug: ramp
+    tier: "Late"
+    sector: "Finance"
+    hq: "New York, NY"
+    job_count_at_probe: 140
+  - name: "Sierra"
+    website: "https://sierra.ai"
+    ats: ashby
+    slug: sierra
+    tier: "Late"
+    sector: "Customer Experience"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 210
+  - name: "OpenEvidence"
+    website: "https://openevidence.com"
+    ats: ashby
+    slug: openevidence
+    tier: "Late"
+    sector: "Healthcare"
+    hq: "Miami, FL"
+    job_count_at_probe: 8
+  - name: "Cognition"
+    website: "https://cognition.com"
+    ats: ashby
+    slug: cognition
+    tier: "Late"
+    sector: "Coding"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 91
+  - name: "Applied Intuition"
+    website: "https://appliedintuition.com"
+    ats: ashby
+    slug: applied
+    tier: "Late"
+    sector: "Infrastructure"
+    hq: "Mountain View, CA"
+    job_count_at_probe: 279
+  - name: "Legora"
+    website: "https://legora.com"
+    ats: ashby
+    slug: legora
+    tier: "Late"
+    sector: "Legal"
+    hq: "Stockholm, Sweden"
+    job_count_at_probe: 282
+  - name: "Clay"
+    website: "https://clay.com"
+    ats: ashby
+    slug: claylabs
+    tier: "Late"
+    sector: "Sales"
+    hq: "New York, NY"
+    job_count_at_probe: 59
+  - name: "Lovable"
+    website: "https://lovable.dev"
+    ats: ashby
+    slug: lovable
+    tier: "Late"
+    sector: "Coding"
+    hq: "Stockholm, Sweden"
+    job_count_at_probe: 81
+  - name: "Simile"
+    website: "https://simile.com"
+    ats: ashby
+    slug: simile
+    tier: "Late"
+    sector: "Research"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 15
+  - name: "Anthropic"
+    website: "https://anthropic.com"
+    ats: greenhouse
+    slug: anthropic
+    tier: "Enabler"
+    sector: "Models & More"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 587
+  - name: "Turbopuffer"
+    website: "https://turbopuffer.com"
+    ats: ashby
+    slug: turbopuffer
+    tier: "Enabler"
+    sector: "Infrastructure"
+    hq: "Ottawa, Canada"
+    job_count_at_probe: 5
+  - name: "Databricks"
+    website: "https://databricks.com"
+    ats: greenhouse
+    slug: databricks
+    tier: "Enabler"
+    sector: "Data & Analytics"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 859
+  - name: "OpenAI"
+    website: "https://openai.com"
+    ats: ashby
+    slug: openai
+    tier: "Enabler"
+    sector: "Models & More"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 768
+  - name: "Baseten"
+    website: "https://baseten.co"
+    ats: ashby
+    slug: baseten
+    tier: "Enabler"
+    sector: "Inference"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 85
+  - name: "OpenRouter"
+    website: "https://openrouter.ai"
+    ats: ashby
+    slug: openrouter
+    tier: "Enabler"
+    sector: "Models & More"
+    hq: "New York, NY"
+    job_count_at_probe: 23
+  - name: "ClickHouse"
+    website: "https://clickhouse.com"
+    ats: ashby
+    slug: clickhouse
+    tier: "Enabler"
+    sector: "Data & Analytics"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 178
+  - name: "Cartesia"
+    website: "https://cartesia.ai"
+    ats: ashby
+    slug: cartesia
+    tier: "Enabler"
+    sector: "Voice & Video"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 33
+  - name: "Together AI"
+    website: "https://together.ai"
+    ats: greenhouse
+    slug: togetherai
+    tier: "Enabler"
+    sector: "Inference"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 58
+  - name: "Fal"
+    website: "https://fal.ai"
+    ats: ashby
+    slug: fal-ai
+    tier: "Enabler"
+    sector: "Inference"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 32
+  - name: "Vercel"
+    website: "https://vercel.com"
+    ats: greenhouse
+    slug: vercel
+    tier: "Enabler"
+    sector: "Infrastructure"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 88
+  - name: "Fireworks AI"
+    website: "https://fireworks.ai"
+    ats: ashby
+    slug: fireworks
+    tier: "Enabler"
+    sector: "Inference"
+    hq: "Redwood City, CA"
+    job_count_at_probe: 67
+  - name: "Gimlet Labs"
+    website: "https://gimletlabs.ai"
+    ats: ashby
+    slug: gimlet
+    tier: "Emerging Enablers"
+    sector: "Inference"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 11
+  - name: "Browserbase"
+    website: "https://browserbase.com"
+    ats: ashby
+    slug: browserbase
+    tier: "Emerging Enablers"
+    sector: "Infrastructure"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 9
+  - name: "Mastra"
+    website: "https://mastra.ai"
+    ats: ashby
+    slug: mastra
+    tier: "Emerging Enablers"
+    sector: "Infrastructure"
+    hq: "San Francisco, CA"
+    job_count_at_probe: 3
+
+# No public standard-ATS board (checked 2026-09-03) — revisit occasionally:
+excluded:
+  - name: "Paper"
+    website: "https://paper.design"
+    reason: "no public job board found (site + common paths scanned)"
+  - name: "Pierre"
+    website: "https://pierre.computer"
+    reason: "no public job board found"
+  - name: "JetStream Security"
+    website: "https://jetstream.security"
+    reason: "no public job board found"
+  - name: "Fireflies.ai"
+    website: "https://fireflies.ai"
+    reason: "uses Gem (jobs.gem.com/fireflies) — no standard public API; revisit"

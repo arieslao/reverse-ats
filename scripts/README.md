@@ -1,5 +1,33 @@
 # scripts/
 
+## `ia40_to_local_sqlite.py` + `ia40_companies.yaml`
+
+Third local job source (next to `rfj_to_local_sqlite.py` and
+`indeed_to_local_sqlite.py`): the IA40 list (https://www.ia40.com/the-list),
+~48 top AI startups. `ia40_companies.yaml` pins each company to its resolved
+public ATS board (39 Ashby + 5 Greenhouse as of 2026-09-03; 4 companies have
+no public board and sit in the `excluded:` section with reasons).
+
+The loader fetches every board via `scraper/job_scraper.py` fetchers, keeps
+only fully-remote roles (Ashby `workplaceType` when present, else an explicit
+"remote" location + the phrase gate shared with the Indeed loader), collapses
+same company+title duplicates across sources, and upserts via `db.upsert_job`
+with `ats_type="ia40"`. Rows arrive pre-resolved (`apply_url`/`ats`/`ats_slug`
+stamped), so `ats_resolver.py` skips them and the apply agent can autofill.
+
+Wired into `POST /api/scrape/trigger` (backend/api.py) and the daily digest
+(`local_daily_digest.py`) — no extra cron needed. Typical volume: ~6.8k jobs
+fetched, ~480 pass the remote gate.
+
+```bash
+python3 scripts/ia40_to_local_sqlite.py --dry-run       # fetch+filter, no writes
+python3 scripts/ia40_to_local_sqlite.py                 # load into local SQLite
+python3 scripts/ia40_to_local_sqlite.py --all-locations # skip the remote gate
+```
+
+The IA40 list refreshes annually — re-probe boards and regenerate the yaml
+when the new list drops (or when a company's board 404s).
+
 ## `scrape_workday_gx10.py`
 
 Workday-only scrape that runs on GX10 (residential IP) instead of GitHub

@@ -120,6 +120,7 @@ def list_jobs(
     new_since: Optional[str] = Query(None, description="ISO date, e.g. 2026-04-15"),
     search: Optional[str] = Query(None, description="Search title/company"),
     sort_by: str = Query("score", description="Sort: score, newest, oldest, company, title"),
+    stage: Optional[str] = Query(None, description="Pipeline filter: a stage name, or 'in_pipeline'/'none'/'active'"),
     exclude_companies: Optional[str] = Query(None, description="Comma-separated company names to exclude"),
     locations: Optional[str] = Query(None, description="Comma-separated location tokens (city/state/country) — match if location contains ANY"),
 ):
@@ -147,6 +148,7 @@ def list_jobs(
             new_since=new_since,
             search=search,
             sort_by=sort_by,
+            stage=stage,
             exclude_companies=exc_companies,
             locations=loc_list,
         )
@@ -234,6 +236,7 @@ def generate_cover_letter_endpoint(job_id: str):
             target_roles=profile.get("target_roles") if isinstance(profile.get("target_roles"), list) else None,
             must_have_skills=profile.get("must_have_skills") if isinstance(profile.get("must_have_skills"), list) else None,
             nice_to_have_skills=profile.get("nice_to_have_skills") if isinstance(profile.get("nice_to_have_skills"), list) else None,
+            cover_letter_samples=profile.get("cover_letter_samples"),
             settings=settings,
         )
         # Save cover letter to pipeline entry if one exists
@@ -314,7 +317,8 @@ def cover_letter_docx_endpoint(job_id: str):
             title=job["title"], company=job["company"], location=job.get("location", ""),
             department=job.get("department", ""),
             description=job.get("description_snippet", "") or job.get("description_full", ""),
-            resume_text=profile.get("resume_text"), settings=settings,
+            resume_text=profile.get("resume_text"),
+            cover_letter_samples=profile.get("cover_letter_samples"), settings=settings,
         )
         if result.get("error"):
             raise HTTPException(status_code=502, detail=result["error"])
@@ -413,7 +417,8 @@ def email_docs_endpoint(job_id: str):
             title=job["title"], company=job["company"], location=job.get("location", ""),
             department=job.get("department", ""),
             description=job.get("description_snippet", "") or job.get("description_full", ""),
-            resume_text=profile.get("resume_text"), settings=settings,
+            resume_text=profile.get("resume_text"),
+            cover_letter_samples=profile.get("cover_letter_samples"), settings=settings,
         )
         if not cl.get("error") and cl.get("cover_letter"):
             cbytes = cover_to_docx(cl["cover_letter"], os.environ.get("CANDIDATE_NAME", ""),
@@ -937,23 +942,38 @@ def scrape_status():
 
 
 RFJ_SCRIPT = Path(__file__).parent.parent / "scripts" / "rfj_to_local_sqlite.py"
+IA40_SCRIPT = Path(__file__).parent.parent / "scripts" / "ia40_to_local_sqlite.py"
+RESOLVER_SCRIPT = Path(__file__).parent.parent / "scripts" / "ats_resolver.py"
 
 
 @app.post("/api/scrape/trigger")
 def trigger_scrape():
-    """Refresh jobs from the curated Remote First Jobs source into local SQLite.
+    """Refresh jobs from the curated Remote First Jobs source AND the IA40
+    startup boards (scripts/ia40_companies.yaml) into local SQLite, then RESOLVE
+    new jobs to their ATS board (so they're autofillable) and SCORE them (so
+    they surface in the feed instead of sitting unscored below the match
+    filter). These sources only ever arrive via this trigger, so resolving here
+    keeps the autofillable set current without a separate cron. (IA40 rows
+    arrive pre-resolved and are skipped by the resolver's `ats IS NULL` sweep.)
     (NOT the old Greenhouse/Ashby/Workday COMPANIES scrape — those sources are
     intentionally not used on this private instance.)"""
     if not RFJ_SCRIPT.exists():
         raise HTTPException(status_code=500, detail=f"RFJ loader not found at {RFJ_SCRIPT}")
-    # Inherits this process's env, including REVERSE_ATS_DB_PATH → same local DB.
+    # Chain in ONE background session: RFJ load → resolve new (unresolved, newest
+    # first) → score-only (unscored). Inherits env incl. REVERSE_ATS_DB_PATH.
+    cmd = (
+        f'{sys.executable} {RFJ_SCRIPT}; '
+        f'{sys.executable} {IA40_SCRIPT}; '
+        f'{sys.executable} {RESOLVER_SCRIPT} --all --limit 250; '
+        f'{sys.executable} {PIPELINE_SCRIPT} --score-only'
+    )
     subprocess.Popen(
-        [sys.executable, str(RFJ_SCRIPT)],
+        cmd, shell=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    return {"status": "started", "source": "remotefirstjobs"}
+    return {"status": "started", "sources": ["remotefirstjobs", "ia40"], "then": "resolve+score"}
 
 
 @app.get("/api/scoring/stats")
