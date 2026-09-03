@@ -167,6 +167,7 @@ function ProfileTab() {
         salary_max: profile.salary_max ?? null,
         must_have_skills: profile.must_have_skills || [],
         nice_to_have_skills: profile.nice_to_have_skills || [],
+        cover_letter_samples: profile.cover_letter_samples || '',
         blacklisted_companies: profile.blacklisted_companies || [],
         blacklisted_keywords: profile.blacklisted_keywords || [],
         priority_categories: profile.priority_categories || [],
@@ -219,6 +220,21 @@ function ProfileTab() {
             fontFamily: 'monospace',
             fontSize: 12,
           }}
+        />
+      </Section>
+
+      <Section title="Cover-letter voice">
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+          Paste 1–2 cover letters you've actually written. They're used as voice examples so generated
+          letters sound like you — same opener, rhythm, and sign-off — not like AI. Separate multiple
+          letters with a blank line. <b>Required:</b> cover-letter generation is disabled until you add at least one.
+        </p>
+        <textarea
+          value={form.cover_letter_samples || ''}
+          onChange={(e) => setForm((f) => ({ ...f, cover_letter_samples: e.target.value }))}
+          placeholder={"Dear [Company] team,\n\nI'm applying for the [role] because…\n\nThanks for your time,\nYour Name"}
+          rows={14}
+          style={{ ...textareaStyle, fontSize: 13 }}
         />
       </Section>
 

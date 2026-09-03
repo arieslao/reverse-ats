@@ -108,6 +108,7 @@ export interface Profile {
   salary_max: number | null
   must_have_skills: string[]
   nice_to_have_skills: string[]
+  cover_letter_samples: string | null
   blacklisted_companies: string[]
   blacklisted_keywords: string[]
   priority_categories: string[]

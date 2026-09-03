@@ -21,6 +21,10 @@ export interface Job {
   description_full: string | null
   category: string | null
   ats_type: string | null
+  /** Resolved application board (greenhouse/lever/ashby) when known — these are
+   *  autofillable by the apply agent. Null = open for manual entry (e.g. Indeed). */
+  ats: string | null
+  apply_url: string | null
   remote: boolean
   /** Ashby/Lever workplaceType: OnSite | Remote | Hybrid. Finer than `remote`. */
   workplace_type: string | null
@@ -100,6 +104,7 @@ export interface Profile {
   salary_max: number | null
   must_have_skills: string[]
   nice_to_have_skills: string[]
+  cover_letter_samples: string | null
   blacklisted_companies: string[]
   blacklisted_keywords: string[]
   priority_categories: string[]

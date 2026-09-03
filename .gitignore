@@ -44,3 +44,20 @@ logs/
 
 # Scraper output (regenerated on each run)
 output/
+
+# --- Personal job-hunt tooling — keep OUT of this PUBLIC product repo (2026-06-30) ---
+# PII + secrets that must never be published. The autoapply system + Indeed lane
+# are personal tooling for the PRIVATE GX10 instance, not part of the public app.
+# (.gitignore has no inline comments — keep patterns on their own lines.)
+# name / email / phone / LinkedIn / citizenship / EEO answers:
+autoapply/standing_answers.json
+# tailored résumés + cover letters (full personal history):
+autoapply/generated/
+# form / console screenshots (may show filled applications):
+autoapply/*.png
+# secrets:
+.digest.env
+autoapply/.digest.env
+# 2026-09-03: the whole autoapply/ tree stays out of the public repo — the
+# code files also embed personal defaults (drive paths, private endpoints).
+autoapply/

@@ -8,6 +8,8 @@ interface FilterState {
   remote_only: boolean
   since_days: number
   sort_by: string
+  stage: string
+  dismissed: boolean
   exclude_companies: string
   locations: string[]
 }
@@ -38,6 +40,22 @@ const SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest First' },
   { value: 'company', label: 'Company A-Z' },
   { value: 'title', label: 'Title A-Z' },
+]
+
+// Application-status filter (maps to the backend `stage` param).
+const STATUS_OPTIONS = [
+  { value: '', label: 'All Jobs' },
+  { value: 'none', label: 'Not in Pipeline' },
+  { value: 'in_pipeline', label: 'In Pipeline (any)' },
+  { value: 'active', label: 'Active (excl. rejected/withdrawn)' },
+  { value: 'saved', label: 'Saved' },
+  { value: 'applied', label: 'Applied' },
+  { value: 'phone_screen', label: 'Phone Screen' },
+  { value: 'technical', label: 'Technical' },
+  { value: 'final', label: 'Final Round' },
+  { value: 'offer', label: 'Offer' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'withdrawn', label: 'Withdrawn' },
 ]
 
 const inputStyle: React.CSSProperties = {
@@ -90,6 +108,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
     local.min_score > 0 ||
     local.remote_only ||
     local.since_days > 0 ||
+    local.stage ||
     local.exclude_companies ||
     local.locations.length > 0 ||
     (local.sort_by && local.sort_by !== 'score')
@@ -145,6 +164,26 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
             style={{ ...inputStyle, cursor: 'pointer' }}
           >
             {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Application status */}
+        <div style={{ flex: '0 0 auto' }}>
+          <label style={labelStyle}>Status</label>
+          <select
+            value={local.stage || ''}
+            onChange={(e) => update({ stage: e.target.value })}
+            style={{
+              ...inputStyle,
+              cursor: 'pointer',
+              borderColor: local.stage ? 'var(--color-accent)' : 'var(--color-border-muted)',
+            }}
+          >
+            {STATUS_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
                 {o.label}
               </option>
@@ -243,6 +282,8 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
                 remote_only: false,
                 since_days: 0,
                 sort_by: 'score',
+                stage: '',
+                dismissed: false,
                 exclude_companies: '',
                 locations: [],
               })

@@ -237,6 +237,7 @@ CREATE TABLE IF NOT EXISTS profile (
     salary_max           INTEGER,
     must_have_skills     TEXT DEFAULT '[]',   -- JSON array
     nice_to_have_skills  TEXT DEFAULT '[]',   -- JSON array
+    cover_letter_samples TEXT,                -- 1-2 real letters the candidate wrote (few-shot voice)
     blacklisted_companies  TEXT DEFAULT '[]', -- JSON array
     blacklisted_keywords   TEXT DEFAULT '[]', -- JSON array
     priority_categories    TEXT DEFAULT '[]', -- JSON array
@@ -379,6 +380,15 @@ def init_db(db_path: str = None) -> None:
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
+
+        # M6: cover_letter_samples column (added 2026-07-06). Stores 1-2 real
+        # letters the candidate wrote, used as few-shot voice examples so
+        # generated cover letters match their natural writing style.
+        try:
+            conn.execute("ALTER TABLE profile ADD COLUMN cover_letter_samples TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
         seed_companies_from_scraper(conn)
     finally:
@@ -649,6 +659,7 @@ def get_jobs(
     new_since: str = None,        # ISO datetime string
     search: str = None,           # free-text search against title + company
     sort_by: str = "score",       # score, newest, oldest, company, title
+    stage: str = None,            # pipeline filter: a specific stage, or "in_pipeline"/"none"/"active"
     exclude_companies: list[str] = None,
     locations: list[str] = None,  # Match if j.location contains ANY of these (case-insensitive partial)
 ) -> tuple[list[dict], int]:
@@ -684,6 +695,18 @@ def get_jobs(
     if new_since:
         conditions.append("j.first_seen_at >= :new_since")
         params["new_since"] = new_since
+
+    # Pipeline-stage filter (uses the LEFT JOIN'd p.stage below)
+    if stage:
+        if stage == "in_pipeline":
+            conditions.append("p.stage IS NOT NULL")
+        elif stage == "none":
+            conditions.append("p.stage IS NULL")
+        elif stage == "active":
+            conditions.append("p.stage IS NOT NULL AND p.stage NOT IN ('rejected', 'withdrawn')")
+        else:
+            conditions.append("p.stage = :stage")
+            params["stage"] = stage
 
     if search:
         conditions.append("(j.title LIKE :search OR j.company LIKE :search)")
@@ -1035,6 +1058,7 @@ _DEFAULT_PROFILE: dict = {
     "salary_max": None,
     "must_have_skills": "[]",
     "nice_to_have_skills": "[]",
+    "cover_letter_samples": None,
     "blacklisted_companies": "[]",
     "blacklisted_keywords": "[]",
     "priority_categories": "[]",
@@ -1100,7 +1124,7 @@ def update_profile(conn: sqlite3.Connection, updates: dict) -> dict:
 
     allowed = {
         "resume_text", "remote_only", "min_seniority",
-        "salary_min", "salary_max",
+        "salary_min", "salary_max", "cover_letter_samples",
     } | _JSON_PROFILE_FIELDS
 
     for field, value in updates.items():

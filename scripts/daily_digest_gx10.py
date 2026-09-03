@@ -86,11 +86,38 @@ Output ONLY valid JSON:
 JSON only — no prose, no markdown fences."""
 
 COVER_SYSTEM = (
-    "Write a SHORT, simple, straightforward cover letter. 3 short paragraphs, ~180 words total, plain "
-    "everyday language — no clichés, no flowery adjectives, no buzzwords, no fluff. Get straight to the "
-    "point: why this candidate fits THIS specific role, citing 2-3 concrete things from their experience. "
-    "Sound like a real, direct person. Return ONLY the letter body — no greeting line, no signature, no markdown."
+    "You write a cover letter for ONE specific role by imitating the candidate's OWN writing, shown to you "
+    "as sample letters they actually wrote. Your #1 job is to match THEIR voice — the samples are ground "
+    "truth for how this person writes. Copy their opening pattern, sentence rhythm and length, paragraph "
+    "count, overall length, word choice, level of formality, how they cite concrete proof (specific "
+    "employers, metrics, projects), and their closing line and sign-off. Mirror the samples' STRUCTURE and "
+    "TONE but write NEW content specific to THIS job and company — do not copy sentences verbatim. Cite 2-3 "
+    "concrete things from the candidate's real experience that fit THIS role; never fabricate. Return ONLY "
+    "the cover letter body, formatted like the samples (including their greeting and sign-off style) — no "
+    "markdown, no commentary."
 )
+
+
+def _cover_samples() -> str:
+    """1-2 real letters the candidate wrote, used as few-shot voice examples.
+
+    Sourced the same way as CANDIDATE_NAME/CANDIDATE_CONTACT (GX10 env), so no
+    Cloudflare D1 change or Worker deploy is needed:
+      • CANDIDATE_COVER_SAMPLES       — the letters inline, or
+      • CANDIDATE_COVER_SAMPLES_FILE  — path to a file containing them.
+    Returns "" if neither is set (cover-letter generation is then skipped).
+    """
+    inline = os.environ.get("CANDIDATE_COVER_SAMPLES", "").strip()
+    if inline:
+        return inline
+    path = os.environ.get("CANDIDATE_COVER_SAMPLES_FILE", "").strip()
+    if path and os.path.isfile(path):
+        try:
+            with open(path, "r", encoding="utf-8") as fh:
+                return fh.read().strip()
+        except OSError as e:
+            log.warning("could not read CANDIDATE_COVER_SAMPLES_FILE %s: %s", path, e)
+    return ""
 
 
 def _env(name: str, default: str | None = None, required: bool = False) -> str:
@@ -390,6 +417,7 @@ def _run() -> int:
         name = _env("CANDIDATE_NAME", email.split("@")[0])
         contact = _env("CANDIDATE_CONTACT", email)
         inv_digest = _inventory_digest(inv)
+        cover_samples = _cover_samples()
 
         attachments: list[dict] = []
         doc_job_ids: set[str] = set()
@@ -416,12 +444,22 @@ def _run() -> int:
                     f"## Candidate inventory\n{inv_digest[:5000]}\n\n## Target job\n{job_block}\n\nProduce the tailored résumé JSON.",
                     max_tokens=2500,
                 ))
-                # Cover letter
-                cl = _llm(
-                    llm_base, model, COVER_SYSTEM,
-                    f"Candidate inventory:\n{inv_digest[:4000]}\n\nJob:\n{job_block}\n\nWrite a 3-paragraph cover letter (~300 words).",
-                    max_tokens=800,
-                ).strip()
+                # Cover letter — requires the candidate's own letters as voice
+                # examples; without them we skip it rather than email an
+                # AI-sounding letter. Set CANDIDATE_COVER_SAMPLES[_FILE] on GX10.
+                if cover_samples:
+                    cl = _llm(
+                        llm_base, model, COVER_SYSTEM,
+                        f"## HOW THE CANDIDATE WRITES — sample letters they wrote (match this voice, rhythm, and format)\n"
+                        f"{cover_samples[:6000]}\n\n"
+                        f"## Candidate inventory\n{inv_digest[:4000]}\n\n"
+                        f"## Job\n{job_block}\n\n"
+                        f"Write a NEW cover letter for THIS role, imitating the candidate's voice and format from the samples above.",
+                        max_tokens=800,
+                    ).strip()
+                else:
+                    cl = ""
+                    log.warning("no CANDIDATE_COVER_SAMPLES set — skipping cover letter for %s", m.get("company"))
 
                 if isinstance(rj, dict):
                     rbytes = _resume_docx(rj, name, contact)

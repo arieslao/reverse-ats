@@ -122,6 +122,47 @@ export function Layout() {
               {item.label}
             </NavLink>
           ))}
+
+          {/* Apply Console — served from the Mac apply-agent (127.0.0.1:8765).
+              It's a separate origin, so it opens in a new tab; being served
+              FROM localhost, its autofill has no cross-origin/PNA issues. */}
+          <a
+            href="http://127.0.0.1:8765/"
+            target="_blank"
+            rel="noreferrer"
+            title="Open the Apply Console (autofill workspace) in a new tab"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              padding: '8px 10px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 500,
+              textDecoration: 'none',
+              color: 'var(--color-text-secondary)',
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              ;(e.currentTarget as HTMLAnchorElement).style.background = 'rgba(59, 130, 246, 0.12)'
+              ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--color-accent)'
+            }}
+            onMouseLeave={(e) => {
+              ;(e.currentTarget as HTMLAnchorElement).style.background = 'transparent'
+              ;(e.currentTarget as HTMLAnchorElement).style.color = 'var(--color-text-secondary)'
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+            Apply
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 'auto', opacity: 0.5 }}>
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+          </a>
         </nav>
 
         {/* Footer */}

@@ -24,6 +24,7 @@ keyword_only      — No LLM; pure keyword matching (free fallback)
 import json
 import logging
 import re
+import time
 import requests
 from typing import Optional
 
@@ -339,6 +340,9 @@ def score_job(
         description,
     )
 
+    # The LLM HTTP call (_post_with_retry) already retries transient failures
+    # (connection reset / timeout / 5xx) before raising — so any exception that
+    # reaches here is a genuine, persistent failure: fall back to keyword scoring.
     try:
         if provider_info["format"] == "openai":
             return _call_openai_format(user_prompt, settings, provider_info)
@@ -348,14 +352,15 @@ def score_job(
             raise ValueError(f"Unknown provider format: {provider_info['format']}")
 
     except requests.ConnectionError as exc:
-        logger.info("LLM provider unreachable (%s) — keyword fallback", exc)
+        logger.info("LLM provider unreachable after retries (%s) — keyword fallback", exc)
         return _keyword_fallback(title, description, f"connection error: {exc}")
     except requests.Timeout:
-        logger.warning("LLM provider timed out after %ds — keyword fallback", REQUEST_TIMEOUT)
+        logger.warning("LLM provider timed out after retries — keyword fallback")
         return _keyword_fallback(title, description, "request timeout")
     except requests.HTTPError as exc:
+        status = getattr(getattr(exc, "response", None), "status_code", 0)
         logger.warning("LLM provider HTTP error %s — keyword fallback", exc)
-        return _keyword_fallback(title, description, f"HTTP {exc.response.status_code}")
+        return _keyword_fallback(title, description, f"HTTP {status}")
     except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
         logger.warning("Failed to parse LLM response (%s) — keyword fallback", exc)
         return _keyword_fallback(title, description, f"parse error: {exc}")
@@ -398,6 +403,35 @@ def _build_user_prompt(
     )
 
 
+def _post_with_retry(url, *, headers, json, timeout):
+    """POST to the LLM with retry-on-transient-failure, then raise_for_status.
+
+    Retries connection resets, timeouts, and 429/5xx ("busy") up to 3× with
+    1.5s/3s backoff before giving up. The LLM is shared local infra (Qwen
+    :8093) that occasionally drops connections under load — retrying HERE, at
+    the single HTTP chokepoint, makes EVERY caller resilient in one place:
+    scoring, cover letters, tailored résumés, inventory, role suggester, the
+    digest. Local model, so retries cost no API $. Returns a 2xx Response.
+    """
+    RETRY_HTTP = {429, 500, 502, 503, 504}
+    MAX_TRIES = 3
+    for attempt in range(MAX_TRIES):
+        last = attempt == MAX_TRIES - 1
+        try:
+            r = requests.post(url, headers=headers, json=json, timeout=timeout)
+        except (requests.ConnectionError, requests.Timeout):
+            if last:
+                raise
+            time.sleep(1.5 * (attempt + 1))
+            continue
+        if r.status_code in RETRY_HTTP and not last:
+            time.sleep(1.5 * (attempt + 1))
+            continue
+        r.raise_for_status()
+        return r
+    raise requests.ConnectionError("LLM unreachable after retries")
+
+
 def _call_openai_format(user_prompt: str, settings: dict, provider_info: dict) -> dict:
     """
     Call an OpenAI-compatible chat completions endpoint.
@@ -418,7 +452,7 @@ def _call_openai_format(user_prompt: str, settings: dict, provider_info: dict) -
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    resp = requests.post(
+    resp = _post_with_retry(
         url,
         headers=headers,
         json={
@@ -462,7 +496,7 @@ def _call_anthropic_format(user_prompt: str, settings: dict, provider_info: dict
     max_tokens = settings.get("max_tokens", 500)
     api_key = settings.get("api_key", "")
 
-    resp = requests.post(
+    resp = _post_with_retry(
         url,
         headers={
             "Content-Type": "application/json",
@@ -564,16 +598,22 @@ def _validate_result(result: dict) -> dict:
 # Cover letter generation
 # ---------------------------------------------------------------------------
 
-COVER_LETTER_SYSTEM_PROMPT = """Write a SHORT, simple, straightforward cover letter for this specific role.
+COVER_LETTER_SYSTEM_PROMPT = """You write a cover letter for ONE specific role by imitating the candidate's OWN writing, shown to you as sample letters they actually wrote.
 
-Guidelines:
-- 3 short paragraphs, ~180 words total. Plain, everyday language.
-- NO clichés, NO flowery adjectives, NO buzzwords, NO fluff. Sound like a real, direct person.
-- Get to the point: why this candidate fits THIS role, citing 2-3 concrete things from their experience (real metrics/outcomes, not generic claims).
-- Do NOT use openers like "I am writing to express my interest" or "I believe I would be a great fit".
-- Do NOT fabricate experience — only what's in the résumé/inventory.
+Your #1 job is to match THEIR voice — the sample letters below are the ground truth for how this person writes. Copy their:
+- Opening pattern (e.g. how they lead into why they're applying).
+- Sentence rhythm and length, paragraph count, and overall length.
+- Word choice, level of formality, and how they cite concrete proof (specific employers, metrics, projects).
+- Closing line and sign-off.
 
-Return ONLY the cover letter body — no JSON, no markdown, no greeting/signature lines."""
+Rules:
+- Mirror the samples' STRUCTURE and TONE, but write NEW content specific to THIS job and company. Do not copy sentences verbatim from the samples.
+- Cite 2-3 concrete things from the candidate's real experience (résumé/inventory) that fit THIS role — real employers, metrics, and outcomes only.
+- Do NOT fabricate experience, skills, or credentials. Only use what's in the résumé/inventory.
+- No clichés, no buzzwords, no flowery filler — unless the candidate's own samples use them, match the samples.
+- Write a genuine "why this company" beat if the samples have one.
+
+Return ONLY the cover letter body, formatted like the samples (including their greeting and sign-off style). No JSON, no markdown fences, no commentary."""
 
 
 TAILORED_RESUME_SYSTEM_PROMPT = """You are an expert résumé writer tailoring a candidate's résumé to ONE specific job for ATS systems.
@@ -710,10 +750,16 @@ def generate_cover_letter(
     target_roles: Optional[list[str]] = None,
     must_have_skills: Optional[list[str]] = None,
     nice_to_have_skills: Optional[list[str]] = None,
+    cover_letter_samples: Optional[str] = None,
     settings: Optional[dict] = None,
 ) -> dict:
     """
     Generate a personalized cover letter for a specific job posting.
+
+    Requires `cover_letter_samples` — 1-2 real letters the candidate wrote —
+    which are used as few-shot voice examples. Without them the generator
+    refuses, because a letter written from a generic prompt reads as
+    AI-generated. Add samples in Admin → Profile.
 
     Returns: {"cover_letter": str, "provider": str, "error": str|None}
     """
@@ -722,6 +768,15 @@ def generate_cover_letter(
             "cover_letter": "",
             "provider": "keyword_only",
             "error": "Cover letter generation requires an LLM provider. Configure one in Admin → LLM Settings.",
+        }
+
+    samples = (cover_letter_samples or "").strip()
+    if not samples:
+        return {
+            "cover_letter": "",
+            "provider": settings.get("provider", "keyword_only"),
+            "error": "Add 1-2 cover letters you've written in Admin → Profile first. "
+                     "They're used as voice examples so generated letters sound like you, not like AI.",
         }
 
     provider = settings.get("provider", "openai_compatible")
@@ -740,13 +795,15 @@ def generate_cover_letter(
     nice_str = json.dumps(nice_to_have_skills) if nice_to_have_skills else "Not specified"
 
     user_prompt = (
+        f"## HOW THE CANDIDATE WRITES — sample letters they wrote (match this voice, rhythm, and format)\n"
+        f"{samples[:6000]}\n\n"
         f"## Candidate Resume\n{profile}\n\n"
         f"## Candidate's Target Roles\n{target_str}\n\n"
         f"## Candidate's Key Skills\nMust-have: {must_str}\nNice-to-have: {nice_str}\n\n"
         f"## Job Posting\nCompany: {company}\nTitle: {title}\n"
         f"Location: {location}\nDepartment: {department}\n\n"
         f"Description:\n{description[:4000]}\n\n"
-        f"Write a cover letter for this specific role."
+        f"Write a NEW cover letter for THIS specific role, imitating the candidate's voice and format from the sample letters above."
     )
 
     try:
@@ -915,7 +972,7 @@ def _call_llm_raw(user_prompt: str, system_prompt: str, settings: dict, provider
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    resp = requests.post(url, headers=headers, json={
+    resp = _post_with_retry(url, headers=headers, json={
         "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -942,7 +999,7 @@ def _call_llm_raw_anthropic(user_prompt: str, system_prompt: str, settings: dict
     max_tokens = settings.get("max_tokens", 800)
     api_key = settings.get("api_key", "")
 
-    resp = requests.post(url, headers={
+    resp = _post_with_retry(url, headers={
         "Content-Type": "application/json",
         "x-api-key": api_key,
         "anthropic-version": "2023-06-01",

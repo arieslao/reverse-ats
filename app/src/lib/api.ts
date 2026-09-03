@@ -49,6 +49,33 @@ export const emailJobDocs = (jobId: string) =>
   request<{ status: string; to: string; attached: string[] }>(
     `/api/jobs/${encodeURIComponent(jobId)}/email-docs`, { method: 'POST' })
 
+// "Apply Kit" — one click: the Mac apply-agent generates the tailored résumé +
+// cover letter, saves them to Google Drive, and opens/auto-fills the application.
+// This page is served from GX10 but runs in the Mac browser, so it calls the
+// Mac-local agent directly (CORS-open). The agent re-fetches the full job by id.
+const APPLY_AGENT = 'http://127.0.0.1:8765'
+export interface ApplyKitResult {
+  status: 'filled' | 'filled_with_warnings' | 'manual_opened' | 'manual' | 'already_applied' | string
+  company?: string; title?: string; ats?: string | null
+  reason?: string; note?: string; apply_url?: string
+  saved_to_drive?: boolean; warnings?: number; error?: string
+}
+export async function applyKit(jobId: string): Promise<ApplyKitResult> {
+  let res: Response
+  try {
+    res = await fetch(`${APPLY_AGENT}/apply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ job_id: jobId }),
+    })
+  } catch {
+    // Agent not reachable — almost always "not started".
+    throw new Error('Apply agent not running. Start it on your Mac:  python3 ~/AriesLabs.ai/reverse-ats/autoapply/apply_agent.py')
+  }
+  if (!res.ok) throw new Error(`Apply agent error: ${res.status}`)
+  return res.json()
+}
+
 // Target-role résumé — tailor the master to any free-text role (+ optional focus/JD).
 export const emailTargetResume = (role: string, focus: string) =>
   request<{ status: string; to: string; attached: string[] }>('/api/target-resume/email', {
@@ -110,8 +137,8 @@ export const fetchJobs = (params: Record<string, string | number | boolean>) => 
 export const fetchJob = (id: string) =>
   request<import('./types').Job>(`/api/jobs/${id}`)
 
-export const dismissJob = (id: string) =>
-  request(`/api/jobs/${id}/dismiss`, { method: 'POST' })
+export const dismissJob = (id: string, dismissed = true) =>
+  request(`/api/jobs/${id}/dismiss`, { method: 'POST', body: JSON.stringify({ dismissed }) })
 
 export const saveJob = (id: string) =>
   request<import('./types').PipelineEntry>(`/api/jobs/${id}/save`, { method: 'POST' })

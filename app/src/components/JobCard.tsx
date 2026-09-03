@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Job } from '../lib/types'
-import { dismissJob, saveJob, generateCoverLetter, downloadTailoredResume, downloadCoverLetterDocx, emailJobDocs } from '../lib/api'
+import { dismissJob, saveJob, generateCoverLetter, downloadTailoredResume, downloadCoverLetterDocx, emailJobDocs, applyKit } from '../lib/api'
 import { ScoreBadge } from './ScoreBadge'
 
 interface JobCardProps {
@@ -50,6 +50,20 @@ function formatSalary(job: Job): string | null {
   return formatAmount((lo ?? hi) as number)
 }
 
+// Pipeline-stage badge styling (label + colors). Keeps the feed badge in sync
+// with the actual application status instead of a generic "In Pipeline".
+const STAGE_META: Record<string, { label: string; bg: string; fg: string }> = {
+  discovered:   { label: 'Discovered',   bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },
+  saved:        { label: 'Saved',        bg: 'rgba(59,130,246,0.12)',  fg: '#60a5fa' },
+  applied:      { label: '✓ Applied',    bg: 'rgba(34,197,94,0.16)',   fg: '#22c55e' },
+  phone_screen: { label: 'Phone Screen', bg: 'rgba(168,85,247,0.16)',  fg: '#c084fc' },
+  technical:    { label: 'Technical',    bg: 'rgba(168,85,247,0.16)',  fg: '#c084fc' },
+  final:        { label: 'Final Round',  bg: 'rgba(234,179,8,0.16)',   fg: '#eab308' },
+  offer:        { label: 'Offer 🎉',     bg: 'rgba(34,197,94,0.24)',   fg: '#4ade80' },
+  rejected:     { label: 'Rejected',     bg: 'rgba(239,68,68,0.12)',   fg: '#f87171' },
+  withdrawn:    { label: 'Withdrawn',    bg: 'rgba(148,163,184,0.12)', fg: '#94a3b8' },
+}
+
 export function JobCard({ job }: JobCardProps) {
   const [expanded, setExpanded] = useState(false)
   const queryClient = useQueryClient()
@@ -61,6 +75,8 @@ export function JobCard({ job }: JobCardProps) {
   const [docBusy, setDocBusy] = useState<'' | 'resume' | 'cover' | 'email'>('')
   const [docError, setDocError] = useState<string | null>(null)
   const [docOk, setDocOk] = useState<string | null>(null)
+  const [applyBusy, setApplyBusy] = useState(false)
+  const [applyMsg, setApplyMsg] = useState<{ ok: boolean; text: string; url?: string } | null>(null)
 
   const handleDownload = async (kind: 'resume' | 'cover') => {
     setDocBusy(kind)
@@ -89,8 +105,33 @@ export function JobCard({ job }: JobCardProps) {
     }
   }
 
+  // One-click: agent generates tailored docs → saves to Drive → opens/auto-fills.
+  const handleApplyKit = async () => {
+    setApplyBusy(true)
+    setApplyMsg(null)
+    try {
+      const d = await applyKit(job.id)
+      if (d.status === 'filled' || d.status === 'filled_with_warnings') {
+        setApplyMsg({ ok: true, text: `Auto-filled in your Chrome${d.warnings ? ` (${d.warnings} field(s) to review)` : ''} + docs saved to Drive. Review & click Submit — it never submits for you.` })
+      } else if (d.status === 'manual' || d.status === 'manual_opened') {
+        // Open in the user's OWN browser (best-effort; may be popup-blocked
+        // after the await, so the message also shows a clickable link).
+        if (d.apply_url) window.open(d.apply_url, '_blank', 'noopener')
+        setApplyMsg({ ok: true, text: 'Tailored résumé + cover letter saved to Google Drive. This site has no autofill — opening the apply page in a new tab (if your browser blocked it, click →):', url: d.apply_url })
+      } else if (d.status === 'already_applied') {
+        setApplyMsg({ ok: true, text: d.reason || 'Already applied to this posting.' })
+      } else {
+        setApplyMsg({ ok: false, text: d.error || d.reason || 'Apply Kit failed.' })
+      }
+    } catch (e) {
+      setApplyMsg({ ok: false, text: (e as Error).message })
+    } finally {
+      setApplyBusy(false)
+    }
+  }
+
   const dismissMut = useMutation({
-    mutationFn: () => dismissJob(job.id),
+    mutationFn: (dismissed: boolean) => dismissJob(job.id, dismissed),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['jobs'] }),
   })
 
@@ -284,18 +325,33 @@ export function JobCard({ job }: JobCardProps) {
             {job.ats_type}
           </span>
         )}
+        {job.ats && ['greenhouse', 'lever', 'ashby'].includes(job.ats) && (
+          <span
+            style={{
+              background: 'rgba(34,197,94,0.14)',
+              color: '#22c55e',
+              borderRadius: 4,
+              padding: '1px 8px',
+              fontSize: 11,
+              fontWeight: 600,
+            }}
+            title={`Apply Kit auto-fills this ${job.ats} application in your Chrome`}
+          >
+            ⚡ Auto-fill
+          </span>
+        )}
         {job.pipeline_stage && (
           <span
             style={{
-              background: 'rgba(59, 130, 246, 0.12)',
-              color: '#60a5fa',
+              background: (STAGE_META[job.pipeline_stage] ?? STAGE_META.saved).bg,
+              color: (STAGE_META[job.pipeline_stage] ?? STAGE_META.saved).fg,
               borderRadius: 4,
               padding: '1px 8px',
               fontSize: 11,
               fontWeight: 600,
             }}
           >
-            In Pipeline
+            {(STAGE_META[job.pipeline_stage] ?? { label: job.pipeline_stage }).label}
           </span>
         )}
       </div>
@@ -356,6 +412,29 @@ export function JobCard({ job }: JobCardProps) {
             >
               Apply
             </a>
+
+            <button
+              disabled={applyBusy}
+              onClick={handleApplyKit}
+              title="Generate tailored résumé + cover letter, save to Google Drive, and open/auto-fill the application in your Chrome"
+              style={{
+                background: 'var(--color-accent)',
+                color: 'var(--color-bg-elevated)',
+                border: 0,
+                borderRadius: 6,
+                padding: '6px 14px',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+                opacity: applyBusy ? 0.6 : 1,
+              }}
+            >
+              {applyBusy
+                ? 'Preparing…'
+                : job.ats && ['greenhouse', 'lever', 'ashby'].includes(job.ats)
+                  ? '🚀 Apply Kit · auto-fill'
+                  : '🚀 Apply Kit'}
+            </button>
 
             {!job.pipeline_stage && (
               <button
@@ -452,10 +531,29 @@ export function JobCard({ job }: JobCardProps) {
               {docBusy === 'email' ? 'Emailing…' : '📧 Email résumé + cover letter'}
             </button>
 
-            {!job.dismissed && (
+            {job.dismissed ? (
               <button
                 disabled={dismissMut.isPending}
-                onClick={() => dismissMut.mutate()}
+                onClick={() => dismissMut.mutate(false)}
+                title="Restore this job to the feed"
+                style={{
+                  background: 'rgba(34, 197, 94, 0.12)',
+                  border: '1px solid rgba(34, 197, 94, 0.3)',
+                  color: 'var(--color-success)',
+                  borderRadius: 6,
+                  padding: '6px 14px',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  opacity: dismissMut.isPending ? 0.6 : 1,
+                }}
+              >
+                ♻ Restore
+              </button>
+            ) : (
+              <button
+                disabled={dismissMut.isPending}
+                onClick={() => dismissMut.mutate(true)}
+                title="Hide this job from the feed"
                 style={{
                   background: 'transparent',
                   border: '1px solid var(--color-border-muted)',
@@ -517,6 +615,23 @@ export function JobCard({ job }: JobCardProps) {
               color: 'var(--color-success)',
             }}>
               ✅ {docOk}
+            </div>
+          )}
+
+          {applyMsg && (
+            <div style={{
+              marginTop: 12,
+              padding: 12,
+              background: applyMsg.ok ? 'rgba(34, 197, 94, 0.06)' : 'rgba(239, 68, 68, 0.05)',
+              border: `1px solid ${applyMsg.ok ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.2)'}`,
+              borderRadius: 6,
+              fontSize: 13,
+              color: applyMsg.ok ? 'var(--color-success)' : 'var(--color-danger)',
+            }}>
+              {applyMsg.ok ? '✅ ' : '⚠ '}{applyMsg.text}
+              {applyMsg.url && (
+                <>{' '}<a href={applyMsg.url} target="_blank" rel="noreferrer" style={{ color: 'var(--color-accent)' }} onClick={(e) => e.stopPropagation()}>{applyMsg.url}</a></>
+              )}
             </div>
           )}
 

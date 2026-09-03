@@ -17,6 +17,7 @@ const EMPTY: Profile = {
   salary_max: null,
   must_have_skills: [],
   nice_to_have_skills: [],
+  cover_letter_samples: '',
   blacklisted_companies: [],
   blacklisted_keywords: [],
   priority_categories: [],
@@ -35,7 +36,7 @@ export default function ProfilePage() {
     let cancelled = false;
     fetchProfile()
       .then((p) => {
-        if (!cancelled) setForm({ ...p, resume_text: p.resume_text ?? '' });
+        if (!cancelled) setForm({ ...p, resume_text: p.resume_text ?? '', cover_letter_samples: p.cover_letter_samples ?? '' });
       })
       .catch((e) => !cancelled && setError(e instanceof Error ? e.message : 'Failed to load profile'))
       .finally(() => !cancelled && setLoading(false));
@@ -50,6 +51,7 @@ export default function ProfilePage() {
     try {
       const next = await updateProfile({
         resume_text: form.resume_text || null,
+        cover_letter_samples: form.cover_letter_samples || null,
         target_roles: form.target_roles,
         target_locations: form.target_locations,
         remote_only: form.remote_only,
@@ -62,7 +64,7 @@ export default function ProfilePage() {
         blacklisted_keywords: form.blacklisted_keywords,
         priority_categories: form.priority_categories,
       });
-      setForm({ ...next, resume_text: next.resume_text ?? '' });
+      setForm({ ...next, resume_text: next.resume_text ?? '', cover_letter_samples: next.cover_letter_samples ?? '' });
       setSavedAt(Date.now());
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed');
@@ -104,6 +106,19 @@ export default function ProfilePage() {
                 rows={12}
                 placeholder="Paste your resume here…"
                 className="w-full px-3 py-2 text-xs font-mono rounded-md bg-[var(--color-bg-elevated)] border border-[var(--color-border-muted)] focus:border-[var(--color-accent)] focus:outline-none resize-y"
+              />
+            </Field>
+
+            <Field
+              label="Cover-letter voice (required for cover letters)"
+              hint="Paste 1–2 cover letters you've actually written. Used as voice examples so generated letters sound like you, not AI. Cover-letter generation stays disabled until you add at least one."
+            >
+              <textarea
+                value={form.cover_letter_samples ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, cover_letter_samples: e.target.value }))}
+                rows={14}
+                placeholder={"Dear [Company] team,\n\nI'm applying for the [role] because…\n\nThanks for your time,\nYour Name"}
+                className="w-full px-3 py-2 text-sm rounded-md bg-[var(--color-bg-elevated)] border border-[var(--color-border-muted)] focus:border-[var(--color-accent)] focus:outline-none resize-y"
               />
             </Field>
 

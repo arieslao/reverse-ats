@@ -44,6 +44,11 @@ class JobOut(BaseModel):
     description_full: Optional[str] = None
     category: Optional[str] = None
     ats_type: Optional[str] = None
+    # Resolved real apply destination (ats_resolver.py): the ATS + canonical ids.
+    apply_url: Optional[str] = None
+    ats: Optional[str] = None
+    ats_slug: Optional[str] = None
+    ats_job_id: Optional[str] = None
     remote: bool = False
     # Ashby's `workplaceType`: "OnSite" | "Remote" | "Hybrid". Finer than the
     # legacy boolean `remote`. NULL for ATS that don't expose it.
@@ -165,6 +170,7 @@ class ProfileUpdate(BaseModel):
     salary_max: Optional[int] = None
     must_have_skills: Optional[list[str]] = None
     nice_to_have_skills: Optional[list[str]] = None
+    cover_letter_samples: Optional[str] = None
     blacklisted_companies: Optional[list[str]] = None
     blacklisted_keywords: Optional[list[str]] = None
     priority_categories: Optional[list[str]] = None
@@ -180,6 +186,7 @@ class ProfileOut(BaseModel):
     salary_max: Optional[int] = None
     must_have_skills: list[str] = Field(default_factory=list)
     nice_to_have_skills: list[str] = Field(default_factory=list)
+    cover_letter_samples: Optional[str] = None
     blacklisted_companies: list[str] = Field(default_factory=list)
     blacklisted_keywords: list[str] = Field(default_factory=list)
     priority_categories: list[str] = Field(default_factory=list)
