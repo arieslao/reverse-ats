@@ -14,6 +14,8 @@ Env (loaded from .digest.env by the cron):
   CF_BASE_URL, CF_INGEST_SECRET   — the send relay
   CANDIDATE_NAME / CANDIDATE_CONTACT or EMAIL_TO — recipient + résumé header
   DIGEST_MIN_SCORE (default 90), DIGEST_MAX_JOBS (default 25)
+  DIGEST_TAILOR (default 1) — set 0 to skip résumé/cover-letter generation and
+    email the ranked match list only (no LLM calls beyond scoring).
 """
 
 import base64
@@ -38,6 +40,7 @@ DB_PATH = os.environ.setdefault(
 MIN_SCORE = int(os.environ.get("DIGEST_MIN_SCORE", "90"))
 MAX_JOBS = int(os.environ.get("DIGEST_MAX_JOBS", "25"))
 PACE_SECONDS = float(os.environ.get("DIGEST_PACE", "2"))
+TAILOR = os.environ.get("DIGEST_TAILOR", "1").strip().lower() not in ("0", "false", "no", "off")
 
 import db  # noqa: E402
 from scorer import tailor_master_resume, generate_cover_letter  # noqa: E402
@@ -129,9 +132,11 @@ def main() -> int:
     except Exception:  # noqa: BLE001
         pass
     master = (profile.get("resume_text") or "").strip()
-    if not (master and rt.looks_like_master(master)):
+    if TAILOR and not (master and rt.looks_like_master(master)):
         log("No master résumé on file — cannot tailor. Upload it in Admin → Profile.")
         return 3
+    if not TAILOR:
+        log("DIGEST_TAILOR=0 — sending ranked matches only, no résumé/cover-letter generation")
 
     try:
         from db import get_llm_settings
@@ -139,7 +144,7 @@ def main() -> int:
     except Exception:  # noqa: BLE001
         settings = None
 
-    to = _recipient(rt.split_master(master)[1])
+    to = _recipient(rt.split_master(master)[1] if master and rt.looks_like_master(master) else "")
     matches = _new_matches(conn)
     log(f"{len(matches)} new ≥{MIN_SCORE}% match(es) to send to {to}")
     if not matches:
@@ -153,20 +158,24 @@ def main() -> int:
     for job in matches:
         company, title = job.get("company", ""), job.get("title", "")
         try:
-            res = tailor_master_resume(master, job, settings)
-            if not res.get("error"):
+            res = {}
+            if TAILOR:
+                res = tailor_master_resume(master, job, settings)
+            if TAILOR and not res.get("error"):
                 rbytes = master_resume_to_docx(
                     res.get("name") or os.environ.get("CANDIDATE_NAME", ""),
                     res.get("contact", ""), res.get("target_title", ""), res.get("sections", []))
                 attachments.append({"filename": f"resume_{slug(company)}_{slug(title)}.docx",
                                     "content": base64.b64encode(rbytes).decode()})
-            cl = generate_cover_letter(
-                title=title, company=company, location=job.get("location", ""),
-                department=job.get("department", ""),
-                description=job.get("description_snippet", "") or job.get("description_full", ""),
-                resume_text=master,
-                cover_letter_samples=profile.get("cover_letter_samples"), settings=settings)
-            if not cl.get("error") and cl.get("cover_letter"):
+            cl = {}
+            if TAILOR:
+                cl = generate_cover_letter(
+                    title=title, company=company, location=job.get("location", ""),
+                    department=job.get("department", ""),
+                    description=job.get("description_snippet", "") or job.get("description_full", ""),
+                    resume_text=master,
+                    cover_letter_samples=profile.get("cover_letter_samples"), settings=settings)
+            if TAILOR and not cl.get("error") and cl.get("cover_letter"):
                 cbytes = cover_to_docx(cl["cover_letter"], os.environ.get("CANDIDATE_NAME", ""),
                                        res.get("contact", ""), company)
                 attachments.append({"filename": f"cover_{slug(company)}_{slug(title)}.docx",
@@ -184,10 +193,14 @@ def main() -> int:
             log(f"  prepared {title} @ {company} ({score}%)")
         except Exception as e:  # noqa: BLE001
             log(f"  skip {title} @ {company}: {e}")
-        time.sleep(PACE_SECONDS)
+        if TAILOR:
+            time.sleep(PACE_SECONDS)  # pace LLM calls — the vLLM is shared with trading
 
-    if not attachments:
+    if TAILOR and not attachments:
         log("No documents generated. Nothing sent.")
+        return 4
+    if not sent_ids:
+        log("No matches prepared. Nothing sent.")
         return 4
 
     today = datetime.now(timezone.utc).strftime("%b %d")
@@ -195,8 +208,10 @@ def main() -> int:
     html = (
         f'<div style="font-family:system-ui,Arial,sans-serif;max-width:620px">'
         f'<h2 style="color:#111">{len(sent_ids)} new match(es) at ≥{MIN_SCORE}% fit</h2>'
-        f'<p style="color:#555">Tailored résumé + cover letter attached for each (master-template tailoring).</p>'
-        f'<table style="width:100%;border-collapse:collapse">{"".join(rows_html)}</table>'
+        + (f'<p style="color:#555">Tailored résumé + cover letter attached for each (master-template tailoring).</p>'
+           if attachments else
+           f'<p style="color:#555">Ranked matches only — tailoring is off (DIGEST_TAILOR=0).</p>')
+        + f'<table style="width:100%;border-collapse:collapse">{"".join(rows_html)}</table>'
         f'<p style="color:#999;font-size:12px;margin-top:16px">Your private Reverse-ATS instance · '
         f'{len(attachments)} attachment(s)</p></div>')
 
