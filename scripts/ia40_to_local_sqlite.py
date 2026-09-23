@@ -15,9 +15,10 @@ Differences from the RFJ lane:
     `ats IS NULL`).
   * ats_type="ia40" (source identity); the `ats` COLUMN carries the real
     board type so the apply agent can autofill.
-  * Remote gate: boards mix onsite/hybrid SF roles, so we drop anything that
-    is not fully remote (Ashby workplaceType + the tuned phrase gate shared
-    with the Indeed loader).
+  * Location gate: boards mix onsite/hybrid SF roles, so we keep only roles
+    that are fully remote (Ashby workplaceType + the tuned phrase gate shared
+    with the Indeed loader) OR hybrid/on-site inside the home metro
+    (config/local_metro.json; policy REVERSE_ATS_LOCATION_POLICY).
   * Cross-source dedup: job_id_hash includes the URL, so the same role seen
     via RFJ earlier would insert a second row here. We skip inserts whose
     normalized company|title already exists under a different job id.
@@ -46,7 +47,7 @@ sys.path.insert(0, str(REPO / "scraper"))
 
 import db  # backend/db.py  # noqa: E402
 from ats_resolver import ensure_columns  # noqa: E402
-from indeed_to_local_sqlite import _is_fully_remote  # noqa: E402
+from indeed_to_local_sqlite import _is_fully_remote, local_metro_allowed  # noqa: E402
 from job_scraper import FetchError, fetch_ashby, fetch_greenhouse  # noqa: E402
 
 REGISTRY = Path(__file__).resolve().parent / "ia40_companies.yaml"
@@ -75,21 +76,23 @@ def _map(raw: dict, entry: dict) -> dict | None:
     return m
 
 
-def _passes_remote_gate(m: dict) -> bool:
+def _passes_location_gate(m: dict) -> bool:
     # Ashby's workplaceType (OnSite/Hybrid/Remote) is authoritative when set;
     # the shared phrase gate catches "hybrid role"-style JDs on boards that
     # only give a location string (Greenhouse).
     wt = m.get("workplace_type")
     if wt is not None:
-        if wt != "Remote":
-            return False
-    elif "remote" not in (m.get("location") or "").lower():
+        explicit_remote = wt == "Remote"
+    else:
         # Greenhouse rows carry no workplaceType, and the fetcher's `remote`
         # flag counts any US location as remote-eligible (REMOTE_KEYWORDS has
         # "united states" — cloud-lane semantics). Require an explicit remote
         # location instead.
-        return False
-    return _is_fully_remote(m)
+        explicit_remote = "remote" in (m.get("location") or "").lower()
+    if explicit_remote:
+        return _is_fully_remote(m)
+    # Hybrid / on-site: admitted only inside the home metro (shared policy).
+    return local_metro_allowed(m)
 
 
 def main() -> int:
@@ -118,7 +121,7 @@ def main() -> int:
             errors += 1
             continue
         mapped = [m for r in raw_jobs if (m := _map(r, entry))]
-        kept = [m for m in mapped if _passes_remote_gate(m)] if remote_only else mapped
+        kept = [m for m in mapped if _passes_location_gate(m)] if remote_only else mapped
         total_fetched += len(mapped)
         total_kept += len(kept)
         jobs.extend((m, entry) for m in kept)

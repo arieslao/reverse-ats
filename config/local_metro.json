@@ -1,0 +1,21 @@
+{
+  "_comment": "Home-metro definition for the location gate (scripts/indeed_to_local_sqlite.py passes_location_gate, shared by the IA40 loader). Policy REVERSE_ATS_LOCATION_POLICY=remote_or_local (default) admits fully-remote roles PLUS hybrid/on-site roles whose location string names one of these places. 'ambiguous' tokens also exist outside California, so they only count when the location string also says CA/California. Defined 2026-09-22 (owner call: hybrid/in-office in the general Los Angeles area is now acceptable).",
+  "name": "Los Angeles / Orange County",
+  "state_markers": [", ca", " ca ", " ca,", "california", ", ca)"],
+  "tokens": [
+    "los angeles", "greater los angeles", "orange county", "south bay",
+    "santa monica", "culver city", "playa vista", "playa del rey", "marina del rey", "venice",
+    "el segundo", "manhattan beach", "hermosa beach", "redondo beach", "torrance", "lomita",
+    "palos verdes", "san pedro", "carson", "long beach", "hawthorne", "inglewood", "gardena",
+    "lawndale", "compton", "downey", "lakewood", "cerritos", "norwalk", "whittier", "signal hill",
+    "pasadena", "glendale", "burbank", "universal city", "north hollywood", "studio city",
+    "sherman oaks", "encino", "woodland hills", "calabasas", "van nuys", "hollywood",
+    "west hollywood", "beverly hills", "century city", "westwood", "brentwood", "santa clarita",
+    "valencia", "duarte", "monrovia", "arcadia", "city of industry", "alhambra", "monterey park",
+    "rosemead", "el monte", "pomona", "diamond bar", "west covina", "covina", "azusa",
+    "irvine", "costa mesa", "newport beach", "santa ana", "anaheim", "tustin", "fountain valley",
+    "huntington beach", "seal beach", "cypress", "buena park", "fullerton", "brea", "garden grove",
+    "westminster", "lake forest", "aliso viejo", "laguna hills", "mission viejo", "orange"
+  ],
+  "ambiguous": ["venice", "hollywood", "carson", "orange", "brea", "valencia", "brentwood", "compton", "westminster", "covina", "azusa", "downey", "norwalk", "cypress", "glendale", "burbank", "pasadena", "lakewood"]
+}

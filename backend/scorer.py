@@ -23,6 +23,7 @@ keyword_only      — No LLM; pure keyword matching (free fallback)
 
 import json
 import logging
+import os
 import re
 import time
 import requests
@@ -99,12 +100,21 @@ The scorer will use keyword matching only until a resume is provided.
 # Scoring prompt
 # ---------------------------------------------------------------------------
 
+# Where the candidate lives; fed to the scorer so in-metro on-site/hybrid roles
+# are not capped as location knockouts (owner call 2026-09-22). Keep in sync
+# with config/local_metro.json (the loaders' admission gate).
+HOME_METRO = os.environ.get(
+    "REVERSE_ATS_HOME_METRO",
+    "Los Angeles / Orange County, California (based in Lomita, CA)",
+)
+
 SYSTEM_PROMPT = (
     "You are a job-fit evaluator scoring REAL selectability through an ATS — not just skill overlap.\n\n"
     "STEP 1 — HARD REQUIREMENTS (knockouts): Identify any DISQUALIFYING gate in the JD — an ACTIVE "
     "certification or license (e.g. 'active PMP', 'Epic certified', security clearance, RN, CPA), a specific "
-    "minimum number of years in a NAMED skill/tool, mandatory work authorization or required on-site "
-    "location, or an explicit 'must have' / 'required' gate. For EACH, decide whether the candidate CLEARLY "
+    "minimum number of years in a NAMED skill/tool, mandatory work authorization, a required on-site or "
+    "hybrid location OUTSIDE the candidate's home metro (on-site/hybrid INSIDE the home metro is fine and is "
+    "never a knockout), or an explicit 'must have' / 'required' gate. For EACH, decide whether the candidate CLEARLY "
     "meets it from their profile. List every UNMET hard requirement in \"knockouts\". Note: a lapsed or "
     "'previously held' cert does NOT meet an 'active' requirement; deep hands-on experience with a tool does "
     "NOT satisfy a 'certified in <tool>' requirement.\n\n"
@@ -390,6 +400,9 @@ def _build_user_prompt(
 
     return (
         f"## Candidate Profile\n{profile}\n\n"
+        f"## Candidate Home Metro\n{HOME_METRO}\n"
+        "On-site or hybrid work inside this metro is acceptable and NOT a knockout; a required "
+        "on-site/hybrid location outside it IS a knockout.\n\n"
         f"## Target Roles\n{target_str}\n\n"
         f"## Must-Have Skills\n{must_str}\n\n"
         f"## Nice-to-Have Skills\n{nice_str}\n\n"

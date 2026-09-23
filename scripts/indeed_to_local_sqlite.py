@@ -29,6 +29,7 @@ category, remote, id (a stable id is recommended so re-runs dedup cleanly).
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -43,10 +44,53 @@ def _slug(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", (s or "").lower()).strip("-")[:60]
 
 
+# Location policy (2026-09-22, owner call): fully-remote roles PLUS hybrid /
+# on-site roles inside the home metro (config/local_metro.json). Set
+# REVERSE_ATS_LOCATION_POLICY=remote to fall back to the pre-9-22 remote-only
+# behaviour. passes_location_gate() is the single gate; the IA40 loader
+# imports it, so both local sources stay in sync.
+LOCATION_POLICY = os.environ.get("REVERSE_ATS_LOCATION_POLICY", "remote_or_local").strip().lower()
+_METRO_FILE = Path(os.environ.get("REVERSE_ATS_LOCAL_METRO_FILE",
+                                  REPO / "config" / "local_metro.json"))
+
+
+def _load_metro() -> dict:
+    try:
+        return json.loads(_METRO_FILE.read_text())
+    except (OSError, ValueError) as e:  # missing/invalid file -> remote-only, loudly
+        print(f"WARN local metro config unreadable ({_METRO_FILE}): {e}; metro gate disabled")
+        return {"tokens": [], "ambiguous": [], "state_markers": []}
+
+
+_METRO = _load_metro()
+
+
+def _is_local_metro(location: str | None) -> bool:
+    loc = f" {(location or '').lower().strip()} "
+    if not loc.strip():
+        return False
+    has_state = any(mk in loc for mk in _METRO.get("state_markers", []))
+    ambiguous = set(_METRO.get("ambiguous", []))
+    for tok in _METRO.get("tokens", []):
+        if tok in loc and (has_state or tok not in ambiguous):
+            return True
+    return False
+
+
+def local_metro_allowed(m: dict) -> bool:
+    """True when policy admits non-remote roles and this one sits in the home metro."""
+    return LOCATION_POLICY == "remote_or_local" and _is_local_metro(m.get("location"))
+
+
+def passes_location_gate(m: dict) -> bool:
+    """Fully remote (phrase-gated) OR hybrid/on-site inside the home metro."""
+    return _is_fully_remote(m) or local_metro_allowed(m)
+
+
 # Fully-remote gate. Indeed's location="remote" search still returns hybrid /
 # onsite-with-remote-flexibility roles, so we drop anything that signals an
 # office requirement. Conservative by design: better to miss a borderline role
-# than surface an onsite one (user preference: fully remote only).
+# than surface an onsite one outside the home metro.
 #
 # Work-mode PHRASES only — never a bare "hybrid"/"onsite" token, which yields
 # false positives on methodology language like "hybrid delivery models" or
@@ -81,11 +125,15 @@ def _map(job: dict) -> dict | None:
     smin = job.get("salary_min") or None
     smax = job.get("salary_max") or None
     job_id = job.get("id") or f"indeed-{_slug(company)}-{_slug(title)}"
+    # workplace_type ("Remote" | "Hybrid" | "OnSite") from the puller wins over
+    # the bare remote flag; absent both, keep the legacy remote default.
+    wt = job.get("workplace_type") or None
+    is_remote = (wt == "Remote") if wt else bool(job.get("remote", True))
     return {
         "id": job_id,
         "company": company,
         "title": title,
-        "location": job.get("location") or "Remote",
+        "location": job.get("location") or ("Remote" if is_remote else ""),
         "url": apply_url,
         "apply_url": apply_url,
         "description_full": job.get("description_full") or "",
@@ -93,9 +141,9 @@ def _map(job: dict) -> dict | None:
         "category": job.get("category") or "program-management",
         "ats_type": "indeed",
         "ats": None,  # not Greenhouse/Lever/Ashby -> apply agent uses manual fallback
-        "remote": 1 if job.get("remote", True) else 0,
+        "remote": 1 if is_remote else 0,
         "employment_type": job.get("employment_type") or "Full-time",
-        "workplace_type": "Remote" if job.get("remote", True) else None,
+        "workplace_type": wt or ("Remote" if is_remote else None),
         "salary_min": int(smin) if smin else None,
         "salary_max": int(smax) if smax else None,
         "salary_currency": "USD" if (smin or smax) else None,
@@ -106,21 +154,21 @@ def main() -> int:
     if len(sys.argv) < 2:
         print("usage: indeed_to_local_sqlite.py <indeed_jobs.json>")
         return 2
-    remote_only = "--all-locations" not in sys.argv
+    gated = "--all-locations" not in sys.argv
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     raw = json.loads(Path(args[0]).read_text())
     mapped = [m for j in raw if (m := _map(j))]
-    if remote_only:
+    if gated:
         kept, dropped = [], []
         for m in mapped:
-            (kept if _is_fully_remote(m) else dropped).append(m)
+            (kept if passes_location_gate(m) else dropped).append(m)
         for m in dropped:
-            print(f"SKIP (not fully remote)  ::  {m['company']} — {m['title']} [{m.get('location')}]")
+            print(f"SKIP (not remote / not in home metro)  ::  {m['company']} — {m['title']} [{m.get('location')}]")
         jobs = kept
     else:
         jobs = mapped
     if not jobs:
-        print("no valid fully-remote jobs in input")
+        print(f"no jobs pass the location gate (policy={LOCATION_POLICY})")
         return 1
 
     db.init_db()

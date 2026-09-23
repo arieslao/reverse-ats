@@ -181,7 +181,10 @@ def main() -> int:
                 attachments.append({"filename": f"cover_{slug(company)}_{slug(title)}.docx",
                                     "content": base64.b64encode(cbytes).decode()})
             score = job.get("llm_score")
-            loc = job.get("location") or "Remote"
+            wt = job.get("workplace_type") or ""
+            loc = job.get("location") or ("Remote" if job.get("remote") else "Location not stated")
+            if wt and wt.lower() != "remote" and wt.lower() not in loc.lower():
+                loc = f"{loc} · {wt}"
             url = job.get("url") or "#"
             rows_html.append(
                 f'<tr><td style="padding:10px 0;border-bottom:1px solid #eee">'
