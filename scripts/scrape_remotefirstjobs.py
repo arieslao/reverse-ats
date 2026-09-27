@@ -155,6 +155,13 @@ def main() -> int:
         "done: sent=%s new=%s updated=%s errors=%s (%.1fs)",
         stats.get("sent"), stats.get("new"), stats.get("updated"), len(stats.get("errors", [])), time.time() - t0,
     )
+    # Nothing landed although jobs were fetched = the ingest endpoint is failing.
+    # Exit non-zero so the cron monitor flags it; from 2026-09-02 every run
+    # logged sent=0 errors=3 yet exited 0, hiding a full database for weeks.
+    if not stats.get("sent") and stats.get("errors"):
+        log.error("ingest failed: %d jobs fetched, 0 sent; first error: %s",
+                  len(jobs), str(stats["errors"][0])[:300])
+        return 1
     return 0
 
 

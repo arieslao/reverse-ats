@@ -112,7 +112,15 @@ const handler: ExportedHandler<Env> = {
     // entirely on GX10's free local model (scripts/preprocess_backlog_gx10.py),
     // so we no longer spend Workers-AI neurons on the in-Worker trickle — that
     // budget is reserved for the small on-demand calls until they move to GX10.
-    ctx.waitUntil(expireStaleJobs(env));
+    // Then purge: delete listings unseen for STALE_JOB_DAYS so the database
+    // can't creep back to the size cap (it hit it on 2026-09-02 and every
+    // ingest write failed silently for weeks).
+    ctx.waitUntil(
+      (async () => {
+        await expireStaleJobs(env);
+        await purgeStaleJobs(env);
+      })(),
+    );
   },
 };
 
@@ -139,12 +147,21 @@ async function handleIngest(request: Request, env: Env, ctx: ExecutionContext): 
   }
 
   const startedAt = nowIso();
-  const runResult = await env.DB.prepare(
-    `INSERT INTO ingest_runs (source, started_at, jobs_received) VALUES (?, ?, ?)`,
-  )
-    .bind(body.source || "unknown", startedAt, body.jobs.length)
-    .run();
-  const ingestRunId = Number(runResult.meta.last_row_id);
+  let ingestRunId: number;
+  try {
+    const runResult = await env.DB.prepare(
+      `INSERT INTO ingest_runs (source, started_at, jobs_received) VALUES (?, ?, ?)`,
+    )
+      .bind(body.source || "unknown", startedAt, body.jobs.length)
+      .run();
+    ingestRunId = Number(runResult.meta.last_row_id);
+  } catch (err) {
+    // Surface the real cause (e.g. "Exceeded maximum DB size") instead of a
+    // bare 500 — on 2026-09-02 this failed silently for three weeks.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`ingest: database write failed: ${msg}`);
+    return jsonResponse({ ok: false, error: `database write failed: ${msg}` }, 503);
+  }
 
   let newCount = 0;
   let updatedCount = 0;
@@ -460,6 +477,44 @@ async function expireStaleJobs(env: Env): Promise<number> {
   const n = res.meta.changes ?? 0;
   if (n > 0) console.log(`reaper: expired ${n} jobs not seen since ${cutoff}`);
   return n;
+}
+
+// ─── Stale-job purge (retention) ────────────────────────────────────────────
+//
+// Delete expired listings unseen for STALE_JOB_DAYS, plus their embedding /
+// structured / repost rows (FKs are enforced, so children go first; one batch
+// = one transaction). Jobs in any user's pipeline are never deleted. Bounded
+// per tick so the free tier's daily write budget still covers ingest: at
+// */30 that's ≤ 48 × PURGE_BATCH jobs/day, ~4 row writes each.
+
+const PURGE_BATCH = 300;
+
+async function purgeStaleJobs(env: Env): Promise<number> {
+  const cutoff = new Date(Date.now() - STALE_JOB_DAYS * 86_400_000).toISOString();
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT id FROM jobs
+        WHERE expired = 1 AND last_seen_at < ?
+          AND id NOT IN (SELECT job_id FROM user_pipeline)
+        LIMIT ?`,
+    )
+      .bind(cutoff, PURGE_BATCH)
+      .all<{ id: string }>();
+    if (!results.length) return 0;
+    const ids = JSON.stringify(results.map((r) => r.id));
+    const inIds = "IN (SELECT value FROM json_each(?))";
+    await env.DB.batch([
+      env.DB.prepare(`DELETE FROM jobs_embeddings WHERE job_id ${inIds}`).bind(ids),
+      env.DB.prepare(`DELETE FROM jobs_structured WHERE job_id ${inIds}`).bind(ids),
+      env.DB.prepare(`DELETE FROM job_reposts WHERE job_id ${inIds}`).bind(ids),
+      env.DB.prepare(`DELETE FROM jobs WHERE id ${inIds}`).bind(ids),
+    ]);
+    console.log(`purge: deleted ${results.length} listings not seen since ${cutoff}`);
+    return results.length;
+  } catch (err) {
+    console.error(`purge failed: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
 }
 
 // ─── Shared structured-store + embed (used by in-Worker + GX10 lanes) ───────
