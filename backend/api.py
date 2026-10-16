@@ -943,13 +943,15 @@ def scrape_status():
 
 RFJ_SCRIPT = Path(__file__).parent.parent / "scripts" / "rfj_to_local_sqlite.py"
 IA40_SCRIPT = Path(__file__).parent.parent / "scripts" / "ia40_to_local_sqlite.py"
+YC_SCRIPT = Path(__file__).parent.parent / "scripts" / "yc_to_local_sqlite.py"
 RESOLVER_SCRIPT = Path(__file__).parent.parent / "scripts" / "ats_resolver.py"
 
 
 @app.post("/api/scrape/trigger")
 def trigger_scrape():
-    """Refresh jobs from the curated Remote First Jobs source AND the IA40
-    startup boards (scripts/ia40_companies.yaml) into local SQLite, then RESOLVE
+    """Refresh jobs from the curated Remote First Jobs source, the IA40
+    startup boards (scripts/ia40_companies.yaml) AND the Y Combinator jobs
+    board (scripts/yc_to_local_sqlite.py) into local SQLite, then RESOLVE
     new jobs to their ATS board (so they're autofillable) and SCORE them (so
     they surface in the feed instead of sitting unscored below the match
     filter). These sources only ever arrive via this trigger, so resolving here
@@ -964,6 +966,7 @@ def trigger_scrape():
     cmd = (
         f'{sys.executable} {RFJ_SCRIPT}; '
         f'{sys.executable} {IA40_SCRIPT}; '
+        f'{sys.executable} {YC_SCRIPT}; '
         f'{sys.executable} {RESOLVER_SCRIPT} --all --limit 250; '
         f'{sys.executable} {PIPELINE_SCRIPT} --score-only'
     )
@@ -973,7 +976,7 @@ def trigger_scrape():
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    return {"status": "started", "sources": ["remotefirstjobs", "ia40"], "then": "resolve+score"}
+    return {"status": "started", "sources": ["remotefirstjobs", "ia40", "yc"], "then": "resolve+score"}
 
 
 @app.get("/api/scoring/stats")

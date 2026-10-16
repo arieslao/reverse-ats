@@ -1,5 +1,30 @@
 # scripts/
 
+## `yc_to_local_sqlite.py`
+
+Fourth local job source (2026-10-16): the Y Combinator "Work at a Startup"
+board, https://www.ycombinator.com/jobs/role/<role>. The role pages are
+server-rendered Inertia pages; the loader reads the `data-page` JSON payload
+(`jobPostings`: title, location, salary/equity, min experience, company,
+batch) and fetches each NEW job's page for its markdown description. Reading
+needs no login; applying does, so rows land with `ats=None`, `ats_type="yc"`,
+and `apply_url` = the job page (manual fallback, like Indeed rows). The
+resolver may later map the company to a public Greenhouse/Ashby/Lever board.
+
+Filters: title lane regex (`YC_TITLE_REGEX`, default covers program/product/
+ops/solutions/CS/chief-of-staff lanes; '' disables) → US or unspecified
+country → the shared location gate (remote, or hybrid/on-site in
+`config/local_metro.json`). Roles read: `YC_ROLES` (default product-manager,
+operations, sales-manager, support, software-engineer, recruiting-hr).
+
+Wired into `local_daily_digest.py` (pull-yc) and `POST /api/scrape/trigger`.
+
+```bash
+python3 scripts/yc_to_local_sqlite.py --dry-run        # fetch+filter, no writes
+python3 scripts/yc_to_local_sqlite.py                  # load into local SQLite
+python3 scripts/yc_to_local_sqlite.py --all-locations  # skip the location gate
+```
+
 ## `ia40_to_local_sqlite.py` + `ia40_companies.yaml`
 
 Third local job source (next to `rfj_to_local_sqlite.py` and
