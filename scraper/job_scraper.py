@@ -1225,6 +1225,19 @@ def _workday_paginate(
     `seen_paths` in place so subsequent passes don't re-emit the same
     role under a different query."""
     site_root = api_url.split("/wday/cxs/")[0]
+    # The CXS API path is /wday/cxs/{tenant}/{site}/jobs, but the PUBLIC,
+    # browsable job URL needs that same {site} segment inserted after the
+    # host: https://{tenant}.{host}.myworkdayjobs.com/{site}/job/{path} —
+    # NOT .../job/{path} directly off site_root. Confirmed by probing live
+    # Disney/Snap/Amgen tenants 2026-10-19: the bare site_root+externalPath
+    # URL this function used to emit 404s and Workday's edge redirects it to
+    # https://community.workday.com/invalid-url; inserting {site} returns 200.
+    # This bug shipped with the original Workday fetcher and affected every
+    # Workday-sourced job system-wide (not just the la_companies source).
+    try:
+        site = api_url.split("/wday/cxs/", 1)[1].split("/")[1]
+    except IndexError:
+        site = ""
     out: list[dict] = []
     advertised_total = 0
 
@@ -1283,7 +1296,7 @@ def _workday_paginate(
             out.append({
                 "title": j.get("title", ""),
                 "location": _normalize_location(location),
-                "url": f"{site_root}{external_path}" if external_path else legacy_url,
+                "url": f"{site_root}/{site}{external_path}" if (external_path and site) else legacy_url,
                 "department": "",  # Workday doesn't expose this on the listing
                 "remote": is_remote,
                 "description_snippet": "",  # filled by Workers AI preprocess
