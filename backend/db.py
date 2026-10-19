@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     keyword_score       INTEGER NOT NULL DEFAULT 0,
     llm_score           INTEGER,
     llm_reasoning       TEXT,
+    posted_at           TEXT,  -- employer's own posting date, from the ATS; see M7 migration
     first_seen_at       TEXT NOT NULL,
     last_seen_at        TEXT NOT NULL,
     expired             INTEGER NOT NULL DEFAULT 0,
@@ -390,6 +391,26 @@ def init_db(db_path: str = None) -> None:
         except sqlite3.OperationalError:
             pass
 
+        # M7: posted_at column (added 2026-10-25). Every fetcher in
+        # scraper/job_scraper.py has computed this (Greenhouse updated_at,
+        # Lever createdAt, Ashby publishedAt, SmartRecruiters releasedDate,
+        # Workday postedOn) since the scrapers were written, but no column
+        # ever existed to store it — upsert_job silently dropped it on every
+        # call, system-wide, for every source. Without it there was no way
+        # to tell "the employer posted this N days ago" from "our scraper
+        # first saw this N days ago" (first_seen_at), which collapses for
+        # any newly-added source (its whole backlog looks "new" on day one).
+        # Not backfilled for existing rows — re-scraping ~38k historical
+        # postings just to recover a date isn't worth it; populates going
+        # forward for every source via upsert_job.
+        try:
+            conn.execute("ALTER TABLE jobs ADD COLUMN posted_at TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_posted_at ON jobs(posted_at)")
+        conn.commit()
+
         seed_companies_from_scraper(conn)
     finally:
         conn.close()
@@ -553,14 +574,14 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
                 description_snippet, description_full, category, ats_type,
                 remote, employment_type, workplace_type,
                 salary_min, salary_max, salary_currency, comp_summary,
-                keyword_score, llm_score, llm_reasoning,
+                keyword_score, llm_score, llm_reasoning, posted_at,
                 first_seen_at, last_seen_at, expired, dismissed, created_at
             ) VALUES (
                 :id, :company, :title, :location, :department, :team, :url,
                 :description_snippet, :description_full, :category, :ats_type,
                 :remote, :employment_type, :workplace_type,
                 :salary_min, :salary_max, :salary_currency, :comp_summary,
-                :keyword_score, :llm_score, :llm_reasoning,
+                :keyword_score, :llm_score, :llm_reasoning, :posted_at,
                 :first_seen_at, :last_seen_at, 0, 0, :created_at
             )
             """,
@@ -586,6 +607,7 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
                 "keyword_score": job_data.get("keyword_score", 0),
                 "llm_score": job_data.get("llm_score"),
                 "llm_reasoning": job_data.get("llm_reasoning"),
+                "posted_at": job_data.get("posted_at"),
                 "first_seen_at": job_data.get("first_seen_at", now),
                 "last_seen_at": job_data.get("last_seen_at", now),
                 "created_at": now,
@@ -616,6 +638,7 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
                 keyword_score       = :keyword_score,
                 llm_score           = COALESCE(:llm_score, llm_score),
                 llm_reasoning       = COALESCE(:llm_reasoning, llm_reasoning),
+                posted_at           = COALESCE(:posted_at, posted_at),
                 last_seen_at        = :last_seen_at,
                 expired             = 0
             WHERE id = :id
@@ -639,6 +662,7 @@ def upsert_job(conn: sqlite3.Connection, job_data: dict) -> tuple[str, bool]:
                 "keyword_score": job_data.get("keyword_score", 0),
                 "llm_score": job_data.get("llm_score"),
                 "llm_reasoning": job_data.get("llm_reasoning"),
+                "posted_at": job_data.get("posted_at"),
                 "last_seen_at": now,
             },
         )

@@ -81,6 +81,19 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/128.0 Safari/537.36")
 
 
+def _parse_amazon_posted_date(value: str | None) -> str | None:
+    """amazon.jobs' posted_date is a human string like "June 17, 2026", not
+    ISO-8601 like every other source's posted_at — parse it so date-range
+    filtering (e.g. "posted in the last 7 days") compares correctly."""
+    if not value:
+        return None
+    try:
+        from datetime import datetime as _dt
+        return _dt.strptime(value.strip(), "%B %d, %Y").replace(tzinfo=timezone.utc).isoformat()
+    except ValueError:
+        return None
+
+
 def fetch_amazon_jobs(entry: dict) -> list[dict]:
     """amazon.jobs' own search.json API (confirmed live 2026-10-18), scoped to
     one Amazon sub-brand via `amazon_query` (e.g. "Ring") since the full
@@ -119,7 +132,7 @@ def fetch_amazon_jobs(entry: dict) -> list[dict]:
                 "remote": _location_says_remote(j.get("location") or ""),
                 "description_full": re.sub(r"<[^>]+>", " ", desc),
                 "description_snippet": re.sub(r"<[^>]+>", " ", desc)[:500],
-                "posted_at": j.get("posted_date"),
+                "posted_at": _parse_amazon_posted_date(j.get("posted_date")),
                 "company": entry["name"],
             })
         if len(jobs) < 100:
@@ -151,6 +164,13 @@ def fetch_eightfold(entry: dict) -> list[dict]:
         if not positions:
             break
         for p in positions:
+            # t_create/t_update are Unix epoch seconds (confirmed against
+            # Netflix's board 2026-10-18); prefer t_create (first posted)
+            # over t_update (last touched) so a re-posted listing doesn't
+            # look freshly created.
+            ts = p.get("t_create") or p.get("t_update")
+            posted_at = (datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                         if ts else None)
             out.append({
                 "title": p.get("name", ""),
                 "location": p.get("location", ""),
@@ -159,7 +179,7 @@ def fetch_eightfold(entry: dict) -> list[dict]:
                 "remote": _location_says_remote(p.get("location") or ""),
                 "description_full": "",  # filled by detail fetch later, bounded
                 "description_snippet": "",
-                "posted_at": None,
+                "posted_at": posted_at,
                 "company": entry["name"],
                 "_eightfold_id": p.get("id"),
                 "_eightfold_base": base,
