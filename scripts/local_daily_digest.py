@@ -16,6 +16,16 @@ Env (loaded from .digest.env by the cron):
   DIGEST_MIN_SCORE (default 90), DIGEST_MAX_JOBS (default 25)
   DIGEST_TAILOR (default 1) — set 0 to skip résumé/cover-letter generation and
     email the ranked match list only (no LLM calls beyond scoring).
+
+Owner call 2026-10-19: the aggregators (Remote First Jobs, Indeed) stay at the
+plain DIGEST_MIN_SCORE bar, unchanged — a real test of a genuinely excellent
+fit. But the direct-company sources (your LA company list, Y Combinator, IA40
+AI startups) were topping out around 75% most days and so would silently
+never email under that same bar. For those three, every run also pulls the
+single best not-yet-emailed match from EACH source regardless of score and
+sends it in a clearly separate, honestly labeled section — never presented as
+a 90%+ match. DIRECT_COMPANY_GUARANTEED_PICKS=0 disables this and reverts to
+the plain ≥DIGEST_MIN_SCORE behavior for every source.
 """
 
 import base64
@@ -41,6 +51,16 @@ MIN_SCORE = int(os.environ.get("DIGEST_MIN_SCORE", "90"))
 MAX_JOBS = int(os.environ.get("DIGEST_MAX_JOBS", "25"))
 PACE_SECONDS = float(os.environ.get("DIGEST_PACE", "2"))
 TAILOR = os.environ.get("DIGEST_TAILOR", "1").strip().lower() not in ("0", "false", "no", "off")
+GUARANTEED_PICKS = os.environ.get("DIRECT_COMPANY_GUARANTEED_PICKS", "1").strip().lower() not in ("0", "false", "no", "off")
+
+# Sources pulled directly from each employer's own ATS, as opposed to
+# Remote First Jobs / Indeed, which aggregate across many employers.
+DIRECT_COMPANY_SOURCES = ("la_companies", "yc", "ia40")
+DIRECT_COMPANY_LABELS = {
+    "la_companies": "your LA company list",
+    "yc": "Y Combinator",
+    "ia40": "the IA40 AI startup list",
+}
 
 import db  # noqa: E402
 from scorer import tailor_master_resume, generate_cover_letter  # noqa: E402
@@ -89,6 +109,38 @@ def _new_matches(conn):
         (MIN_SCORE,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def _guaranteed_picks(conn, exclude_ids: set) -> list[dict]:
+    """One top pick per direct-company source per run, regardless of score.
+
+    Excludes anything already in `exclude_ids` (so a source whose best match
+    already cleared MIN_SCORE isn't double-counted) and anything scored by
+    the keyword fallback rather than the real LLM (an unreliable number —
+    see memory reverse-ats-indeed-lane: "LLM unavailable" rows), so a
+    transient scorer outage can't produce a misleadingly-labeled pick. Each
+    returned dict carries `_guaranteed_pick_source` so the email renderer
+    labels it honestly instead of implying a MIN_SCORE-grade match."""
+    picks = []
+    for source in DIRECT_COMPANY_SOURCES:
+        row = conn.execute(
+            """
+            SELECT j.* FROM jobs j
+            WHERE j.ats_type = ?
+              AND j.expired = 0 AND j.dismissed = 0
+              AND j.llm_score IS NOT NULL
+              AND (j.llm_reasoning IS NULL OR j.llm_reasoning NOT LIKE '%LLM unavailable%')
+              AND j.id NOT IN (SELECT job_id FROM digest_log)
+            ORDER BY j.llm_score DESC, j.first_seen_at DESC
+            LIMIT 1
+            """,
+            (source,),
+        ).fetchone()
+        if row and row["id"] not in exclude_ids:
+            d = dict(row)
+            d["_guaranteed_pick_source"] = source
+            picks.append(d)
+    return picks
 
 
 def _send(base: str, secret: str, to: str, subject: str, html: str, attachments: list) -> bool:
@@ -149,16 +201,20 @@ def main() -> int:
 
     to = _recipient(rt.split_master(master)[1] if master and rt.looks_like_master(master) else "")
     matches = _new_matches(conn)
-    log(f"{len(matches)} new ≥{MIN_SCORE}% match(es) to send to {to}")
-    if not matches:
+    picks = _guaranteed_picks(conn, {m["id"] for m in matches}) if GUARANTEED_PICKS else []
+    log(f"{len(matches)} new ≥{MIN_SCORE}% match(es); {len(picks)} guaranteed top-pick(s) "
+        f"from direct-company sources, to {to}")
+    if not matches and not picks:
         log("Nothing new today. Done.")
         return 0
-    if len(matches) > MAX_JOBS:
-        log(f"capping to {MAX_JOBS} of {len(matches)} (rest will send next run)")
-        matches = matches[:MAX_JOBS]
+    if len(matches) > MAX_JOBS - len(picks):
+        keep = max(MAX_JOBS - len(picks), 0)
+        log(f"capping ≥{MIN_SCORE}% matches to {keep} of {len(matches)} (rest will send next run; "
+            f"guaranteed picks are never dropped by this cap)")
+        matches = matches[:keep]
 
-    attachments, rows_html, sent_ids = [], [], []
-    for job in matches:
+    attachments, rows_html, pick_rows_html, sent_ids = [], [], [], []
+    for job in matches + picks:
         company, title = job.get("company", ""), job.get("title", "")
         try:
             res = {}
@@ -189,14 +245,20 @@ def main() -> int:
             if wt and wt.lower() != "remote" and wt.lower() not in loc.lower():
                 loc = f"{loc} · {wt}"
             url = job.get("url") or "#"
-            rows_html.append(
+            pick_source = job.get("_guaranteed_pick_source")
+            if pick_source:
+                badge = f'<span style="color:#b45309">· {score}% · top pick, below the {MIN_SCORE}% bar</span>'
+            else:
+                badge = f'<span style="color:#16a34a">· {score}%</span>'
+            row = (
                 f'<tr><td style="padding:10px 0;border-bottom:1px solid #eee">'
-                f'<div style="font-weight:600;color:#111">{title} '
-                f'<span style="color:#16a34a">· {score}%</span></div>'
+                f'<div style="font-weight:600;color:#111">{title} {badge}</div>'
                 f'<div style="color:#555;font-size:13px">{company} · {loc}</div>'
                 f'<a href="{url}" style="font-size:12px;color:#2563eb">View posting →</a></td></tr>')
+            (pick_rows_html if pick_source else rows_html).append(row)
             sent_ids.append(job["id"])
-            log(f"  prepared {title} @ {company} ({score}%)")
+            log(f"  prepared {title} @ {company} ({score}%)"
+                + (f" [guaranteed pick: {pick_source}]" if pick_source else ""))
         except Exception as e:  # noqa: BLE001
             log(f"  skip {title} @ {company}: {e}")
         if TAILOR:
@@ -210,16 +272,31 @@ def main() -> int:
         return 4
 
     today = datetime.now(timezone.utc).strftime("%b %d")
-    subject = f"Reverse-ATS — {len(sent_ids)} new ≥{MIN_SCORE}% match(es) ({today})"
-    html = (
-        f'<div style="font-family:system-ui,Arial,sans-serif;max-width:620px">'
-        f'<h2 style="color:#111">{len(sent_ids)} new match(es) at ≥{MIN_SCORE}% fit</h2>'
-        + (f'<p style="color:#555">Tailored résumé + cover letter attached for each (master-template tailoring).</p>'
-           if attachments else
-           f'<p style="color:#555">Ranked matches only — tailoring is off (DIGEST_TAILOR=0).</p>')
-        + f'<table style="width:100%;border-collapse:collapse">{"".join(rows_html)}</table>'
-        f'<p style="color:#999;font-size:12px;margin-top:16px">Your private Reverse-ATS instance · '
-        f'{len(attachments)} attachment(s)</p></div>')
+    n_main, n_picks = len(rows_html), len(pick_rows_html)
+    if n_main and n_picks:
+        subject = f"Reverse-ATS — {n_main} new ≥{MIN_SCORE}% match(es) + {n_picks} top pick(s) ({today})"
+    elif n_picks:
+        subject = f"Reverse-ATS — {n_picks} top pick(s) from your target companies ({today})"
+    else:
+        subject = f"Reverse-ATS — {n_main} new ≥{MIN_SCORE}% match(es) ({today})"
+
+    body = f'<div style="font-family:system-ui,Arial,sans-serif;max-width:620px">'
+    if n_main:
+        body += (
+            f'<h2 style="color:#111">{n_main} new match(es) at ≥{MIN_SCORE}% fit</h2>'
+            + (f'<p style="color:#555">Tailored résumé + cover letter attached for each (master-template tailoring).</p>'
+               if attachments else
+               f'<p style="color:#555">Ranked matches only — tailoring is off (DIGEST_TAILOR=0).</p>')
+            + f'<table style="width:100%;border-collapse:collapse">{"".join(rows_html)}</table>')
+    if n_picks:
+        body += (
+            f'<h2 style="color:#111;margin-top:{"28px" if n_main else "0"}">Today\'s top pick(s) from your target companies</h2>'
+            f'<p style="color:#555">Below the {MIN_SCORE}% bar, shown anyway so a strong local/direct-company '
+            f'match never goes silent — one per source, real score shown, never implied to be a {MIN_SCORE}%+ fit.</p>'
+            f'<table style="width:100%;border-collapse:collapse">{"".join(pick_rows_html)}</table>')
+    body += (f'<p style="color:#999;font-size:12px;margin-top:16px">Your private Reverse-ATS instance · '
+             f'{len(attachments)} attachment(s)</p></div>')
+    html = body
 
     if _send(base, secret, to, subject, html, attachments):
         now = datetime.now(timezone.utc).isoformat()
