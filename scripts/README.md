@@ -1,5 +1,56 @@
 # scripts/
 
+## `la_companies_to_local_sqlite.py` + `la_companies.yaml` + `job_lanes.py`
+
+Fifth local job source (2026-10-18), owner-supplied: "LA Based Company Career
+Site List.csv" — 47 named LA-area employers across Big Tech/Media, Defense &
+Hard Tech, Frontier Labs/Robotics/Biotech, Enterprise SaaS/Fintech/Consumer,
+Gaming Studios, and High-Growth Startups. `la_companies.yaml` pins each one
+to its resolved public ATS board — Greenhouse, Lever, Ashby, SmartRecruiters,
+Workday, plus two bespoke fetchers this loader adds (`amazon_jobs` for Ring,
+scoped by `amazon_query`; `eightfold` for Netflix, which moved off
+Greenhouse). Every entry was verified by a LIVE API probe before being added
+(a 200-with-empty-array response is not proof — Greenhouse, Lever and Ashby
+all do this for a wrong slug just like SmartRecruiters does; cross-check
+against the company's own careers-page HTML). 34 of 47 resolved to a real
+board; the other 13 sit in `excluded:` with the reason (true custom in-house
+ATS like Apple/Meta/Microsoft/Google/TikTok, email-only apply, or a splash
+page with no careers content at all).
+
+Unlike IA40/YC's pre-filtered lists, these are GENERAL company-wide boards
+(SpaceX ~2,700 jobs, Anduril ~2,500), so a title LANE filter
+(`job_lanes.py`, shared with the YC loader's default) runs first, before the
+location gate or any detail fetch. Workday listings carry an upstream bug —
+everything from the fetcher's `searchText="remote"` pass gets flagged
+`remote=True` even when the job is onsite elsewhere — so this loader
+recomputes `remote` from the location text alone before the gate runs.
+Workday and Eightfold (Netflix) listings arrive with no description; this
+loader fetches each NEW surviving job's detail page, bounded by
+`LA_MAX_DETAIL` (default 120/run) — the same bounded pattern the YC loader
+uses. (Fixed a real bug in `scraper/job_scraper.py`'s `_fetch_workday_job_detail`
+while building this: it double-prefixed `/job/job/...` and always returned
+None; `externalPath` from the listing API already starts with `/job/...`.)
+
+Wired into `local_daily_digest.py` (pull-la-companies) and
+`POST /api/scrape/trigger`. Filters: `LA_TITLE_REGEX` / `LA_TITLE_EXCLUDE`
+(defaults from `job_lanes.py`), the shared location gate (remote or
+LA/OC metro — `indeed_to_local_sqlite.py`'s `passes_location_gate`).
+
+```bash
+python3 scripts/la_companies_to_local_sqlite.py --dry-run        # fetch+filter, no writes
+python3 scripts/la_companies_to_local_sqlite.py                  # load into local SQLite
+python3 scripts/la_companies_to_local_sqlite.py --all-locations  # skip the location gate
+```
+
+To add a company later: probe Greenhouse (`boards-api.greenhouse.io/v1/boards/<slug>/jobs`),
+Lever (`api.lever.co/v0/postings/<slug>?mode=json`), Ashby
+(`api.ashbyhq.com/posting-api/job-board/<slug>`) or SmartRecruiters
+(`api.smartrecruiters.com/v1/companies/<slug>/postings`) directly; for
+Workday, find the `*.myworkdayjobs.com` tenant/host/site from the company's
+careers page and add a `workday: {tenant, host, site}` block. A 404 means
+wrong slug; a 200 with zero jobs can still mean wrong slug (check the
+company's own page for the real one before trusting it).
+
 ## `yc_to_local_sqlite.py`
 
 Fourth local job source (2026-10-16): the Y Combinator "Work at a Startup"

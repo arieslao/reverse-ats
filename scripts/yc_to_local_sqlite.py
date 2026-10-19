@@ -53,6 +53,7 @@ sys.path.insert(0, str(REPO / "scripts"))
 import db  # backend/db.py  # noqa: E402
 from ats_resolver import ensure_columns  # noqa: E402
 from indeed_to_local_sqlite import passes_location_gate, LOCATION_POLICY  # noqa: E402
+from job_lanes import DEFAULT_TITLE_REGEX, DEFAULT_TITLE_EXCLUDE, compile_title_filter  # noqa: E402
 
 BASE = "https://www.ycombinator.com"
 UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 "
@@ -62,26 +63,14 @@ UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 "
 # because YC files "Forward Deployed Engineer", "Solutions Engineer" and
 # "Technical Program Manager" under it; the title regex keeps pure SWE out.
 DEFAULT_ROLES = "product-manager,operations,sales-manager,support,software-engineer,recruiting-hr"
-DEFAULT_TITLE_REGEX = (
-    r"\b(program manager|project manager|product manager|technical program|chief of staff|"
-    r"operations|bizops|business operations|solutions? (engineer|architect|consultant|lead)|"
-    r"forward.deployed|implementation|customer success|customer engineer|account manager|"
-    r"technical account|strategy|head of|director|general manager|partnerships|enablement|"
-    r"deployment|delivery|program lead|product lead|product ops|founding (pm|product|operator))\b"
-)
 
-# Titles the lane regex would otherwise admit through a shared word ("strategy",
-# "head of") but which are quota sales or engineering management.
-DEFAULT_TITLE_EXCLUDE = (
-    r"\b(account executive|sales development|\bsdr\b|\bbdr\b|engineering manager|"
-    r"head of (engineering|sales|marketing|design|people|talent)|software engineer|recruiter)\b"
-)
-
+# Default title lane lives in job_lanes.py (shared with la_companies_to_local_sqlite.py);
+# override just this loader's lane via YC_TITLE_REGEX / YC_TITLE_EXCLUDE.
 ROLES = [r.strip() for r in os.environ.get("YC_ROLES", DEFAULT_ROLES).split(",") if r.strip()]
-TITLE_RE_SRC = os.environ.get("YC_TITLE_REGEX", DEFAULT_TITLE_REGEX)
-TITLE_RE = re.compile(TITLE_RE_SRC, re.IGNORECASE) if TITLE_RE_SRC else None
-EXCL_RE_SRC = os.environ.get("YC_TITLE_EXCLUDE", DEFAULT_TITLE_EXCLUDE)
-EXCL_RE = re.compile(EXCL_RE_SRC, re.IGNORECASE) if EXCL_RE_SRC else None
+TITLE_RE, EXCL_RE = compile_title_filter(
+    os.environ.get("YC_TITLE_REGEX", DEFAULT_TITLE_REGEX),
+    os.environ.get("YC_TITLE_EXCLUDE", DEFAULT_TITLE_EXCLUDE),
+)
 MAX_DETAIL = int(os.environ.get("YC_MAX_DETAIL", "150"))
 SLEEP = float(os.environ.get("YC_SLEEP", "0.6"))
 

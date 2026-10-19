@@ -117,10 +117,12 @@ def main() -> int:
         log("CF_BASE_URL / CF_INGEST_SECRET missing — cannot send. Exiting.")
         return 2
 
-    # 1. Pull RFJ + IA40 boards + YC jobs into local SQLite, then 2. score unscored jobs.
+    # 1. Pull RFJ + IA40 + YC + named-LA-company boards into local SQLite, then
+    # 2. score unscored jobs.
     _run([sys.executable, os.path.join(HERE, "rfj_to_local_sqlite.py")], "pull-rfj")
     _run([sys.executable, os.path.join(HERE, "ia40_to_local_sqlite.py")], "pull-ia40")
     _run([sys.executable, os.path.join(HERE, "yc_to_local_sqlite.py")], "pull-yc")
+    _run([sys.executable, os.path.join(HERE, "la_companies_to_local_sqlite.py")], "pull-la-companies")
     _run([sys.executable, os.path.join(BACKEND, "pipeline.py"), "--score-only"], "score")
 
     conn = db.get_connection()

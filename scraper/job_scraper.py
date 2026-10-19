@@ -1177,13 +1177,20 @@ def _parse_workday_posted_on(value: str) -> Optional[str]:
 
 
 def _fetch_workday_job_detail(api_root: str, external_path: str) -> Optional[dict]:
-    """Best-effort fetch of the full job posting body. Workday exposes
-    `/wday/cxs/{tenant}/{site}/job/{path}` for individual postings, returning
-    `jobPostingInfo.jobDescription` (HTML). Failure is non-fatal; the listing
-    row itself is enough for the feed."""
+    """Best-effort fetch of the full job posting body. Workday's listing API
+    returns each job's `externalPath` ALREADY prefixed with `/job/...`
+    (verified against snapchat.wd1 2026-10-18: `/job/Remote---Washington/
+    Integrated-Circuit-Design-Verification-Engineer_R0046055`), so the detail
+    endpoint is just that path joined onto `/wday/cxs/{tenant}/{site}` — NOT
+    `.../{site}/job` + external_path, which double-prefixes to `.../job/job/...`
+    and 404s. Confirmed working shape: `{tenant}.{host}.myworkdayjobs.com/
+    wday/cxs/{tenant}/{site}{external_path}` -> `{"jobPostingInfo": {...
+    "jobDescription": "<html>", ...}}`. Failure is non-fatal; the listing row
+    itself is enough for the feed."""
     try:
-        # api_root is …/wday/cxs/{tenant}/{site}/jobs ; strip trailing /jobs.
-        detail_url = api_root.rsplit("/", 1)[0] + "/job" + external_path
+        # api_root is …/wday/cxs/{tenant}/{site}/jobs ; strip trailing /jobs,
+        # then join external_path (which already starts with /job/...).
+        detail_url = api_root.rsplit("/", 1)[0] + external_path
         return _get(detail_url)
     except Exception:
         return None

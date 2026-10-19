@@ -1,0 +1,276 @@
+# LA-based company career sites to scrape and match daily.
+# Source: owner-supplied "LA Based Company Career Site List.csv" (2026-10-18).
+# Each entry's ats/slug (or workday tenant/host/site) was VERIFIED by a live
+# API probe before being added here — see scripts/README.md for the method
+# and scripts/la_companies_resolution_notes.md for the evidence trail.
+#
+# ats: greenhouse | lever | ashby | smartrecruiters | workday
+# slug: required for greenhouse/lever/ashby/smartrecruiters
+# workday: {tenant, host, site} — required for ats: workday
+#
+# `excluded:` below lists companies with no public structured job-board API
+# (confirmed, not just unresolved) — the loader does not fetch them, but they
+# stay listed here so the next refresh knows what was already checked and why.
+
+companies:
+  # ─── Big Tech / Media Giants ───────────────────────────────────────────
+  - name: "Snap Inc."
+    category: big_tech_media
+    hq: "Santa Monica, CA"
+    ats: workday
+    workday: {tenant: snapchat, host: wd1, site: snap}
+    careers_url: "https://careers.snap.com/"
+  - name: "SpaceX"
+    category: big_tech_media
+    hq: "Hawthorne, CA"
+    ats: greenhouse
+    slug: spacex
+    careers_url: "https://www.spacex.com/careers"
+  - name: "Riot Games"
+    category: big_tech_media
+    hq: "West Los Angeles, CA"
+    ats: greenhouse
+    slug: riotgames
+    careers_url: "https://www.riotgames.com/en/work-with-us/jobs"
+  - name: "Hulu (Disney)"
+    category: big_tech_media
+    hq: "Santa Monica, CA"
+    ats: workday
+    workday: {tenant: disney, host: wd5, site: disneycareer}
+    careers_url: "https://jobs.disneycareers.com/"
+  - name: "Pinterest"
+    category: big_tech_media
+    hq: "Culver City, CA"
+    ats: greenhouse
+    slug: pinterest
+    careers_url: "https://www.pinterestcareers.com/jobs/"
+  - name: "Cloudflare"
+    category: big_tech_media
+    hq: "Venice, CA"
+    ats: greenhouse
+    slug: cloudflare
+    careers_url: "https://www.cloudflare.com/careers/"
+  - name: "Ring (Amazon)"
+    category: big_tech_media
+    hq: "Santa Monica, CA"
+    ats: amazon_jobs
+    amazon_query: "Ring"
+    careers_url: "https://www.amazon.jobs/en/search?base_query=Ring"
+  - name: "Activision Blizzard"
+    category: big_tech_media
+    hq: "Santa Monica, CA"
+    ats: workday
+    workday: {tenant: xboxgaming, host: wd1, site: External}
+    careers_url: "https://careers.activisionblizzard.com/"
+  - name: "Sony PlayStation (Santa Monica Studio)"
+    category: big_tech_media
+    hq: "West Los Angeles, CA"
+    ats: greenhouse
+    slug: sonyinteractiveentertainmentglobal
+    careers_url: "https://www.playstation.com/en-us/corporate/playstation-careers/"
+  - name: "Netflix"
+    category: big_tech_media
+    hq: "Hollywood, CA"
+    ats: eightfold
+    eightfold_base: "https://explore.jobs.netflix.net"
+    eightfold_domain: "netflix.com"
+    careers_url: "https://jobs.netflix.com/"
+    note: "moved off Greenhouse to an Eightfold-hosted board; the old greenhouse/netflix slug now returns 0 jobs"
+
+  # ─── Defense Tech & Hard Tech ───────────────────────────────────────────
+  - name: "Anduril Industries"
+    category: defense_hard_tech
+    hq: "Costa Mesa, CA"
+    ats: greenhouse
+    slug: andurilindustries
+    careers_url: "https://www.anduril.com/careers"
+  - name: "Relativity Space"
+    category: defense_hard_tech
+    hq: "Long Beach, CA"
+    ats: greenhouse
+    slug: relativity
+    careers_url: "https://www.relativityspace.com/careers"
+  - name: "AnySignal"
+    category: defense_hard_tech
+    hq: "Torrance, CA"
+    ats: ashby
+    slug: anysignal
+    careers_url: "https://www.anysignal.com/"
+  - name: "The Aerospace Corporation"
+    category: defense_hard_tech
+    hq: "El Segundo, CA"
+    ats: workday
+    workday: {tenant: aero, host: wd5, site: External}
+    careers_url: "https://aerospace.org/careers"
+  - name: "Hadrian"
+    category: defense_hard_tech
+    hq: "Torrance, CA"
+    ats: ashby
+    slug: hadrian-automation
+    careers_url: "https://www.hadrian.co/careers"
+  - name: "True Anomaly"
+    category: defense_hard_tech
+    hq: "El Segundo, CA"
+    ats: greenhouse
+    slug: trueanomalyinc
+    careers_url: "https://www.trueanomaly.space/careers"
+  - name: "Slingshot Aerospace"
+    category: defense_hard_tech
+    hq: "El Segundo, CA"
+    ats: ashby
+    slug: slingshot-aerospace
+    careers_url: "https://slingshotaerospace.com/careers/"
+
+  # ─── Frontier Labs, Robotics & Biotech ─────────────────────────────────
+  - name: "Amgen (AI Lab)"
+    category: frontier_robotics_biotech
+    hq: "Thousand Oaks, CA"
+    ats: workday
+    workday: {tenant: amgen, host: wd1, site: Careers}
+    careers_url: "https://careers.amgen.com/"
+  - name: "Machina Labs"
+    category: frontier_robotics_biotech
+    hq: "Chatsworth, CA"
+    ats: lever
+    slug: MachinaLabs
+    careers_url: "https://www.machinalabs.ai/careers"
+  - name: "10a Labs"
+    category: frontier_robotics_biotech
+    hq: "Los Angeles, CA"
+    ats: greenhouse
+    slug: 10alabs
+    careers_url: "https://job-boards.greenhouse.io/10alabs"
+
+  # ─── Enterprise SaaS, Fintech & Consumer ───────────────────────────────
+  - name: "Headspace"
+    category: enterprise_saas_fintech_consumer
+    hq: "Santa Monica, CA"
+    ats: greenhouse
+    slug: hs
+    careers_url: "https://www.headspace.com/careers"
+  - name: "Esri"
+    category: enterprise_saas_fintech_consumer
+    hq: "Redlands, CA"
+    ats: greenhouse
+    slug: esri
+    careers_url: "https://www.esri.com/en-us/about/careers/overview"
+  - name: "ZipRecruiter"
+    category: enterprise_saas_fintech_consumer
+    hq: "Santa Monica, CA"
+    ats: greenhouse
+    slug: ziprecruiter
+    careers_url: "https://www.ziprecruiter.com/careers"
+  - name: "Tinder (Match Group)"
+    category: enterprise_saas_fintech_consumer
+    hq: "West Hollywood, CA"
+    ats: lever
+    slug: matchgroup
+    careers_url: "https://www.matchgroup.com/careers"
+  - name: "FloQast"
+    category: enterprise_saas_fintech_consumer
+    hq: "Los Angeles, CA"
+    ats: lever
+    slug: floqast
+    careers_url: "https://floqast.com/careers/"
+  - name: "ChowNow"
+    category: enterprise_saas_fintech_consumer
+    hq: "Los Angeles, CA"
+    ats: lever
+    slug: chownow
+    careers_url: "https://www.chownow.com/careers/"
+  - name: "Metropolis Technologies"
+    category: enterprise_saas_fintech_consumer
+    hq: "Los Angeles, CA"
+    ats: greenhouse
+    slug: metropolis
+    careers_url: "https://www.metropolis.io/careers"
+  - name: "ServiceNow"
+    category: enterprise_saas_fintech_consumer
+    hq: "Los Angeles, CA"
+    ats: smartrecruiters
+    slug: servicenow
+    careers_url: "https://www.servicenow.com/careers.html"
+  - name: "The Honest Company"
+    category: enterprise_saas_fintech_consumer
+    hq: "Playa Vista, CA"
+    ats: greenhouse
+    slug: thehonestcompany
+    careers_url: "https://www.honest.com/careers.html"
+  - name: "BlackLine Systems"
+    category: enterprise_saas_fintech_consumer
+    hq: "Woodland Hills, CA"
+    ats: workday
+    workday: {tenant: blackline, host: wd108, site: BlackLineCareers}
+    careers_url: "https://www.blackline.com/about/careers/"
+
+  # ─── Gaming Studios ─────────────────────────────────────────────────────
+  - name: "Scopely"
+    category: gaming_studios
+    hq: "Culver City, CA"
+    ats: greenhouse
+    slug: scopely
+    careers_url: "https://www.scopely.com/en/careers"
+
+  # ─── High-Growth Startups ───────────────────────────────────────────────
+  - name: "Varda Space Industries"
+    category: high_growth_startups
+    hq: "El Segundo, CA"
+    ats: greenhouse
+    slug: vardaspace
+    careers_url: "https://www.varda.com/"
+  - name: "Paragon"
+    category: high_growth_startups
+    hq: "Los Angeles, CA"
+    ats: ashby
+    slug: paragon
+    careers_url: "https://www.useparagon.com/careers"
+  - name: "Apex"
+    category: high_growth_startups
+    hq: "Los Angeles, CA"
+    ats: ashby
+    slug: apex-technology-inc
+    careers_url: "https://www.apexspace.com/"
+    note: "satellite manufacturer — distinct from the IT staffing firm Apex Systems"
+
+excluded:
+  # Confirmed no public structured ATS board, not just unresolved (2026-10-18
+  # research pass). Kept here so a future refresh doesn't re-probe them.
+  - name: "Bionaut Labs"
+    reason: "site is a bare splash page; no Greenhouse/Lever/Ashby/SmartRecruiters board found"
+    careers_url: "https://www.bionautlabs.com/careers"
+  - name: "Electronic Arts (EA / Respawn)"
+    reason: "uses Avature (not one of the 5 fetchers this loader supports)"
+    careers_url: "https://www.ea.com/careers"
+  - name: "Open Actuation"
+    reason: "apply via email only (careers@openactuation.com), no ATS"
+    careers_url: "https://www.ycombinator.com/companies/open-actuation"
+  - name: "Inflection Space Systems"
+    reason: "apply via email only, no ATS"
+    careers_url: "https://www.ycombinator.com/companies/inflection-space-systems"
+  - name: "Honeylove"
+    reason: "careers page renders no job content; no ATS link found (jobs surface only on third-party aggregators)"
+    careers_url: "https://www.honeylove.com/pages/careers"
+  - name: "Funktronic Labs"
+    reason: "single-page studio splash site, no careers section at all"
+    careers_url: "http://funktroniclabs.com/"
+  - name: "Product.ai"
+    reason: "proprietary apply flow (video + trial), no ATS link"
+    careers_url: "https://product.ai/join/careers/"
+  - name: "Whatnot"
+    reason: "hosted Ashby board page exists (jobs.ashbyhq.com/whatnot) but the public posting-api endpoint 404s; needs an embedded-JSON scraper to re-add, not built in this pass"
+    careers_url: "https://www.whatnot.com/careers"
+  - name: "Apple"
+    reason: "jobs.apple.com's search API requires an authenticated session (401 Unauthorized on a plain request); the job-detail endpoint works once you have a real job id, but there's no public way to list ids. Matches this repo's existing scraper/job_scraper.py COMPANIES entry, which also marks Apple custom."
+    careers_url: "https://jobs.apple.com/en-us/search?location=los-angeles-metro-area-LAMETRO"
+  - name: "Meta"
+    reason: "metacareers.com is a GraphQL app with no public unauthenticated endpoint found; matches the existing custom entry in scraper/job_scraper.py"
+    careers_url: "https://www.metacareers.com/"
+  - name: "Microsoft"
+    reason: "careers.microsoft.com's search API did not respond to a direct probe (likely requires browser-origin headers/auth); matches the existing custom entry in scraper/job_scraper.py"
+    careers_url: "https://careers.microsoft.com/"
+  - name: "TikTok"
+    reason: "careers.tiktok.com's search API redirects (302) rather than returning JSON directly; needs browser-session handling not built in this pass"
+    careers_url: "https://careers.tiktok.com/"
+  - name: "Google"
+    reason: "careers.google.com's public API paths tried all returned 404; matches the existing custom entry in scraper/job_scraper.py"
+    careers_url: "https://www.google.com/about/careers/"
