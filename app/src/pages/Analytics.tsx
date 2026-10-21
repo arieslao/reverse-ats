@@ -71,7 +71,8 @@ function WeeklyChart({ data }: { data: { week: string; discovered: number; appli
   const maxVal = Math.max(...data.flatMap((d) => [d.discovered, d.applied]), 1)
 
   return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 120, paddingBottom: 24, position: 'relative' }}>
+    <div className="x-scroll">
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', height: 120, paddingBottom: 24, position: 'relative', minWidth: 300 }}>
       {data.map((week) => (
         <div
           key={week.week}
@@ -104,6 +105,7 @@ function WeeklyChart({ data }: { data: { week: string; discovered: number; appli
           </div>
         </div>
       ))}
+    </div>
     </div>
   )
 }
@@ -160,7 +162,7 @@ export function Analytics() {
   )
 
   return (
-    <div style={{ padding: '24px', maxWidth: 1000, margin: '0 auto' }}>
+    <div className="page" style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
           Analytics
@@ -171,7 +173,7 @@ export function Analytics() {
       </div>
 
       {/* Key metrics */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="grid-3" style={{ gap: 12, marginBottom: 24 }}>
         <MetricCard
           label="Total Discovered"
           value={analytics.total_discovered}
@@ -192,7 +194,7 @@ export function Analytics() {
       </div>
 
       {/* Funnel + Weekly charts */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div className="grid-2" style={{ gap: 16, marginBottom: 24 }}>
         <div
           style={{
             background: 'var(--color-bg-elevated)',
@@ -250,6 +252,7 @@ export function Analytics() {
             No company data yet
           </div>
         ) : (
+          <div className="x-scroll">
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr>
@@ -309,6 +312,7 @@ export function Analytics() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

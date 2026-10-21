@@ -108,6 +108,7 @@ body {
 #root {
   width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 ::-webkit-scrollbar {
@@ -129,4 +130,253 @@ body {
 h1, h2, h3, h4 {
   font-family: var(--font-display);
   letter-spacing: -0.022em;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+/* ─── Responsive layout ───────────────────────────────────────────────────────
+ *
+ * Components style themselves inline; only the properties that must change
+ * with viewport width live here, so a breakpoint can override them.
+ * Phone = ≤767px. Tablet-only tweaks = ≤1023px.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+.app-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.app-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.app-topbar,
+.app-tabbar {
+  display: none;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-muted);
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+.icon-btn-accent {
+  border-color: rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-accent);
+}
+.icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.page {
+  padding: 24px;
+}
+.pipeline-page {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.pipeline-board {
+  display: flex;
+  gap: 10px;
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  padding-bottom: 8px;
+}
+.pipeline-col {
+  flex-shrink: 0;
+  width: 280px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* minmax(0, 1fr) rather than 1fr: a bare 1fr track refuses to shrink below
+ * its content, so one long unbreakable string widens the whole grid. */
+.grid-2,
+.grid-3,
+.grid-4 {
+  display: grid;
+}
+.grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+.inv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 90px minmax(0, 1.4fr) 24px;
+}
+
+.tabs-row {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabs-row::-webkit-scrollbar {
+  display: none;
+}
+.tabs-row > button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.x-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fb-item { flex: 0 0 auto; }
+.fb-grow { flex: 1 1 200px; }
+.fb-range { width: 120px; }
+.loc-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.loc-list { max-height: 280px; }
+
+/* Touch devices have no hover: keep the per-card archive control visible. */
+@media (hover: none) {
+  .card-x {
+    color: var(--color-text-tertiary) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .app-sidebar {
+    display: none;
+  }
+  .app-topbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    padding-top: calc(10px + env(safe-area-inset-top));
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-base);
+    flex-shrink: 0;
+  }
+  .app-tabbar {
+    display: flex;
+    flex-shrink: 0;
+    border-top: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-base);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .app-tabbar a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 4px 6px;
+    font-size: 10px;
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--color-text-tertiary);
+  }
+  .app-tabbar a.active {
+    color: var(--color-accent);
+  }
+
+  .page {
+    padding: 16px;
+  }
+  .pipeline-board {
+    gap: 12px;
+    scroll-snap-type: x mandatory;
+  }
+  .pipeline-col {
+    width: min(300px, calc(100vw - 48px));
+    scroll-snap-align: start;
+  }
+
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .inv-row {
+    grid-template-columns: minmax(0, 1fr) 64px 24px;
+  }
+  .inv-row > .inv-basis {
+    grid-column: 1 / -1;
+  }
+  .inv-row > .inv-x {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .x-scroll th {
+    white-space: nowrap;
+  }
+
+  .fb-item {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
+  }
+  .fb-item select {
+    width: 100%;
+  }
+  .fb-grow {
+    flex: 1 1 100%;
+  }
+  .fb-range {
+    width: 100%;
+  }
+  .loc-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .loc-list {
+    max-height: 160px;
+  }
+  .stat-divider {
+    display: none;
+  }
+
+  /* iOS Safari zooms the page when a focused control is under 16px. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
 }

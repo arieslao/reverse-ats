@@ -128,7 +128,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
       {/* Row 1: Search, Category, Sort */}
       <div style={rowStyle}>
         {/* Search */}
-        <div style={{ flex: '1 1 200px', minWidth: 160 }}>
+        <div className="fb-grow" style={{ minWidth: 160 }}>
           <label style={labelStyle}>Search</label>
           <input
             type="text"
@@ -140,7 +140,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
         </div>
 
         {/* Industry */}
-        <div style={{ flex: '0 0 auto' }}>
+        <div className="fb-item">
           <label style={labelStyle}>Industry</label>
           <select
             value={local.category}
@@ -156,7 +156,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
         </div>
 
         {/* Sort */}
-        <div style={{ flex: '0 0 auto' }}>
+        <div className="fb-item">
           <label style={labelStyle}>Sort By</label>
           <select
             value={local.sort_by || 'score'}
@@ -172,7 +172,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
         </div>
 
         {/* Application status */}
-        <div style={{ flex: '0 0 auto' }}>
+        <div className="fb-item">
           <label style={labelStyle}>Status</label>
           <select
             value={local.stage || ''}
@@ -195,7 +195,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
       {/* Row 2: Min Score, New Since, Remote Only, Exclude Companies, Clear */}
       <div style={{ ...rowStyle, alignItems: 'flex-end' }}>
         {/* Min Score */}
-        <div style={{ flex: '0 0 auto', minWidth: 140 }}>
+        <div className="fb-item" style={{ minWidth: 140 }}>
           <label style={labelStyle}>Min Score: {local.min_score}</label>
           <input
             type="range"
@@ -204,12 +204,13 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
             step={5}
             value={local.min_score}
             onChange={(e) => update({ min_score: Number(e.target.value) })}
-            style={{ width: 120, accentColor: 'var(--color-accent)', cursor: 'pointer' }}
+            className="fb-range"
+            style={{ accentColor: 'var(--color-accent)', cursor: 'pointer' }}
           />
         </div>
 
         {/* New Since */}
-        <div style={{ flex: '0 0 auto' }}>
+        <div className="fb-item">
           <label style={labelStyle}>New Since</label>
           <select
             value={local.since_days}
@@ -226,7 +227,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
         </div>
 
         {/* Remote Only */}
-        <div style={{ flex: '0 0 auto', display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
+        <div className="fb-item" style={{ display: 'flex', alignItems: 'center', gap: 8, paddingBottom: 2 }}>
           <label style={{ ...labelStyle, marginBottom: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             <div
               onClick={() => update({ remote_only: !local.remote_only })}
@@ -260,7 +261,7 @@ export function FilterBar({ filters, onChange, industries, locationsData, matchi
         </div>
 
         {/* Exclude Companies */}
-        <div style={{ flex: '1 1 160px', minWidth: 140 }}>
+        <div className="fb-grow" style={{ minWidth: 140 }}>
           <label style={labelStyle}>Exclude Companies</label>
           <input
             type="text"
@@ -480,7 +481,7 @@ function LocationsPicker({
           )}
 
           {data && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+            <div className="loc-grid" style={{ gap: 14 }}>
               <LocationGroup
                 title="Countries"
                 items={filtered.countries}
@@ -619,7 +620,7 @@ function LocationGroup({
       {items.length === 0 ? (
         <div style={{ fontSize: 11, color: 'var(--color-text-muted)', padding: '6px 0' }}>—</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 280, overflow: 'auto' }}>
+        <div className="loc-list" style={{ display: 'flex', flexDirection: 'column', gap: 2, overflow: 'auto' }}>
           {items.map((t) => {
             const isSelected = selectedLower.has(t.name.toLowerCase())
             return (

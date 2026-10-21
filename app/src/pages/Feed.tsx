@@ -178,7 +178,7 @@ export function Feed() {
       : 0
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 24px' }}>
+    <div className="page" style={{ maxWidth: 900, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 20, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
@@ -216,17 +216,11 @@ export function Feed() {
             ;(e.currentTarget as HTMLButtonElement).style.color = isRefreshing ? 'var(--color-text-muted)' : 'var(--color-text-secondary)'
           }}
         >
-          <span
-            style={{
-              display: 'inline-block',
-              animation: isRefreshing ? 'spin 0.8s linear infinite' : 'none',
-            }}
-          >
+          <span className={isRefreshing ? 'spin' : undefined} style={{ display: 'inline-block' }}>
             ↻
           </span>
           {isRefreshing ? 'Refreshing...' : 'Refresh'}
         </button>
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
       </div>
 
       {refreshMsg && (
@@ -268,15 +262,15 @@ export function Feed() {
           }}
         >
           <Stat label="Total Results" value={data.total} />
-          <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
+          <div className="stat-divider" style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
           <Stat label="New Today" value={newToday} color="var(--color-success)" />
-          <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
+          <div className="stat-divider" style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
           <Stat label="Avg Score" value={avgScore} color={avgScore >= 70 ? 'var(--color-success)' : avgScore >= 50 ? 'var(--color-accent)' : 'var(--color-text-secondary)'} />
-          <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
+          <div className="stat-divider" style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
           <Stat label="Page" value={`${page} / ${totalPages}`} />
           {scrapeStatus?.last_run && (
             <>
-              <div style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
+              <div className="stat-divider" style={{ width: 1, background: 'var(--color-border-muted)', alignSelf: 'stretch' }} />
               <Stat label="Last Scraped" value={timeAgoFromNow(scrapeStatus.last_run)} color="var(--color-text-tertiary)" />
             </>
           )}
@@ -360,7 +354,7 @@ export function Feed() {
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
         <button
           onClick={() => setFilters((f) => ({ ...f, min_score: f.min_score >= 90 ? 0 : 90, sort_by: 'score' }))}
           style={{
@@ -392,6 +386,7 @@ export function Feed() {
             alignItems: 'center',
             gap: 8,
             marginTop: 24,
+            flexWrap: 'wrap',
           }}
         >
           <PagBtn

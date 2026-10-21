@@ -314,6 +314,7 @@ function EntryCard({ entry, isDragging, onDragStart, onDragEnd, onArchive }: Ent
               setShowArchiveConfirm(true)
             }}
             title="Archive application"
+            className="card-x"
             style={{
               background: 'none',
               border: 'none',
@@ -769,15 +770,7 @@ export function Pipeline() {
   ).length
 
   return (
-    <div
-      style={{
-        padding: '24px',
-        height: '100vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    <div className="page pipeline-page">
       {/* Header */}
       <div
         style={{
@@ -828,15 +821,7 @@ export function Pipeline() {
       )}
 
       {!isLoading && !isError && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 10,
-            overflow: 'auto',
-            flex: 1,
-            paddingBottom: 8,
-          }}
-        >
+        <div className="pipeline-board">
           {STAGES.map((stage) => {
             const entries: PipelineEntry[] = byStage[stage] || []
             const isDragTarget = dragOverStage === stage
@@ -864,15 +849,11 @@ export function Pipeline() {
                   setDraggedId(null)
                   setDragOverStage(null)
                 }}
+                className="pipeline-col"
                 style={{
-                  flexShrink: 0,
-                  width: 280,
                   background: isDragTarget ? 'rgba(59,130,246,0.04)' : 'var(--color-bg-base)',
                   border: `1px solid ${isDragTarget ? 'var(--color-accent)' : 'var(--color-bg-elevated)'}`,
                   borderRadius: 8,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  maxHeight: '100%',
                   transition: 'border-color 0.15s, background 0.15s',
                 }}
               >

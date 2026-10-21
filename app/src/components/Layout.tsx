@@ -1,7 +1,7 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { triggerScrape } from '../lib/api'
-import { useTheme } from '../lib/theme'
+import { useTheme, type Theme } from '../lib/theme'
 
 const NAV_ITEMS = [
   {
@@ -47,22 +47,105 @@ const NAV_ITEMS = [
   },
 ]
 
+function BrandMark() {
+  return (
+    <div
+      style={{
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        background: 'linear-gradient(135deg, var(--color-accent) 0%, #1d4ed8 100%)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+      }}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 7.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 15z" />
+      </svg>
+    </div>
+  )
+}
+
+function BrandText() {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
+        Reverse ATS
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>JOB TRACKER</div>
+    </div>
+  )
+}
+
+function ThemeGlyph({ theme }: { theme: Theme }) {
+  return theme === 'dark' ? (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function ScrapeGlyph({ spinning }: { spinning: boolean }) {
+  return (
+    <svg
+      className={spinning ? 'spin' : undefined}
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  )
+}
+
 export function Layout() {
   const scrapeMut = useMutation({ mutationFn: triggerScrape })
   const { theme, toggle: toggleTheme } = useTheme()
+  const themeTitle = `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--color-bg-base)' }}>
-      {/* Sidebar */}
+    <div className="app-shell" style={{ background: 'var(--color-bg-base)' }}>
+      {/* Mobile top bar (phones only) */}
+      <header className="app-topbar">
+        <BrandMark />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <BrandText />
+        </div>
+        <button className="icon-btn" onClick={toggleTheme} title={themeTitle} aria-label={themeTitle}>
+          <ThemeGlyph theme={theme} />
+        </button>
+        <button
+          className="icon-btn icon-btn-accent"
+          onClick={() => scrapeMut.mutate()}
+          disabled={scrapeMut.isPending}
+          title="Trigger scrape"
+          aria-label="Trigger scrape"
+          style={{ color: scrapeMut.isError ? 'var(--color-danger)' : scrapeMut.isSuccess ? 'var(--color-success)' : undefined }}
+        >
+          {scrapeMut.isSuccess && !scrapeMut.isPending ? '✓' : <ScrapeGlyph spinning={scrapeMut.isPending} />}
+        </button>
+      </header>
+
+      {/* Sidebar (tablet / desktop) */}
       <aside
+        className="app-sidebar"
         style={{
-          width: 220,
-          flexShrink: 0,
           background: 'var(--color-bg-base)',
           borderRight: '1px solid var(--color-bg-elevated)',
-          display: 'flex',
-          flexDirection: 'column',
-          height: '100vh',
         }}
       >
         {/* Logo */}
@@ -73,28 +156,8 @@ export function Layout() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 6,
-                background: 'linear-gradient(135deg, var(--color-accent) 0%, #1d4ed8 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.36 10a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.11 0h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 7.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21 15z" />
-              </svg>
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.01em' }}>
-                Reverse ATS
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--color-text-muted)', letterSpacing: '0.05em' }}>JOB TRACKER</div>
-            </div>
+            <BrandMark />
+            <BrandText />
           </div>
         </div>
 
@@ -170,7 +233,7 @@ export function Layout() {
           {/* Theme toggle — light/dark switch matching the marketing site */}
           <button
             onClick={toggleTheme}
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={themeTitle}
             style={{
               width: '100%',
               background: 'transparent',
@@ -196,16 +259,7 @@ export function Layout() {
               ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-border-muted)'
             }}
           >
-            {theme === 'dark' ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-              </svg>
-            )}
+            <ThemeGlyph theme={theme} />
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
           <button
@@ -230,11 +284,7 @@ export function Layout() {
               transition: 'all 0.15s',
             }}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
+            <ScrapeGlyph spinning={false} />
             {scrapeMut.isPending ? 'Scraping...' : 'Trigger Scrape'}
           </button>
 
@@ -252,15 +302,21 @@ export function Layout() {
       </aside>
 
       {/* Main content */}
-      <main
-        style={{
-          flex: 1,
-          overflow: 'auto',
-          background: 'var(--color-bg-base)',
-        }}
-      >
+      <main className="app-main" style={{ background: 'var(--color-bg-base)' }}>
         <Outlet />
       </main>
+
+      {/* Mobile bottom tab bar (phones only). The Apply Console link is
+          intentionally absent here: it points at 127.0.0.1:8765 on the Mac
+          running the apply-agent, which a phone can't reach. */}
+      <nav className="app-tabbar" aria-label="Primary">
+        {NAV_ITEMS.map((item) => (
+          <NavLink key={item.path} to={item.path}>
+            {item.icon}
+            <span>{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

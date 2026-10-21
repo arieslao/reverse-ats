@@ -195,7 +195,7 @@ function ProfileTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <Section title="Resume">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10, flexWrap: 'wrap' }}>
           <label
             style={{
               display: 'inline-block', padding: '6px 14px', borderRadius: 6, cursor: 'pointer',
@@ -260,7 +260,7 @@ function ProfileTab() {
         }}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div className="grid-2" style={{ gap: 16 }}>
         <Section title="Target Roles">
           <TagInput
             value={form.target_roles || []}
@@ -310,7 +310,7 @@ function ProfileTab() {
         </Section>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
+      <div className="grid-4" style={{ gap: 16 }}>
         <Section title="Min Seniority">
           <select
             value={form.min_seniority || ''}
@@ -412,7 +412,7 @@ function ProfileTab() {
         </div>
       </Section>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button
           onClick={() => updateMut.mutate(form)}
           disabled={updateMut.isPending}
@@ -494,7 +494,7 @@ function InventoryPanel() {
       {err && <div style={{ color: '#dc2626', fontSize: 12, marginBottom: 8 }}>{err}</div>}
 
       {/* Editable skill GROUPS — Skill/Group | Years | Basis */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>Skill groups ({skills.length}) — years reasoned from your dated history</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={add} style={{ ...primaryBtnStyle, background: 'transparent', border: '1px solid var(--color-border, #444)', color: 'inherit', padding: '4px 10px' }}>+ Add group</button>
@@ -507,11 +507,11 @@ function InventoryPanel() {
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>No skills yet — extract from your résumé or paste LinkedIn text above.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 90px 1.4fr 24px', gap: 8, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
-            <div>Skill / Group</div><div>Years</div><div>Basis (from dated history)</div><div></div>
+          <div className="inv-row" style={{ gap: 8, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
+            <div>Skill / Group</div><div>Years</div><div className="inv-basis">Basis (from dated history)</div><div className="inv-x"></div>
           </div>
           {skills.map((s, i) => (
-            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1.4fr 90px 1.4fr 24px', gap: 8, alignItems: 'start' }}>
+            <div key={i} className="inv-row" style={{ gap: 8, alignItems: 'start' }}>
               <div>
                 <input value={s.name} onChange={(e) => update(i, { name: e.target.value })} placeholder="Group name" style={{ ...inputStyle, width: '100%', fontWeight: 600 }} />
                 <input
@@ -522,8 +522,8 @@ function InventoryPanel() {
                 />
               </div>
               <input value={s.years_label || ''} onChange={(e) => update(i, { years_label: e.target.value })} placeholder="~5 yrs" style={{ ...inputStyle, width: '100%' }} />
-              <textarea value={s.basis || ''} onChange={(e) => update(i, { basis: e.target.value })} placeholder="e.g. Kaiser 2017–2022" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical', fontSize: 11 }} />
-              <button onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 14, paddingTop: 4 }} title="Remove">×</button>
+              <textarea className="inv-basis" value={s.basis || ''} onChange={(e) => update(i, { basis: e.target.value })} placeholder="e.g. Kaiser 2017–2022" rows={2} style={{ ...inputStyle, width: '100%', resize: 'vertical', fontSize: 11 }} />
+              <button className="inv-x" onClick={() => remove(i)} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: 14, paddingTop: 4 }} title="Remove">×</button>
             </div>
           ))}
         </div>
@@ -624,7 +624,7 @@ function SuggestRolesPanel({
         padding: 14,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
             AI Role Suggestions
@@ -649,7 +649,7 @@ function SuggestRolesPanel({
       {/* Results */}
       {open && data && !apiError && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div className="grid-2" style={{ gap: 14 }}>
             <SuggestionList
               heading="Strong fit now"
               subheading="Based on your current experience"
@@ -966,7 +966,7 @@ function CompanyTab() {
       <IndustryPacks />
 
       {/* Toolbar */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <select
           value={filterCat}
           onChange={(e) => setFilterCat(e.target.value)}
@@ -1015,7 +1015,7 @@ function CompanyTab() {
       )}
 
       {/* Table */}
-      <div style={{ border: '1px solid var(--color-border-muted)', borderRadius: 8, overflow: 'hidden' }}>
+      <div className="x-scroll" style={{ border: '1px solid var(--color-border-muted)', borderRadius: 8 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: 'var(--color-bg-base)' }}>
@@ -1148,7 +1148,7 @@ function CompanyFormFields({
   setForm: React.Dispatch<React.SetStateAction<CompanyFormData>>
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+    <div className="grid-3" style={{ gap: 10 }}>
       <FieldWrap label="Company Name *">
         <input
           type="text"
@@ -1227,7 +1227,7 @@ function ScrapeTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 640 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <button
           onClick={() => triggerMut.mutate()}
           disabled={triggerMut.isPending}
@@ -1253,7 +1253,7 @@ function ScrapeTab() {
             Last Scrape Run
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+          <div className="grid-2" style={{ gap: 12, marginBottom: 16 }}>
             <StatRow label="Started" value={formatDatetime(status.started_at)} />
             <StatRow label="Completed" value={formatDatetime(status.completed_at)} />
             <StatRow label="Total Fetched" value={status.total_fetched} highlight />
@@ -1345,6 +1345,7 @@ function BackupsCard() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 gap: 12,
+                flexWrap: 'wrap',
                 padding: '6px 10px',
                 background: 'var(--color-bg-base)',
                 border: '1px solid var(--color-border-muted)',
@@ -1603,11 +1604,11 @@ function LLMTab() {
                   style={{ accentColor: 'var(--color-accent)', marginTop: 2, flexShrink: 0 }}
                 />
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 13, fontWeight: 500, color: selected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
                       {p.name}
                     </span>
-                    <span style={{ fontSize: 11, color: selected ? '#60a5fa' : 'var(--color-text-muted)', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 11, color: selected ? '#60a5fa' : 'var(--color-text-muted)' }}>
                       {PROVIDER_COST_NOTES[p.id]}
                     </span>
                   </div>
@@ -1680,7 +1681,7 @@ function LLMTab() {
               </FieldWrap>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div className="grid-2" style={{ gap: 12 }}>
               <FieldWrap label={`Temperature: ${temperature.toFixed(1)}`}>
                 <input
                   type="range"
@@ -1880,7 +1881,7 @@ function RescoreCard() {
         gap: 12,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Score Coverage
         </div>
@@ -1958,7 +1959,7 @@ export function Admin() {
   const [activeTab, setActiveTab] = useState('profile')
 
   return (
-    <div style={{ padding: '24px', maxWidth: 1100, margin: '0 auto' }}>
+    <div className="page" style={{ maxWidth: 1100, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: '-0.02em' }}>
           Admin
@@ -1969,7 +1970,7 @@ export function Admin() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--color-border-muted)', paddingBottom: 0 }}>
+      <div className="tabs-row" style={{ marginBottom: 20, borderBottom: '1px solid var(--color-border-muted)' }}>
         {TABS.map((tab) => (
           <button
             key={tab.id}
